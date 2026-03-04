@@ -1,7 +1,595 @@
+// ============================================================
+// INKORA - Prisma Schema
+// Generator: prisma-client-js
+// DB: PostgreSQL
+// Based on: INKORA DBML v1.0 (28 tables)
+// ============================================================
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider  = "postgresql"
+  provider = "postgresql"
+}
+
+// ==================== ENUMS ====================
+
+enum UserType {
+  client
+  admin
+  root
+}
+
+enum UserStatus {
+  active
+  inactive
+  blocked
+}
+
+enum BookCondition {
+  new
+  used
+}
+
+enum StoreStatus {
+  active
+  inactive
+}
+
+enum DeliveryMode {
+  homeDelivery
+  storePickup
+}
+
+enum PurchaseStatus {
+  inPreparation
+  shipped
+  delivered
+  cancelled
+}
+
+enum ReservationStatus {
+  active
+  cancelled
+  expired
+  converted
+}
+
+enum ReturnReason {
+  badCondition
+  didNotMeetExpectations
+  lateDelivery
+}
+
+enum ReturnStatus {
+  pending
+  approved
+  rejected
+}
+
+enum RefundStatus {
+  pending
+  processed
+  rejected
+}
+
+enum CardType {
+  credit
+  debit
+}
+
+enum TransactionType {
+  payment
+  refund
+}
+
+enum CartStatus {
+  active
+  processed
+}
+
+enum ConversationStatus {
+  active
+  closed
+}
+
+enum NotificationType {
+  newBook
+  birthday
+  message
+  orderStatus
+}
+
+enum NotificationChannel {
+  email
+  push
+}
+
+enum NotificationLogStatus {
+  pending
+  sent
+  failed
+}
+
+// ==================== USERS ====================
+
+model User {
+  userId           Int        @id @default(autoincrement())
+  dni              String     @unique @db.VarChar(20)
+  firstName        String     @db.VarChar(100)
+  lastName         String     @db.VarChar(100)
+  email            String     @unique @db.VarChar(150)
+  username         String     @unique @db.VarChar(50)
+  passwordHash     String     @db.VarChar(255)
+  birthDate        DateTime   @db.Date
+  birthPlace       String?    @db.VarChar(100)
+  address          String?    @db.VarChar(255)
+  gender           String?    @db.VarChar(20)
+  userType         UserType
+  status           UserStatus
+  registrationDate DateTime   @default(now())
+  failedAttempts   Int        @default(0)
+
+  // Relations
+  client            Client?
+  admin             Admin?          @relation("AdminUser")
+  createdAdmins     Admin[]         @relation("CreatedByRoot")
+  notifications     Notification[]
+  messages          Message[]
+  auditLogs         AuditLog[]
+
+  @@map("user")
+}
+
+model Client {
+  clientId Int  @id @default(autoincrement())
+  userId   Int  @unique
+  user     User @relation(fields: [userId], references: [userId])
+
+  // Relations
+  userPreferences  UserPreference[]
+  carts            Cart[]
+  purchases        Purchase[]
+  reservations     Reservation[]
+  returnBooks      ReturnBook[]
+  paymentCards     PaymentCard[]
+  transactions     Transaction[]
+  subscriptions    Subscription[]
+  conversations    Conversation[]
+  birthdayVouchers BirthdayVoucher[]
+
+  @@map("client")
+}
+
+model Admin {
+  adminId             Int     @id @default(autoincrement())
+  userId              Int     @unique
+  createdByRootId     Int?
+  isTemporaryPassword Boolean @default(true)
+
+  user          User           @relation("AdminUser", fields: [userId], references: [userId])
+  createdByRoot User?          @relation("CreatedByRoot", fields: [createdByRootId], references: [userId])
+
+  // Relations
+  news          News[]
+  conversations Conversation[]
+
+  @@map("admin")
+}
+
+model UserPreference {
+  userPreferenceId Int      @id @default(autoincrement())
+  clientId         Int
+  categoryId       Int
+  createdAt        DateTime @default(now())
+
+  client   Client   @relation(fields: [clientId], references: [clientId])
+  category Category @relation(fields: [categoryId], references: [categoryId])
+
+  @@unique([clientId, categoryId])
+  @@map("user_preference")
+}
+
+// ==================== BOOKS ====================
+
+model Book {
+  bookId          Int      @id @default(autoincrement())
+  title           String   @db.VarChar(255)
+  author          String   @db.VarChar(150)
+  publicationYear Int?
+  publisher       String?  @db.VarChar(150)
+  isbn            String?  @unique @db.VarChar(20)
+  language        String?  @db.VarChar(50)
+  pageCount       Int?
+  price           Decimal  @db.Decimal(10, 2)
+  condition       BookCondition?
+  isAvailable     Boolean  @default(true)
+  description     String?  @db.Text
+  coverUrl        String?  @db.VarChar(500)
+  previewUrl      String?  @db.VarChar(500)
+
+  // Relations
+  bookCategories  BookCategory[]
+  bookImages      BookImage[]
+  inventories     Inventory[]
+  cartItems       CartItem[]
+  purchaseItems   PurchaseItem[]
+  reservationItems ReservationItem[]
+  news            News[]
+  notifications   Notification[]
+
+  @@map("book")
+}
+
+model Category {
+  categoryId  Int     @id @default(autoincrement())
+  name        String  @unique @db.VarChar(100)
+  description String? @db.VarChar(255)
+
+  // Relations
+  bookCategories   BookCategory[]
+  userPreferences  UserPreference[]
+  subscriptions    Subscription[]
+  newsCategories   NewsCategory[]
+
+  @@map("category")
+}
+
+model BookCategory {
+  bookCategoryId Int @id @default(autoincrement())
+  bookId         Int
+  categoryId     Int
+
+  book     Book     @relation(fields: [bookId], references: [bookId])
+  category Category @relation(fields: [categoryId], references: [categoryId])
+
+  @@unique([bookId, categoryId])
+  @@map("book_category")
+}
+
+model BookImage {
+  imageId      Int    @id @default(autoincrement())
+  bookId       Int
+  imageUrl     String @db.VarChar(500)
+  displayOrder Int    @default(1)
+
+  book Book @relation(fields: [bookId], references: [bookId])
+
+  @@map("book_image")
+}
+
+// ==================== STORES & INVENTORY ====================
+
+model Store {
+  storeId   Int         @id @default(autoincrement())
+  name      String      @db.VarChar(150)
+  address   String      @db.VarChar(255)
+  city      String      @db.VarChar(100)
+  latitude  Decimal?    @db.Decimal(10, 7)
+  longitude Decimal?    @db.Decimal(10, 7)
+  capacity  Int?
+  status    StoreStatus
+
+  // Relations
+  inventories Inventory[]
+  purchases   Purchase[]
+
+  @@map("store")
+}
+
+model Inventory {
+  inventoryId       Int @id @default(autoincrement())
+  bookId            Int
+  storeId           Int
+  availableQuantity Int @default(0)
+  reservedQuantity  Int @default(0)
+
+  book  Book  @relation(fields: [bookId], references: [bookId])
+  store Store @relation(fields: [storeId], references: [storeId])
+
+  @@unique([bookId, storeId])
+  @@map("inventory")
+}
+
+// ==================== CART ====================
+
+model Cart {
+  cartId    Int        @id @default(autoincrement())
+  clientId  Int
+  createdAt DateTime   @default(now())
+  status    CartStatus
+
+  client    Client     @relation(fields: [clientId], references: [clientId])
+  cartItems CartItem[]
+
+  @@map("cart")
+}
+
+model CartItem {
+  cartItemId Int     @id @default(autoincrement())
+  cartId     Int
+  bookId     Int
+  quantity   Int
+  unitPrice  Decimal @db.Decimal(10, 2)
+
+  cart Cart @relation(fields: [cartId], references: [cartId])
+  book Book @relation(fields: [bookId], references: [bookId])
+
+  @@map("cart_item")
+}
+
+// ==================== PURCHASES ====================
+
+model Purchase {
+  purchaseId            Int             @id @default(autoincrement())
+  clientId              Int
+  purchaseDate          DateTime        @default(now())
+  totalAmount           Decimal         @db.Decimal(10, 2)
+  paymentMethod         String?         @db.VarChar(50)
+  shippingAddress       String?         @db.VarChar(255)
+  deliveryMode          DeliveryMode?
+  pickupStoreId         Int?
+  estimatedDeliveryTime String?         @db.VarChar(100)
+  dispatchDate          DateTime?
+  status                PurchaseStatus
+
+  client        Client         @relation(fields: [clientId], references: [clientId])
+  pickupStore   Store?         @relation(fields: [pickupStoreId], references: [storeId])
+  purchaseItems PurchaseItem[]
+  returnBook    ReturnBook?
+  transactions  Transaction[]
+  refunds       Refund[]
+
+  @@map("purchase")
+}
+
+model PurchaseItem {
+  purchaseItemId Int     @id @default(autoincrement())
+  purchaseId     Int
+  bookId         Int
+  quantity       Int
+  unitPrice      Decimal @db.Decimal(10, 2)
+
+  purchase Purchase @relation(fields: [purchaseId], references: [purchaseId])
+  book     Book     @relation(fields: [bookId], references: [bookId])
+
+  @@map("purchase_item")
+}
+
+// ==================== RESERVATIONS ====================
+
+model Reservation {
+  reservationId   Int               @id @default(autoincrement())
+  clientId        Int
+  reservationDate DateTime          @default(now())
+  expirationDate  DateTime
+  status          ReservationStatus
+
+  client           Client            @relation(fields: [clientId], references: [clientId])
+  reservationItems ReservationItem[]
+
+  @@map("reservation")
+}
+
+model ReservationItem {
+  reservationItemId Int @id @default(autoincrement())
+  reservationId     Int
+  bookId            Int
+  quantity          Int
+
+  reservation Reservation @relation(fields: [reservationId], references: [reservationId])
+  book        Book        @relation(fields: [bookId], references: [bookId])
+
+  @@map("reservation_item")
+}
+
+// ==================== RETURNS & REFUNDS ====================
+
+model ReturnBook {
+  returnBookId          Int          @id @default(autoincrement())
+  purchaseId            Int          @unique
+  clientId              Int
+  reason                ReturnReason?
+  additionalDescription String?      @db.Text
+  requestDate           DateTime     @default(now())
+  status                ReturnStatus
+  qrCodeUrl             String?      @db.VarChar(500)
+  approvalDate          DateTime?
+
+  purchase Purchase @relation(fields: [purchaseId], references: [purchaseId])
+  client   Client   @relation(fields: [clientId], references: [clientId])
+  refund   Refund?
+
+  @@map("return_book")
+}
+
+model Refund {
+  refundId     Int          @id @default(autoincrement())
+  returnId     Int          @unique
+  purchaseId   Int
+  amount       Decimal      @db.Decimal(10, 2)
+  refundMethod String?      @db.VarChar(50)
+  requestDate  DateTime     @default(now())
+  status       RefundStatus
+
+  returnBook   ReturnBook    @relation(fields: [returnId], references: [returnBookId])
+  purchase     Purchase      @relation(fields: [purchaseId], references: [purchaseId])
+  transactions Transaction[]
+
+  @@map("refund")
+}
+
+// ==================== FINANCES ====================
+
+model PaymentCard {
+  cardId         Int      @id @default(autoincrement())
+  clientId       Int
+  maskedNumber   String   @db.VarChar(20)
+  cardType       CardType
+  expirationDate DateTime @db.Date
+  cardHolder     String   @db.VarChar(150)
+  isActive       Boolean  @default(true)
+
+  client Client @relation(fields: [clientId], references: [clientId])
+
+  @@map("payment_card")
+}
+
+model Transaction {
+  transactionId    Int             @id @default(autoincrement())
+  clientId         Int
+  purchaseId       Int?
+  refundId         Int?
+  transactionType  TransactionType
+  amount           Decimal         @db.Decimal(10, 2)
+  transactionDate  DateTime        @default(now())
+  gatewayReference String?         @db.VarChar(255)
+
+  client   Client   @relation(fields: [clientId], references: [clientId])
+  purchase Purchase? @relation(fields: [purchaseId], references: [purchaseId])
+  refund   Refund?   @relation(fields: [refundId], references: [refundId])
+
+  @@map("transaction")
+}
+
+// ==================== NEWS & SUBSCRIPTIONS ====================
+
+model News {
+  newsId          Int      @id @default(autoincrement())
+  adminId         Int?
+  bookId          Int?
+  title           String   @db.VarChar(255)
+  content         String   @db.Text
+  mediaUrl        String?  @db.VarChar(500)
+  isAutoGenerated Boolean  @default(false)
+  publishedAt     DateTime @default(now())
+  isActive        Boolean  @default(true)
+
+  admin          Admin?         @relation(fields: [adminId], references: [adminId])
+  book           Book?          @relation(fields: [bookId], references: [bookId])
+  newsCategories NewsCategory[]
+  notifications  Notification[]
+
+  @@map("news")
+}
+
+model NewsCategory {
+  newsCategoryId Int @id @default(autoincrement())
+  newsId         Int
+  categoryId     Int
+
+  news     News     @relation(fields: [newsId], references: [newsId])
+  category Category @relation(fields: [categoryId], references: [categoryId])
+
+  @@unique([newsId, categoryId])
+  @@map("news_category")
+}
+
+model Subscription {
+  subscriptionId Int      @id @default(autoincrement())
+  clientId       Int
+  categoryId     Int
+  subscribedAt   DateTime @default(now())
+
+  client   Client   @relation(fields: [clientId], references: [clientId])
+  category Category @relation(fields: [categoryId], references: [categoryId])
+
+  @@unique([clientId, categoryId])
+  @@map("subscription")
+}
+
+model Notification {
+  notificationId   Int              @id @default(autoincrement())
+  userId           Int
+  newsId           Int?
+  bookId           Int?
+  notificationType NotificationType
+  content          String           @db.Text
+  isRead           Boolean          @default(false)
+  createdAt        DateTime         @default(now())
+
+  user             User              @relation(fields: [userId], references: [userId])
+  news             News?             @relation(fields: [newsId], references: [newsId])
+  book             Book?             @relation(fields: [bookId], references: [bookId])
+  notificationLogs NotificationLog[]
+
+  @@map("notification")
+}
+
+model NotificationLog {
+  notificationLogId Int                   @id @default(autoincrement())
+  notificationId    Int
+  channel           NotificationChannel
+  status            NotificationLogStatus
+  sentAt            DateTime?
+  errorMessage      String?               @db.VarChar(500)
+  retryCount        Int                   @default(0)
+
+  notification Notification @relation(fields: [notificationId], references: [notificationId])
+
+  @@index([notificationId])
+  @@index([status])
+  @@map("notification_log")
+}
+
+// ==================== MESSAGING ====================
+
+model Conversation {
+  conversationId Int                @id @default(autoincrement())
+  clientId       Int
+  adminId        Int
+  startedAt      DateTime           @default(now())
+  status         ConversationStatus
+
+  client   Client    @relation(fields: [clientId], references: [clientId])
+  admin    Admin     @relation(fields: [adminId], references: [adminId])
+  messages Message[]
+
+  @@map("conversation")
+}
+
+model Message {
+  messageId      Int      @id @default(autoincrement())
+  conversationId Int
+  senderId       Int
+  content        String   @db.Text
+  sentAt         DateTime @default(now())
+  isRead         Boolean  @default(false)
+
+  conversation Conversation @relation(fields: [conversationId], references: [conversationId])
+  sender       User         @relation(fields: [senderId], references: [userId])
+
+  @@map("message")
+}
+
+// ==================== VOUCHERS & AUDIT ====================
+
+model BirthdayVoucher {
+  voucherId          Int      @id @default(autoincrement())
+  clientId           Int
+  code               String   @unique @db.VarChar(50)
+  discountPercentage Decimal  @db.Decimal(5, 2)
+  voucherPdfUrl      String?  @db.VarChar(500)
+  generatedAt        DateTime @default(now())
+  expiresAt          DateTime
+  isUsed             Boolean  @default(false)
+
+  client Client @relation(fields: [clientId], references: [clientId])
+
+  @@map("birthday_voucher")
+}
+
+model AuditLog {
+  logId            Int      @id @default(autoincrement())
+  userId           Int
+  action           String   @db.VarChar(100)
+  affectedEntity   String?  @db.VarChar(100)
+  affectedEntityId Int?
+  createdAt        DateTime @default(now())
+  detail           String?  @db.Text
+
+  user User @relation(fields: [userId], references: [userId])
+
+  @@map("audit_log")
 }
