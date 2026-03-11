@@ -1,9 +1,10 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { PrismaService } from 'prisma/prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { RecaptchaService } from '../recaptcha/recaptcha.service';
+import { RegisterDto } from './dto/register.dto';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -106,4 +107,70 @@ export class AuthService {
 
     return { message: 'Tu contraseña ha sido restablecida con éxito.' };
   }
+  async register(dto: RegisterDto) {
+  const { email, username, password, categoryIds } = dto;
+
+  // 1. Check email uniqueness
+  const existingEmail = await this.prisma.user.findUnique({
+    where: { email },
+  });
+  if (existingEmail) {
+    throw new ConflictException('Email already exists');
+  }
+
+  // 2. Check username uniqueness
+  const existingUsername = await this.prisma.user.findUnique({
+    where: { username },
+  });
+  if (existingUsername) {
+    throw new ConflictException('Username already exists');
+  }
+
+  // 3. Validate categoryIds exist
+  if (categoryIds && categoryIds.length > 0) {
+    const categories = await this.prisma.category.findMany({
+      where: { categoryId: { in: categoryIds } },
+    });
+    if (categories.length !== categoryIds.length) {
+      throw new BadRequestException('Some categories do not exist');
+    }
+  }
+
+  // 4. Hash password with crypto
+ const passwordHash = crypto.createHash('sha256').update(password).digest('hex');
+
+  // 5. Create user
+  const user = await this.prisma.user.create({
+    data: {
+      email,
+      username,
+      passwordHash,
+      userType: 'client',
+      status: 'active',
+      dni: '',
+      firstName: '',
+      lastName: '',
+      birthDate: new Date(),
+    },
+  });
+
+  // 6. Create client
+  const client = await this.prisma.client.create({
+    data: { userId: user.userId },
+  });
+
+  // 7. Create user preferences
+  if (categoryIds && categoryIds.length > 0) {
+    await this.prisma.userPreference.createMany({
+      data: categoryIds.map(categoryId => ({
+        clientId: client.userId,
+        categoryId,
+      })),
+    });
+  }
+
+  // 8. Return user without passwordHash
+  const { passwordHash: _, ...userWithoutPassword } = user;
+  return userWithoutPassword;
+}
 }
