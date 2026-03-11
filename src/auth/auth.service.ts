@@ -144,15 +144,18 @@ export class AuthService {
     // 5. Create user
     const user = await this.prisma.user.create({
       data: {
+        dni: dto.dni,
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        birthDate: new Date(dto.birthDate),
+        birthPlace: dto.birthPlace,
+        address: dto.address,
+        gender: dto.gender,
         email,
         username,
         passwordHash,
         userType: 'client',
         status: 'active',
-        dni: '',
-        firstName: '',
-        lastName: '',
-        birthDate: new Date(),
       },
     });
 
@@ -175,4 +178,21 @@ export class AuthService {
     const { passwordHash: _, ...userWithoutPassword } = user;
     return userWithoutPassword;
   }
+  async validateUniqueFields(email: string, username: string) {
+  const existing = await this.prisma.user.findFirst({
+    where: { OR: [{ email }, { username }] },
+  });
+  if (existing?.email === email)
+    throw new ConflictException('El email ya está registrado');
+  if (existing?.username === username)
+    throw new ConflictException('El nombre de usuario ya está en uso');
 }
+
+private handlePrismaError(error: any) {
+  if (error.code === 'P2002') {
+    throw new ConflictException('Dato duplicado');
+  }
+  throw error;
+}
+}
+
