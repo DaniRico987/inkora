@@ -132,12 +132,13 @@ model User {
   failedAttempts   Int        @default(0)
 
   // Relations
-  client            Client?
-  admin             Admin?          @relation("AdminUser")
-  createdAdmins     Admin[]         @relation("CreatedByRoot")
-  notifications     Notification[]
-  messages          Message[]
-  auditLogs         AuditLog[]
+  client              Client?
+  admin               Admin?               @relation("AdminUser")
+  createdAdmins       Admin[]              @relation("CreatedByRoot")
+  notifications       Notification[]
+  messages            Message[]
+  auditLogs           AuditLog[]
+  passwordResetTokens PasswordResetToken[]
 
   @@map("user")
 }
@@ -168,8 +169,8 @@ model Admin {
   createdByRootId     Int?
   isTemporaryPassword Boolean @default(true)
 
-  user          User           @relation("AdminUser", fields: [userId], references: [userId])
-  createdByRoot User?          @relation("CreatedByRoot", fields: [createdByRootId], references: [userId])
+  user          User  @relation("AdminUser", fields: [userId], references: [userId])
+  createdByRoot User? @relation("CreatedByRoot", fields: [createdByRootId], references: [userId])
 
   // Relations
   news          News[]
@@ -191,33 +192,46 @@ model UserPreference {
   @@map("user_preference")
 }
 
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  tokenHash String    @unique @db.VarChar(255)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [userId])
+
+  @@map("password_reset_token")
+}
+
 // ==================== BOOKS ====================
 
 model Book {
-  bookId          Int      @id @default(autoincrement())
-  title           String   @db.VarChar(255)
-  author          String   @db.VarChar(150)
+  bookId          Int            @id @default(autoincrement())
+  title           String         @db.VarChar(255)
+  author          String         @db.VarChar(150)
   publicationYear Int?
-  publisher       String?  @db.VarChar(150)
-  isbn            String?  @unique @db.VarChar(20)
-  language        String?  @db.VarChar(50)
+  publisher       String?        @db.VarChar(150)
+  isbn            String?        @unique @db.VarChar(20)
+  language        String?        @db.VarChar(50)
   pageCount       Int?
-  price           Decimal  @db.Decimal(10, 2)
+  price           Decimal        @db.Decimal(10, 2)
   condition       BookCondition?
-  isAvailable     Boolean  @default(true)
-  description     String?  @db.Text
-  coverUrl        String?  @db.VarChar(500)
-  previewUrl      String?  @db.VarChar(500)
+  isAvailable     Boolean        @default(true)
+  description     String?        @db.Text
+  coverUrl        String?        @db.VarChar(500)
+  previewUrl      String?        @db.VarChar(500)
 
   // Relations
-  bookCategories  BookCategory[]
-  bookImages      BookImage[]
-  inventories     Inventory[]
-  cartItems       CartItem[]
-  purchaseItems   PurchaseItem[]
+  bookCategories   BookCategory[]
+  bookImages       BookImage[]
+  inventories      Inventory[]
+  cartItems        CartItem[]
+  purchaseItems    PurchaseItem[]
   reservationItems ReservationItem[]
-  news            News[]
-  notifications   Notification[]
+  news             News[]
+  notifications    Notification[]
 
   @@map("book")
 }
@@ -228,10 +242,10 @@ model Category {
   description String? @db.VarChar(255)
 
   // Relations
-  bookCategories   BookCategory[]
-  userPreferences  UserPreference[]
-  subscriptions    Subscription[]
-  newsCategories   NewsCategory[]
+  bookCategories  BookCategory[]
+  userPreferences UserPreference[]
+  subscriptions   Subscription[]
+  newsCategories  NewsCategory[]
 
   @@map("category")
 }
@@ -322,15 +336,15 @@ model CartItem {
 // ==================== PURCHASES ====================
 
 model Purchase {
-  purchaseId            Int             @id @default(autoincrement())
+  purchaseId            Int            @id @default(autoincrement())
   clientId              Int
-  purchaseDate          DateTime        @default(now())
-  totalAmount           Decimal         @db.Decimal(10, 2)
-  paymentMethod         String?         @db.VarChar(50)
-  shippingAddress       String?         @db.VarChar(255)
+  purchaseDate          DateTime       @default(now())
+  totalAmount           Decimal        @db.Decimal(10, 2)
+  paymentMethod         String?        @db.VarChar(50)
+  shippingAddress       String?        @db.VarChar(255)
   deliveryMode          DeliveryMode?
   pickupStoreId         Int?
-  estimatedDeliveryTime String?         @db.VarChar(100)
+  estimatedDeliveryTime String?        @db.VarChar(100)
   dispatchDate          DateTime?
   status                PurchaseStatus
 
@@ -387,14 +401,14 @@ model ReservationItem {
 // ==================== RETURNS & REFUNDS ====================
 
 model ReturnBook {
-  returnBookId          Int          @id @default(autoincrement())
-  purchaseId            Int          @unique
+  returnBookId          Int           @id @default(autoincrement())
+  purchaseId            Int           @unique
   clientId              Int
   reason                ReturnReason?
-  additionalDescription String?      @db.Text
-  requestDate           DateTime     @default(now())
+  additionalDescription String?       @db.Text
+  requestDate           DateTime      @default(now())
   status                ReturnStatus
-  qrCodeUrl             String?      @db.VarChar(500)
+  qrCodeUrl             String?       @db.VarChar(500)
   approvalDate          DateTime?
 
   purchase Purchase @relation(fields: [purchaseId], references: [purchaseId])
@@ -446,7 +460,7 @@ model Transaction {
   transactionDate  DateTime        @default(now())
   gatewayReference String?         @db.VarChar(255)
 
-  client   Client   @relation(fields: [clientId], references: [clientId])
+  client   Client    @relation(fields: [clientId], references: [clientId])
   purchase Purchase? @relation(fields: [purchaseId], references: [purchaseId])
   refund   Refund?   @relation(fields: [refundId], references: [refundId])
 

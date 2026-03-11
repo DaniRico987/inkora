@@ -2,6 +2,8 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import * as dotenv from 'dotenv';
+dotenv.config();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -46,8 +48,8 @@ async function bootstrap() {
   const port = process.env.PORT || 3000;
   await app.listen(port);
 
-  console.log(`\níº€ INKORA API corriendo en: http://localhost:${port}`);
-  console.log(`í³„ Swagger docs en:         http://localhost:${port}/api/docs\n`);
+  console.log(`\nï¿½ï¿½ï¿½ INKORA API corriendo en: http://localhost:${port}`);
+  console.log(`ï¿½ï¿½ï¿½ Swagger docs en:         http://localhost:${port}/api/docs\n`);
 }
 
 bootstrap();
