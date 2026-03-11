@@ -44,6 +44,17 @@ $ npm run start:dev
 $ npm run start:prod
 ```
 
+## Database Seeding
+
+To seed the database with initial data (like the root user), run:
+
+```bash
+# Seed the database
+$ npx prisma db seed
+```
+
+This will create a default root user using the credentials defined in your `.env` file (see `.env.example`).
+
 ## Run tests
 
 ```bash
