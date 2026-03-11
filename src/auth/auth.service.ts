@@ -5,6 +5,7 @@ import { PrismaService } from 'prisma/prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { RecaptchaService } from '../recaptcha/recaptcha.service';
 import * as crypto from 'crypto';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AuthService {
@@ -39,7 +40,7 @@ export class AuthService {
       .createHash('sha256')
       .update(rawToken)
       .digest('hex');
-    const expiresAt = new Date(Date.now() + 3600000); // 1 hour
+    const expiresAt = new Date(Date.now() + 1800000); // 30 minutes
 
     // 5. Upsert token (cleanup old ones first)
     await this.prisma.passwordResetToken.deleteMany({
@@ -78,20 +79,25 @@ export class AuthService {
       include: { user: true },
     });
 
-    if (!resetToken || resetToken.expiresAt < new Date() || resetToken.usedAt) {
+    if (!resetToken) {
+      throw new UnauthorizedException('Enlace de restablecimiento inválido.');
+    }
+
+    if (resetToken.expiresAt < new Date()) {
       throw new UnauthorizedException(
-        'Enlace de restablecimiento inválido o expirado.',
+        'El enlace de restablecimiento ha expirado.',
       );
     }
 
-    // 4. Update password (assuming passwordHash column exist on User)
-    // IMPORTANT: Assuming bcrypt or similar is used elsewhere, here we just hash with crypto for demonstration
-    // but ideally we should use the same hashing strategy as registration.
-    // For now, I'll use a simple hash to satisfy the requirement, but notes this should be bcrypt.
-    const newPasswordHash = crypto
-      .createHash('sha256')
-      .update(newPassword)
-      .digest('hex');
+    if (resetToken.usedAt) {
+      throw new UnauthorizedException(
+        'El enlace de restablecimiento ya ha sido usado.',
+      );
+    }
+
+    // 4. Update password using bcrypt
+    const salt = await bcrypt.genSalt(10);
+    const newPasswordHash = await bcrypt.hash(newPassword, salt);
 
     await this.prisma.user.update({
       where: { userId: resetToken.userId },
