@@ -1,14 +1,108 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseIntPipe,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import { Request } from 'express';
 import { AuthService } from './auth.service';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RegisterDto } from './dto/register.dto';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { LoginDto } from './dto/login.dto';
+import { LoginResponseDto } from './dto/login-response.dto';
+import { CreateAdminDto } from './dto/create-admin.dto';
+import {
+  ApiBearerAuth,
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBody,
+  ApiOkResponse,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
+import { LocalAuthGuard } from './guards/local-auth.guard';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { RolesGuard } from './guards/roles.guard';
+import { AuthenticatedUser } from './interfaces/authenticated-user.interface';
+import { Roles } from './roles.decorator';
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Post('login')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(LocalAuthGuard)
+  @ApiOperation({ summary: 'Iniciar sesion y obtener JWT' })
+  @ApiBody({ type: LoginDto })
+  @ApiOkResponse({
+    description: 'Inicio de sesion exitoso',
+    type: LoginResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Credenciales invalidas',
+  })
+  async login(@Req() req: Request & { user: AuthenticatedUser }) {
+    return this.authService.login(req.user);
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT')
+  @ApiOperation({ summary: 'Obtener perfil del usuario autenticado' })
+  @ApiOkResponse({ description: 'Perfil obtenido correctamente' })
+  @ApiUnauthorizedResponse({ description: 'Token invalido o expirado' })
+  async me(@Req() req: Request & { user: AuthenticatedUser }) {
+    return this.authService.getProfile(req.user.userId);
+  }
+
+  @Post('admins')
+  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('root')
+  @ApiBearerAuth('JWT')
+  @ApiOperation({ summary: 'Crear administrador (solo root)' })
+  @ApiResponse({
+    status: 201,
+    description: 'Administrador creado exitosamente',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Solo root puede crear administradores',
+  })
+  async createAdmin(
+    @Req() req: Request & { user: AuthenticatedUser },
+    @Body() dto: CreateAdminDto,
+  ) {
+    return this.authService.createAdmin(dto, req.user.userId);
+  }
+
+  @Delete('admins/:userId')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('root')
+  @ApiBearerAuth('JWT')
+  @ApiOperation({ summary: 'Eliminar administrador (solo root)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Administrador eliminado exitosamente',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Solo root puede eliminar administradores',
+  })
+  async deleteAdmin(@Param('userId', ParseIntPipe) userId: number) {
+    return this.authService.deleteAdmin(userId);
+  }
 
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
@@ -17,7 +111,10 @@ export class AuthController {
     status: 200,
     description: 'Se ha enviado un correo con instrucciones si el email existe',
   })
-  @ApiResponse({ status: 400, description: 'Datos inválidos o error en reCAPTCHA' })
+  @ApiResponse({
+    status: 400,
+    description: 'Datos inválidos o error en reCAPTCHA',
+  })
   async forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.authService.forgotPassword(dto);
   }

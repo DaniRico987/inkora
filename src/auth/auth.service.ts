@@ -4,14 +4,21 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { ForgotPasswordDto } from './dto/forgot-password.dto';
-import { ResetPasswordDto } from './dto/reset-password.dto';
-import { PrismaService } from 'prisma/prisma/prisma.service';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcrypt';
 import { MailService } from '../mail/mail.service';
 import { RecaptchaService } from '../recaptcha/recaptcha.service';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { LoginResponseDto } from './dto/login-response.dto';
 import { RegisterDto } from './dto/register.dto';
-import * as crypto from 'crypto';
-import * as bcrypt from 'bcrypt';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { CreateAdminDto } from './dto/create-admin.dto';
+import { AuthenticatedUser } from './interfaces/authenticated-user.interface';
+import { JwtPayload } from './interfaces/jwt-payload.interface';
+import { PrismaService } from 'prisma/prisma/prisma.service';
+
+const BCRYPT_SALT_ROUNDS = 10;
 
 @Injectable()
 export class AuthService {
@@ -19,36 +26,111 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
     private readonly recaptchaService: RecaptchaService,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
   ) {}
 
-  async forgotPassword(dto: ForgotPasswordDto) {
-    const { email, recaptchaToken } = dto;
-
-    // 1. Verify reCAPTCHA
+  async validateUser(
+    identifier: string,
+    password: string,
+    recaptchaToken: string,
+  ): Promise<AuthenticatedUser> {
     const isHuman = await this.recaptchaService.verify(recaptchaToken);
     if (!isHuman) {
       throw new UnauthorizedException('ReCAPTCHA verification failed');
     }
 
-    // 2. Look up user
+    const user = await this.prisma.user.findFirst({
+      where: {
+        OR: [{ email: identifier }, { username: identifier }],
+      },
+      select: {
+        userId: true,
+        email: true,
+        username: true,
+        firstName: true,
+        lastName: true,
+        userType: true,
+        status: true,
+        passwordHash: true,
+      },
+    });
+
+    const genericError = new UnauthorizedException('Credenciales inválidas');
+    if (!user || user.status !== 'active') {
+      throw genericError;
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isPasswordValid) {
+      throw genericError;
+    }
+
+    const { passwordHash: _passwordHash, ...safeUser } = user;
+    return safeUser;
+  }
+
+  async login(user: AuthenticatedUser): Promise<LoginResponseDto> {
+    const payload: JwtPayload = {
+      sub: user.userId,
+      role: user.userType,
+    };
+
+    const accessToken = await this.jwtService.signAsync(payload);
+    return {
+      accessToken,
+      tokenType: 'Bearer',
+      expiresIn: this.configService.get<string>('JWT_EXPIRES_IN') ?? '1h',
+    };
+  }
+
+  async getProfile(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { userId },
+      select: {
+        userId: true,
+        dni: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        username: true,
+        birthDate: true,
+        birthPlace: true,
+        address: true,
+        gender: true,
+        userType: true,
+        status: true,
+        registrationDate: true,
+      },
+    });
+
+    if (!user || user.status !== 'active') {
+      throw new UnauthorizedException('Usuario no autorizado');
+    }
+
+    return user;
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const { email, recaptchaToken } = dto;
+
+    const isHuman = await this.recaptchaService.verify(recaptchaToken);
+    if (!isHuman) {
+      throw new UnauthorizedException('ReCAPTCHA verification failed');
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { email },
     });
 
-    // 3. Silent fail if user not found
     if (!user) {
       return { message: 'Si el correo existe, recibirás un enlace.' };
     }
 
-    // 4. Generate token
-    const rawToken = crypto.randomBytes(32).toString('hex');
-    const tokenHash = crypto
-      .createHash('sha256')
-      .update(rawToken)
-      .digest('hex');
-    const expiresAt = new Date(Date.now() + 3600000); // 1 hour
+    const rawToken = await this.generateResetToken();
+    const tokenHash = await bcrypt.hash(rawToken, BCRYPT_SALT_ROUNDS);
+    const expiresAt = new Date(Date.now() + 3600000);
 
-    // 5. Upsert token (cleanup old ones first)
     await this.prisma.passwordResetToken.deleteMany({
       where: { userId: user.userId },
     });
@@ -61,7 +143,6 @@ export class AuthService {
       },
     });
 
-    // 6. Send mail
     await this.mailService.sendPasswordReset(email, rawToken);
 
     return { message: 'Si el correo existe, recibirás un enlace.' };
@@ -70,20 +151,28 @@ export class AuthService {
   async resetPassword(dto: ResetPasswordDto) {
     const { token, newPassword, recaptchaToken } = dto;
 
-    // 1. Verify reCAPTCHA
     const isHuman = await this.recaptchaService.verify(recaptchaToken);
     if (!isHuman) {
       throw new UnauthorizedException('ReCAPTCHA verification failed');
     }
 
-    // 2. Hash the incoming token to find it in the DB
-    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-
-    // 3. Find valid token
-    const resetToken = await this.prisma.passwordResetToken.findUnique({
-      where: { tokenHash },
-      include: { user: true },
+    const candidateTokens = await this.prisma.passwordResetToken.findMany({
+      where: {
+        usedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { id: 'desc' },
+      take: 200,
     });
+
+    let resetToken: (typeof candidateTokens)[number] | null = null;
+    for (const candidate of candidateTokens) {
+      const isMatch = await bcrypt.compare(token, candidate.tokenHash);
+      if (isMatch) {
+        resetToken = candidate;
+        break;
+      }
+    }
 
     if (!resetToken || resetToken.expiresAt < new Date() || resetToken.usedAt) {
       throw new UnauthorizedException(
@@ -91,16 +180,13 @@ export class AuthService {
       );
     }
 
-    // 4. Update password using bcrypt (10 salts)
-    const salt = await bcrypt.genSalt(10);
-    const newPasswordHash = await bcrypt.hash(newPassword, salt);
+    const newPasswordHash = await bcrypt.hash(newPassword, BCRYPT_SALT_ROUNDS);
 
     await this.prisma.user.update({
       where: { userId: resetToken.userId },
       data: { passwordHash: newPasswordHash },
     });
 
-    // 5. Mark token as used
     await this.prisma.passwordResetToken.update({
       where: { id: resetToken.id },
       data: { usedAt: new Date() },
@@ -108,10 +194,10 @@ export class AuthService {
 
     return { message: 'Tu contraseña ha sido restablecida con éxito.' };
   }
+
   async register(dto: RegisterDto) {
     const { email, username, password, categoryIds } = dto;
 
-    // 1. Check email uniqueness
     const existingEmail = await this.prisma.user.findUnique({
       where: { email },
     });
@@ -119,7 +205,6 @@ export class AuthService {
       throw new ConflictException('Email already exists');
     }
 
-    // 2. Check username uniqueness
     const existingUsername = await this.prisma.user.findUnique({
       where: { username },
     });
@@ -127,7 +212,6 @@ export class AuthService {
       throw new ConflictException('Username already exists');
     }
 
-    // 3. Validate categoryIds exist
     if (categoryIds && categoryIds.length > 0) {
       const categories = await this.prisma.category.findMany({
         where: { categoryId: { in: categoryIds } },
@@ -137,11 +221,8 @@ export class AuthService {
       }
     }
 
-    // 4. Hash password with bcrypt (10 salts)
-    const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(password, salt);
+    const passwordHash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
 
-    // 5. Create user
     const user = await this.prisma.user.create({
       data: {
         dni: dto.dni,
@@ -159,12 +240,10 @@ export class AuthService {
       },
     });
 
-    // 6. Create client
     const client = await this.prisma.client.create({
       data: { userId: user.userId },
     });
 
-    // 7. Create user preferences
     if (categoryIds && categoryIds.length > 0) {
       await this.prisma.userPreference.createMany({
         data: categoryIds.map((categoryId) => ({
@@ -174,25 +253,105 @@ export class AuthService {
       });
     }
 
-    // 8. Return user without passwordHash
-    const { passwordHash: _, ...userWithoutPassword } = user;
+    const { passwordHash: _passwordHash, ...userWithoutPassword } = user;
     return userWithoutPassword;
   }
-  async validateUniqueFields(email: string, username: string) {
-  const existing = await this.prisma.user.findFirst({
-    where: { OR: [{ email }, { username }] },
-  });
-  if (existing?.email === email)
-    throw new ConflictException('El email ya está registrado');
-  if (existing?.username === username)
-    throw new ConflictException('El nombre de usuario ya está en uso');
-}
 
-private handlePrismaError(error: any) {
-  if (error.code === 'P2002') {
-    throw new ConflictException('Dato duplicado');
+  async createAdmin(dto: CreateAdminDto, rootUserId: number) {
+    const { email, username, password } = dto;
+
+    const existingEmail = await this.prisma.user.findUnique({
+      where: { email },
+    });
+    if (existingEmail) {
+      throw new ConflictException('Email already exists');
+    }
+
+    const existingUsername = await this.prisma.user.findUnique({
+      where: { username },
+    });
+    if (existingUsername) {
+      throw new ConflictException('Username already exists');
+    }
+
+    const passwordHash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
+
+    const adminUser = await this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          dni: dto.dni,
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          birthDate: new Date(dto.birthDate),
+          birthPlace: dto.birthPlace,
+          address: dto.address,
+          gender: dto.gender,
+          email,
+          username,
+          passwordHash,
+          userType: 'admin',
+          status: 'active',
+        },
+      });
+
+      await tx.admin.create({
+        data: {
+          userId: user.userId,
+          createdByRootId: rootUserId,
+          isTemporaryPassword: false,
+        },
+      });
+
+      return user;
+    });
+
+    const { passwordHash: _passwordHash, ...safeUser } = adminUser;
+    return safeUser;
   }
-  throw error;
-}
-}
 
+  async deleteAdmin(adminUserId: number) {
+    const adminRecord = await this.prisma.admin.findUnique({
+      where: { userId: adminUserId },
+      include: { user: true },
+    });
+
+    if (!adminRecord || adminRecord.user.userType !== 'admin') {
+      throw new BadRequestException('El usuario indicado no es administrador');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.admin.delete({ where: { userId: adminUserId } });
+      await tx.user.delete({ where: { userId: adminUserId } });
+    });
+
+    return { message: 'Administrador eliminado correctamente' };
+  }
+
+  async validateUniqueFields(email: string, username: string) {
+    const existing = await this.prisma.user.findFirst({
+      where: { OR: [{ email }, { username }] },
+    });
+    if (existing?.email === email) {
+      throw new ConflictException('El email ya está registrado');
+    }
+    if (existing?.username === username) {
+      throw new ConflictException('El nombre de usuario ya está en uso');
+    }
+  }
+
+  private handlePrismaError(error: any) {
+    if (error.code === 'P2002') {
+      throw new ConflictException('Dato duplicado');
+    }
+    throw error;
+  }
+
+  private async generateResetToken(): Promise<string> {
+    const salt = await bcrypt.genSalt(BCRYPT_SALT_ROUNDS);
+    const entropyPart = salt
+      .replace(/^\$2[abxy]\$\d+\$/, '')
+      .replace(/\//g, '_');
+    const timestampPart = Date.now().toString(36);
+    return `${timestampPart}.${entropyPart}`;
+  }
+}
