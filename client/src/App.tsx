@@ -1,11 +1,12 @@
 
 import './App.css'
+import { Card } from './Components/card'
 
 function App() {
 
   return (
     <div className="bg-primary text-skyblue border-babyblue">
-      <h1 className="text-4xl font-bold text-primary">Hello World</h1>
+      <Card />
     </div>
   )
 }

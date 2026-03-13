@@ -4,10 +4,15 @@ export default {
   theme: {
     extend: {
       colors: {
-        Primary: '#274c77',
-        skyblue: '#6096BA',
-        babyblue: '#A3CEF1',
-        metallicgold: '#8b8c89',
+        bg: 'var(--color-bg)',
+        surface: 'var(--color-surface)',
+        text: 'var(--color-text)',
+        'text-muted': 'var(--color-text-muted)',
+        border: 'var(--color-border)',
+        primary: 'var(--color-primary)',
+        skyblue: 'var(--color-skyblue)',
+        babyblue: 'var(--color-babyblue)',
+        gold: 'var(--color-gold)',
       },
     },
   },
