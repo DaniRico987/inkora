@@ -29,17 +29,31 @@ async function bootstrap() {
   // Swagger
   const config = new DocumentBuilder()
     .setTitle('INKORA API')
-    .setDescription('API REST para la plataforma de librería INKORA')
+    .setDescription(
+      'Documentación oficial de la API REST para la plataforma de librería INKORA. ' +
+        'Esta API permite gestionar el catálogo de libros, usuarios, categorías y tiendas físicas.',
+    )
     .setVersion('1.0')
+    .setContact(
+      'INKORA Support',
+      'https://inkora.com/support',
+      'support@inkora.com',
+    )
+    .setLicense('MIT', 'https://opensource.org/licenses/MIT')
     .addBearerAuth(
-      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description: 'Ingrese el token JWT obtenido al iniciar sesión',
+      },
       'JWT',
     )
-    .addTag('Auth', 'Autenticación y autorización')
-    .addTag('Users', 'Gestión de usuarios')
-    .addTag('Books', 'Catálogo de libros')
-    .addTag('Categories', 'Categorías literarias')
-    .addTag('Stores', 'Tiendas físicas')
+    .addTag('Auth', 'Operaciones de autenticación, registro y recuperación de cuenta')
+    .addTag('Users', 'Gestión de perfiles de usuario y preferencias')
+    .addTag('Books', 'Catálogo completo de libros, búsqueda y filtrado')
+    .addTag('Categories', 'Organización de libros por géneros y categorías')
+    .addTag('Stores', 'Información sobre sucursales y puntos de venta físicos')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
