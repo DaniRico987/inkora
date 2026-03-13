@@ -233,6 +233,12 @@ model Book {
   news             News[]
   notifications    Notification[]
 
+  @@index([isAvailable, price], map: "idx_book_available_price")
+  @@index([isAvailable, publicationYear], map: "idx_book_available_publication_year")
+  @@index([isAvailable, language], map: "idx_book_available_language")
+  @@index([isAvailable, condition], map: "idx_book_available_condition")
+  @@index([isAvailable, author], map: "idx_book_available_author")
+  @@index([isAvailable, title], map: "idx_book_available_title")
   @@map("book")
 }
 
@@ -259,6 +265,7 @@ model BookCategory {
   category Category @relation(fields: [categoryId], references: [categoryId])
 
   @@unique([bookId, categoryId])
+  @@index([categoryId, bookId], map: "idx_book_category_category_book")
   @@map("book_category")
 }
 

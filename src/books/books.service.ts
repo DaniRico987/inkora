@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from 'prisma/prisma/prisma.service';
 import { BookDetailDto } from './dto/book-detail.dto';
 import { BookListItemDto } from './dto/book-list-item.dto';
@@ -19,17 +20,15 @@ export class BooksService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 10;
     const skip = (page - 1) * limit;
-
-    const where = {
-      isAvailable: true,
-    };
+    const where = this.buildSearchWhere(query);
+    const orderBy = this.buildOrderBy(query);
 
     const [books, total] = await Promise.all([
       this.prisma.book.findMany({
         where,
         skip,
         take: limit,
-        orderBy: { bookId: 'asc' },
+        orderBy,
         select: {
           bookId: true,
           coverUrl: true,
@@ -58,6 +57,84 @@ export class BooksService {
       total,
       totalPages: Math.ceil(total / limit),
     };
+  }
+
+  private buildSearchWhere(query: GetBooksQueryDto): Prisma.BookWhereInput {
+    if (
+      query.minPrice !== undefined &&
+      query.maxPrice !== undefined &&
+      query.minPrice > query.maxPrice
+    ) {
+      throw new BadRequestException('minPrice no puede ser mayor que maxPrice');
+    }
+
+    const where: Prisma.BookWhereInput = {
+      isAvailable: true,
+    };
+
+    if (query.title) {
+      where.title = {
+        contains: query.title.trim(),
+        mode: 'insensitive',
+      };
+    }
+
+    if (query.author) {
+      where.author = {
+        contains: query.author.trim(),
+        mode: 'insensitive',
+      };
+    }
+
+    if (query.categoryId) {
+      where.bookCategories = {
+        some: {
+          categoryId: query.categoryId,
+        },
+      };
+    }
+
+    if (query.language) {
+      where.language = {
+        equals: query.language.trim(),
+        mode: 'insensitive',
+      };
+    }
+
+    if (query.condition) {
+      where.condition = query.condition;
+    }
+
+    if (query.minPrice !== undefined || query.maxPrice !== undefined) {
+      where.price = {
+        gte: query.minPrice,
+        lte: query.maxPrice,
+      };
+    }
+
+    if (query.year) {
+      where.publicationYear = query.year;
+    }
+
+    return where;
+  }
+
+  private buildOrderBy(
+    query: GetBooksQueryDto,
+  ): Prisma.BookOrderByWithRelationInput[] {
+    const sortOrder = query.sortOrder ?? 'desc';
+    const sortBy = query.sortBy ?? 'relevance';
+
+    if (sortBy === 'price') {
+      return [{ price: sortOrder }, { bookId: 'asc' }];
+    }
+
+    if (sortBy === 'publicationYear') {
+      return [{ publicationYear: sortOrder }, { bookId: 'asc' }];
+    }
+
+    // Relevance temporal: por defecto prioriza publicaciones recientes.
+    return [{ publicationYear: sortOrder }, { bookId: 'asc' }];
   }
 
   async findOne(id: number): Promise<BookDetailDto> {

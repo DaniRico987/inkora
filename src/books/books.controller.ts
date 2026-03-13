@@ -66,6 +66,57 @@ export class BooksController {
     return this.booksService.findAll(query);
   }
 
+  @Get('search')
+  @ApiOperation({
+    summary: 'Buscar libros disponibles con filtros, ordenamiento y paginacion',
+    description:
+      'Endpoint publico para busqueda avanzada en catalogo. Ejemplos: ' +
+      '/api/v1/books/search?title=principito&sortBy=relevance&sortOrder=desc, ' +
+      '/api/v1/books/search?categoryId=1&minPrice=10000&maxPrice=50000&page=1&limit=12, ' +
+      '/api/v1/books/search?author=Rulfo&language=Espanol&condition=used&sortBy=price&sortOrder=asc',
+  })
+  @ApiQuery({ name: 'title', required: false, type: String, example: 'Cien anos' })
+  @ApiQuery({ name: 'author', required: false, type: String, example: 'Garcia Marquez' })
+  @ApiQuery({ name: 'categoryId', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'language', required: false, type: String, example: 'Espanol' })
+  @ApiQuery({
+    name: 'condition',
+    required: false,
+    enum: ['new', 'used'],
+    example: 'used',
+  })
+  @ApiQuery({ name: 'minPrice', required: false, type: Number, example: 10000 })
+  @ApiQuery({ name: 'maxPrice', required: false, type: Number, example: 50000 })
+  @ApiQuery({
+    name: 'year',
+    required: false,
+    type: Number,
+    description: 'Ano de publicacion exacto',
+    example: 1967,
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    enum: ['price', 'publicationYear', 'relevance'],
+    example: 'relevance',
+  })
+  @ApiQuery({
+    name: 'sortOrder',
+    required: false,
+    enum: ['asc', 'desc'],
+    example: 'desc',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Resultado paginado de busqueda de libros disponibles',
+    type: PaginatedBooksResponseDto,
+  })
+  async search(@Query() query: GetBooksQueryDto) {
+    return this.booksService.findAll(query);
+  }
+
   @Get(':id')
   @ApiOperation({
     summary: 'Obtener el detalle completo de un libro',

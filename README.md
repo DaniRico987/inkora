@@ -68,6 +68,53 @@ $ npm run test:e2e
 $ npm run test:cov
 ```
 
+## Books Search API
+
+Public endpoint for advanced catalog filtering:
+
+```bash
+GET /api/v1/books/search
+```
+
+Supported query params:
+
+- `title`
+- `author`
+- `categoryId`
+- `language`
+- `condition` (`new` | `used`)
+- `minPrice`
+- `maxPrice`
+- `year` (publication year)
+- `page` (default `1`)
+- `limit` (default `10`, max `100`)
+- `sortBy` (`price` | `publicationYear` | `relevance`, default `relevance`)
+- `sortOrder` (`asc` | `desc`, default `desc`)
+
+Example:
+
+```bash
+GET /api/v1/books/search?title=principito&categoryId=1&minPrice=10000&maxPrice=50000&sortBy=price&sortOrder=asc&page=1&limit=12
+```
+
+## Search SLA Verification (<=2s)
+
+Measure heavy search cases locally (p95 latency):
+
+```bash
+# start backend first in another terminal
+$ npm run start:dev
+
+# run latency checks
+$ npm run perf:books-search
+```
+
+Optional env vars:
+
+- `BOOKS_SEARCH_URL` (default `http://localhost:3000/api/v1/books/search`)
+- `BOOKS_SEARCH_ITERATIONS` (default `20`)
+- `BOOKS_SEARCH_SLA_MS` (default `2000`)
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.

@@ -70,6 +70,60 @@ describe('Catalog (e2e)', () => {
       ],
     },
     {
+      bookId: 3,
+      title: 'Disponible Dos',
+      author: 'Autor Dos',
+      publicationYear: 2023,
+      publisher: 'Editorial Tres',
+      isbn: '333',
+      language: 'Ingles',
+      pageCount: 340,
+      price: '25000',
+      condition: 'used',
+      isAvailable: true,
+      description: 'Libro disponible dos',
+      coverUrl: 'https://cdn.inkora.com/books/3-cover.webp',
+      previewUrl: null,
+      bookImages: [],
+      bookCategories: [
+        {
+          categoryId: 2,
+          category: {
+            categoryId: 2,
+            name: 'Arte',
+            description: 'Libros de arte',
+          },
+        },
+      ],
+    },
+    {
+      bookId: 4,
+      title: 'Disponible Tres',
+      author: 'Autor Uno',
+      publicationYear: 2018,
+      publisher: 'Editorial Cuatro',
+      isbn: '444',
+      language: 'Espanol',
+      pageCount: 410,
+      price: '10000',
+      condition: 'new',
+      isAvailable: true,
+      description: 'Libro disponible tres',
+      coverUrl: 'https://cdn.inkora.com/books/4-cover.webp',
+      previewUrl: null,
+      bookImages: [],
+      bookCategories: [
+        {
+          categoryId: 1,
+          category: {
+            categoryId: 1,
+            name: 'Novela',
+            description: 'Narrativa extensa',
+          },
+        },
+      ],
+    },
+    {
       bookId: 2,
       title: 'No Disponible',
       author: 'Autor Dos',
@@ -94,6 +148,104 @@ describe('Catalog (e2e)', () => {
     { categoryId: 1, name: 'Novela' },
   ];
   const coverFixturePath = join(__dirname, 'fixtures', 'cover.webp');
+
+  const matchesBookFilter = (book: (typeof books)[number], where?: any): boolean => {
+    if (!where) {
+      return true;
+    }
+
+    if (where.isAvailable !== undefined && book.isAvailable !== where.isAvailable) {
+      return false;
+    }
+
+    if (
+      where.title?.contains &&
+      !book.title.toLowerCase().includes(String(where.title.contains).toLowerCase())
+    ) {
+      return false;
+    }
+
+    if (
+      where.author?.contains &&
+      !book.author.toLowerCase().includes(String(where.author.contains).toLowerCase())
+    ) {
+      return false;
+    }
+
+    if (
+      where.language?.equals &&
+      book.language?.toLowerCase() !== String(where.language.equals).toLowerCase()
+    ) {
+      return false;
+    }
+
+    if (where.condition && book.condition !== where.condition) {
+      return false;
+    }
+
+    if (where.publicationYear !== undefined && book.publicationYear !== where.publicationYear) {
+      return false;
+    }
+
+    const numericPrice = Number(book.price);
+    if (where.price?.gte !== undefined && numericPrice < Number(where.price.gte)) {
+      return false;
+    }
+
+    if (where.price?.lte !== undefined && numericPrice > Number(where.price.lte)) {
+      return false;
+    }
+
+    if (where.bookCategories?.some?.categoryId !== undefined) {
+      const categoryId = where.bookCategories.some.categoryId;
+      const hasCategory = book.bookCategories.some(
+        (bookCategory) => bookCategory.categoryId === categoryId,
+      );
+
+      if (!hasCategory) {
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  const applyOrdering = (
+    inputBooks: (typeof books)[number][],
+    orderBy?: Array<Record<string, 'asc' | 'desc'>> | Record<string, 'asc' | 'desc'>,
+  ) => {
+    const rules = Array.isArray(orderBy) ? orderBy : orderBy ? [orderBy] : [];
+
+    return [...inputBooks].sort((left, right) => {
+      for (const rule of rules) {
+        const [field, direction] = Object.entries(rule)[0];
+        const leftValue = left[field as keyof typeof left] as string | number | null | undefined;
+        const rightValue = right[field as keyof typeof right] as string | number | null | undefined;
+
+        if (leftValue === rightValue) {
+          continue;
+        }
+
+        if (leftValue === null || leftValue === undefined) {
+          return 1;
+        }
+
+        if (rightValue === null || rightValue === undefined) {
+          return -1;
+        }
+
+        if (leftValue < rightValue) {
+          return direction === 'asc' ? -1 : 1;
+        }
+
+        if (leftValue > rightValue) {
+          return direction === 'asc' ? 1 : -1;
+        }
+      }
+
+      return 0;
+    });
+  };
 
   beforeAll(async () => {
     jwtGuardSpy = jest
@@ -154,11 +306,11 @@ describe('Catalog (e2e)', () => {
 
     prismaMock = {
       book: {
-        findMany: jest.fn(({ where, skip = 0, take = 10 }) => {
-          const filtered = books.filter(
-            (book) => !where?.isAvailable || book.isAvailable === where.isAvailable,
-          );
-          return filtered.slice(skip, skip + take).map((book) => ({
+        findMany: jest.fn(({ where, skip = 0, take = 10, orderBy }) => {
+          const filtered = books.filter((book) => matchesBookFilter(book, where));
+          const ordered = applyOrdering(filtered, orderBy);
+
+          return ordered.slice(skip, skip + take).map((book) => ({
             bookId: book.bookId,
             coverUrl: book.coverUrl,
             title: book.title,
@@ -169,9 +321,7 @@ describe('Catalog (e2e)', () => {
           }));
         }),
         count: jest.fn(({ where }) => {
-          return books.filter(
-            (book) => !where?.isAvailable || book.isAvailable === where.isAvailable,
-          ).length;
+          return books.filter((book) => matchesBookFilter(book, where)).length;
         }),
         findUnique: jest.fn(({ where, select }) => {
           const book = books.find((item) => item.bookId === where.bookId) ?? null;
@@ -265,6 +415,20 @@ describe('Catalog (e2e)', () => {
       .get('/api/v1/books')
       .expect(200);
 
+    expect(response.body.items).toHaveLength(3);
+    expect(
+      response.body.items.every((item: { isAvailable: boolean }) => item.isAvailable),
+    ).toBe(true);
+    expect(response.body.total).toBe(3);
+  });
+
+  it('GET /books/search is public and supports combined filters', async () => {
+    const response = await request(app.getHttpServer())
+      .get(
+        '/api/v1/books/search?title=Disponible&author=Autor%20Uno&categoryId=1&language=Espanol&condition=new&minPrice=9000&maxPrice=16000&year=2020',
+      )
+      .expect(200);
+
     expect(response.body.items).toEqual([
       {
         id: 1,
@@ -277,6 +441,44 @@ describe('Catalog (e2e)', () => {
       },
     ]);
     expect(response.body.total).toBe(1);
+  });
+
+  it('GET /books/search enforces isAvailable and applies sorting and pagination', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/books/search?sortBy=price&sortOrder=asc&page=1&limit=2')
+      .expect(200);
+
+    expect(response.body.items).toEqual([
+      {
+        id: 4,
+        coverUrl: 'https://cdn.inkora.com/books/4-cover.webp',
+        title: 'Disponible Tres',
+        author: 'Autor Uno',
+        price: 10000,
+        status: 'new',
+        isAvailable: true,
+      },
+      {
+        id: 1,
+        coverUrl: 'https://cdn.inkora.com/books/1-cover.webp',
+        title: 'Disponible Uno',
+        author: 'Autor Uno',
+        price: 15000,
+        status: 'new',
+        isAvailable: true,
+      },
+    ]);
+    expect(response.body.total).toBe(3);
+    expect(response.body.totalPages).toBe(2);
+    expect(
+      response.body.items.every((item: { isAvailable: boolean }) => item.isAvailable),
+    ).toBe(true);
+  });
+
+  it('GET /books/search validates invalid ranges and rejects minPrice > maxPrice', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/books/search?minPrice=50000&maxPrice=10000')
+      .expect(400);
   });
 
   it('GET /books applies pagination validation errors', async () => {

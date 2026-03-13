@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from 'prisma/prisma/prisma.service';
 import { S3Service } from '../storage/s3.service';
@@ -78,7 +78,7 @@ describe('BooksService', () => {
       where: { isAvailable: true },
       skip: 2,
       take: 2,
-      orderBy: { bookId: 'asc' },
+      orderBy: [{ publicationYear: 'desc' }, { bookId: 'asc' }],
       select: {
         bookId: true,
         coverUrl: true,
@@ -118,6 +118,107 @@ describe('BooksService', () => {
       total: 7,
       totalPages: 4,
     });
+  });
+
+  it('builds dynamic where filters and sort order for search queries', async () => {
+    prismaService.book.findMany.mockResolvedValue([]);
+    prismaService.book.count.mockResolvedValue(0);
+
+    await service.findAll({
+      title: 'Macondo',
+      author: 'Garcia',
+      categoryId: 5,
+      language: 'Espanol',
+      condition: 'used',
+      minPrice: 10000,
+      maxPrice: 45000,
+      year: 1967,
+      sortBy: 'price',
+      sortOrder: 'asc',
+      page: 1,
+      limit: 12,
+    });
+
+    expect(prismaService.book.findMany).toHaveBeenCalledWith({
+      where: {
+        isAvailable: true,
+        title: {
+          contains: 'Macondo',
+          mode: 'insensitive',
+        },
+        author: {
+          contains: 'Garcia',
+          mode: 'insensitive',
+        },
+        bookCategories: {
+          some: {
+            categoryId: 5,
+          },
+        },
+        language: {
+          equals: 'Espanol',
+          mode: 'insensitive',
+        },
+        condition: 'used',
+        price: {
+          gte: 10000,
+          lte: 45000,
+        },
+        publicationYear: 1967,
+      },
+      skip: 0,
+      take: 12,
+      orderBy: [{ price: 'asc' }, { bookId: 'asc' }],
+      select: {
+        bookId: true,
+        coverUrl: true,
+        title: true,
+        author: true,
+        price: true,
+        condition: true,
+        isAvailable: true,
+      },
+    });
+    expect(prismaService.book.count).toHaveBeenCalledWith({
+      where: {
+        isAvailable: true,
+        title: {
+          contains: 'Macondo',
+          mode: 'insensitive',
+        },
+        author: {
+          contains: 'Garcia',
+          mode: 'insensitive',
+        },
+        bookCategories: {
+          some: {
+            categoryId: 5,
+          },
+        },
+        language: {
+          equals: 'Espanol',
+          mode: 'insensitive',
+        },
+        condition: 'used',
+        price: {
+          gte: 10000,
+          lte: 45000,
+        },
+        publicationYear: 1967,
+      },
+    });
+  });
+
+  it('throws bad request when minPrice is greater than maxPrice', async () => {
+    await expect(
+      service.findAll({
+        minPrice: 50000,
+        maxPrice: 10000,
+      }),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(prismaService.book.findMany).not.toHaveBeenCalled();
+    expect(prismaService.book.count).not.toHaveBeenCalled();
   });
 
   it('maps book detail including images and categories', async () => {
