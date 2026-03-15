@@ -7,6 +7,10 @@
     <title>client</title>
   </head>
   <body>
+    <script>
+      const theme = localStorage.getItem('theme') || 'light';
+      document.documentElement.dataset.theme = theme;
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

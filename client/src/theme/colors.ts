@@ -7,7 +7,7 @@ export const lightTheme = {
   '--color-primary': '#274c77',
   '--color-skyblue': '#6096BA',
   '--color-babyblue': '#A3CEF1',
-  '--color-gold': '#8b8c89',
+  '--color-metallicgold': '#8b8c89',
 } as const;
 
 export const darkTheme = {
@@ -19,5 +19,5 @@ export const darkTheme = {
   '--color-primary': '#274c77',
   '--color-skyblue': '#6096BA',
   '--color-babyblue': '#A3CEF1',
-  '--color-gold': '#8b8c89',
+  '--color-metallicgold': '#8b8c89',
 } as const;
