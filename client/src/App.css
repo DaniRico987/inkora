@@ -1,8 +1,10 @@
 #root {
   width: 100vw;
-  height: 100vh;
   margin: 0 auto;
   padding: 0;
   text-align: center;
   display: flex;
+  flex-direction: column;
+  place-items: center;
+  justify-content: center;
 }
