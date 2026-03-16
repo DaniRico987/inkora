@@ -54,6 +54,10 @@ async function bootstrap() {
     .addTag('Books', 'Catálogo completo de libros, búsqueda y filtrado')
     .addTag('Categories', 'Organización de libros por géneros y categorías')
     .addTag('Stores', 'Información sobre sucursales y puntos de venta físicos')
+    .addTag(
+      'Administradores',
+      'Gestión de administradores (solo accesible para usuarios root)',
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

@@ -39,6 +39,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         lastName: true,
         userType: true,
         status: true,
+        admin: {
+          select: {
+            isTemporaryPassword: true,
+          },
+        },
       },
     });
 
@@ -46,6 +51,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Usuario no autorizado');
     }
 
-    return user;
+    const { admin, ...safeUser } = user;
+    return {
+      ...safeUser,
+      isTemporaryPassword: admin?.isTemporaryPassword ?? false,
+    };
   }
 }

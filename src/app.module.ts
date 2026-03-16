@@ -6,9 +6,17 @@ import { BooksModule } from './books/books.module';
 import { MailModule } from './mail/mail.module';
 import { RecaptchaModule } from './recaptcha/recaptcha.module';
 import { CategoriesModule } from './categories/categories.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
-  imports: [AuthModule, BooksModule, MailModule, RecaptchaModule, CategoriesModule],
+  imports: [
+    AuthModule,
+    BooksModule,
+    MailModule,
+    RecaptchaModule,
+    CategoriesModule,
+    AdminModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })
