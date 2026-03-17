@@ -5,12 +5,20 @@ import { ConfigService } from '@nestjs/config';
 export class RecaptchaService {
   private readonly logger = new Logger(RecaptchaService.name);
   private readonly secret: string;
+  private readonly enabled: boolean;
 
   constructor(private readonly configService: ConfigService) {
     this.secret = this.configService.get<string>('RECAPTCHA_SECRET');
+    const enabledRaw = this.configService.get<string>('RECAPTCHA_ENABLED');
+    // Default: enabled unless explicitly set to "false"
+    this.enabled = enabledRaw == null ? true : enabledRaw.toLowerCase() !== 'false';
   }
 
   async verify(token: string): Promise<boolean> {
+    if (!this.enabled) {
+      return true;
+    }
+
     if (!token) return false;
 
     try {

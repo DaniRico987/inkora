@@ -1,7 +1,9 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -332,22 +334,37 @@ export class AuthService {
     return safeUser;
   }
 
-  async deleteAdmin(adminUserId: number) {
+  /**
+   * Desactiva un administrador (soft delete). Solo root.
+   * No borra filas; el historial (AuditLog, etc.) permanece intacto.
+   * Las sesiones del admin quedan invalidadas al rechazar status !== 'active' en JWT.
+   */
+  async deactivateAdmin(adminUserId: number, rootUserId: number) {
     const adminRecord = await this.prisma.admin.findUnique({
       where: { userId: adminUserId },
       include: { user: true },
     });
 
-    if (!adminRecord || adminRecord.user.userType !== 'admin') {
-      throw new BadRequestException('El usuario indicado no es administrador');
+    if (
+      !adminRecord ||
+      adminRecord.user.userType !== 'admin' ||
+      adminRecord.user.status === 'inactive'
+    ) {
+      throw new NotFoundException(
+        'Administrador no encontrado o ya está inactivo',
+      );
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.admin.delete({ where: { userId: adminUserId } });
-      await tx.user.delete({ where: { userId: adminUserId } });
+    if (adminUserId === rootUserId) {
+      throw new ForbiddenException('No puede desactivar su propia cuenta');
+    }
+
+    await this.prisma.user.update({
+      where: { userId: adminUserId },
+      data: { status: 'inactive' },
     });
 
-    return { message: 'Administrador eliminado correctamente' };
+    return { message: 'Administrador desactivado correctamente' };
   }
 
   async validateUniqueFields(email: string, username: string) {

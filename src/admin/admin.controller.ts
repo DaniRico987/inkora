@@ -1,4 +1,16 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseIntPipe,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -80,6 +92,39 @@ export class AdminController {
   })
   async findAllActive() {
     return this.adminService.findActiveAdmins();
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('root')
+  @ApiOperation({
+    summary: 'Desactivar administrador',
+    description:
+      'El usuario root puede desactivar la cuenta de un administrador. La desactivación no afecta el historial de operaciones. El id es el userId del administrador.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Administrador desactivado correctamente',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'No autenticado',
+  })
+  @ApiResponse({
+    status: 403,
+    description:
+      'Solo root puede desactivar administradores. No puede desactivar su propia cuenta',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Administrador no encontrado o ya inactivo',
+  })
+  async deleteAdmin(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: { user: AuthenticatedUser },
+  ) {
+    return this.authService.deactivateAdmin(id, req.user.userId);
   }
 }
 
