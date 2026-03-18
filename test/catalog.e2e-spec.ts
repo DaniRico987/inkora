@@ -11,6 +11,7 @@ import { App } from 'supertest/types';
 import { join } from 'path';
 import { BooksModule } from '../src/books/books.module';
 import { CategoriesModule } from '../src/categories/categories.module';
+import { StoresModule } from '../src/stores/stores.module';
 import { PrismaService } from '../prisma/prisma/prisma.service';
 import { S3Service } from '../src/storage/s3.service';
 import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
@@ -23,10 +24,18 @@ describe('Catalog (e2e)', () => {
       findMany: jest.Mock;
       count: jest.Mock;
       findUnique: jest.Mock;
+      create: jest.Mock;
+      delete: jest.Mock;
       update: jest.Mock;
     };
     category: {
       findMany: jest.Mock;
+    };
+    store: {
+      findMany: jest.Mock;
+      create: jest.Mock;
+      findUnique: jest.Mock;
+      update: jest.Mock;
     };
   };
   let s3Mock: {
@@ -148,6 +157,18 @@ describe('Catalog (e2e)', () => {
     { categoryId: 1, name: 'Novela' },
   ];
   const coverFixturePath = join(__dirname, 'fixtures', 'cover.webp');
+  const stores = [
+    {
+      storeId: 1,
+      name: 'Inkora Centro',
+      address: 'Av. Principal 1234',
+      city: 'Santiago',
+      latitude: null,
+      longitude: null,
+      capacity: 100,
+      status: 'active',
+    },
+  ];
 
   const matchesBookFilter = (book: (typeof books)[number], where?: any): boolean => {
     if (!where) {
@@ -284,24 +305,20 @@ describe('Catalog (e2e)', () => {
           return true;
         }
 
-        throw new UnauthorizedException('Token inválido o ausente');
-      });
-
-    rolesGuardSpy = jest
-      .spyOn(RolesGuard.prototype, 'canActivate')
-      .mockImplementation((context) => {
-        const request = context.switchToHttp().getRequest();
-        const user = request.user;
-
-        if (!user) {
-          throw new UnauthorizedException('Usuario no autenticado');
-        }
-
-        if (user.userType === 'admin' || user.userType === 'root') {
+        if (authorization === 'Bearer root-token') {
+          request.user = {
+            userId: 3,
+            email: 'root@inkora.com',
+            username: 'rootuser',
+            firstName: 'Root',
+            lastName: 'User',
+            userType: 'root',
+            status: 'active',
+          };
           return true;
         }
 
-        throw new ForbiddenException('No tienes permisos para esta acción');
+        throw new UnauthorizedException('Token inválido o ausente');
       });
 
     prismaMock = {
@@ -336,6 +353,30 @@ describe('Catalog (e2e)', () => {
 
           return book;
         }),
+        create: jest.fn(({ data }) => {
+          const nextId =
+            Math.max(0, ...books.map((item) => item.bookId)) + 1;
+          const created = {
+            bookId: nextId,
+            title: data.title,
+            author: data.author,
+            publicationYear: data.publicationYear ?? null,
+            publisher: data.publisher ?? null,
+            isbn: data.isbn ?? null,
+            language: data.language ?? null,
+            pageCount: data.pageCount ?? null,
+            price: String(data.price),
+            condition: data.condition ?? null,
+            isAvailable: data.isAvailable ?? true,
+            description: data.description ?? null,
+            coverUrl: data.coverUrl ?? null,
+            previewUrl: data.previewUrl ?? null,
+            bookImages: [],
+            bookCategories: [],
+          };
+          books.push(created as any);
+          return { bookId: created.bookId };
+        }),
         update: jest.fn(({ where, data }) => {
           const book = books.find((item) => item.bookId === where.bookId);
           if (!book) {
@@ -348,12 +389,58 @@ describe('Catalog (e2e)', () => {
             coverUrl: book.coverUrl,
           };
         }),
+        delete: jest.fn(({ where }) => {
+          const index = books.findIndex((item) => item.bookId === where.bookId);
+          if (index === -1) {
+            return null;
+          }
+          const [deleted] = books.splice(index, 1);
+          return { bookId: deleted.bookId };
+        }),
       },
       category: {
         findMany: jest.fn(() => {
           return [...categories].sort((left, right) =>
             left.name.localeCompare(right.name),
           );
+        }),
+      },
+      store: {
+        findMany: jest.fn(() => {
+          return [...stores].sort((a, b) => a.storeId - b.storeId);
+        }),
+        create: jest.fn(({ data }) => {
+          const nextId = Math.max(0, ...stores.map((s) => s.storeId)) + 1;
+          const created = {
+            storeId: nextId,
+            name: data.name,
+            address: data.address,
+            city: data.city,
+            latitude: data.latitude ?? null,
+            longitude: data.longitude ?? null,
+            capacity: data.capacity ?? null,
+            status: data.status,
+          };
+          stores.push(created as any);
+          return created;
+        }),
+        findUnique: jest.fn(({ where, select }) => {
+          const store = stores.find((item) => item.storeId === where.storeId) ?? null;
+          if (!store) {
+            return null;
+          }
+          if (select?.storeId) {
+            return { storeId: store.storeId };
+          }
+          return store;
+        }),
+        update: jest.fn(({ where, data }) => {
+          const store = stores.find((item) => item.storeId === where.storeId);
+          if (!store) {
+            return null;
+          }
+          Object.assign(store, data);
+          return store;
         }),
       },
     };
@@ -365,7 +452,7 @@ describe('Catalog (e2e)', () => {
     };
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [BooksModule, CategoriesModule],
+      imports: [BooksModule, CategoriesModule, StoresModule],
     })
       .overrideProvider(PrismaService)
       .useValue(prismaMock)
@@ -388,6 +475,7 @@ describe('Catalog (e2e)', () => {
       .setVersion('1.0')
       .addTag('Books')
       .addTag('Categories')
+      .addTag('Stores')
       .addBearerAuth(
         {
           type: 'http',
@@ -406,7 +494,7 @@ describe('Catalog (e2e)', () => {
 
   afterAll(async () => {
     jwtGuardSpy.mockRestore();
-    rolesGuardSpy.mockRestore();
+    rolesGuardSpy?.mockRestore();
     await app.close();
   });
 
@@ -540,6 +628,206 @@ describe('Catalog (e2e)', () => {
     });
   });
 
+  it('POST /books requires admin token', async () => {
+    await request(app.getHttpServer())
+      .post('/api/v1/books')
+      .send({
+        title: 'Nuevo libro',
+        author: 'Autor',
+        price: 10000,
+      })
+      .expect(401);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/books')
+      .set('Authorization', 'Bearer client-token')
+      .send({
+        title: 'Nuevo libro',
+        author: 'Autor',
+        price: 10000,
+      })
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/books')
+      .set('Authorization', 'Bearer root-token')
+      .send({
+        title: 'Nuevo libro',
+        author: 'Autor',
+        price: 10000,
+      })
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/books')
+      .set('Authorization', 'Bearer admin-token')
+      .send({
+        title: 'Nuevo libro',
+        author: 'Autor',
+        price: 10000,
+      })
+      .expect(201);
+  });
+
+  it('DELETE /books/:id requires admin token', async () => {
+    await request(app.getHttpServer())
+      .delete('/api/v1/books/1')
+      .expect(401);
+
+    await request(app.getHttpServer())
+      .delete('/api/v1/books/1')
+      .set('Authorization', 'Bearer client-token')
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .delete('/api/v1/books/1')
+      .set('Authorization', 'Bearer root-token')
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .delete('/api/v1/books/1')
+      .set('Authorization', 'Bearer admin-token')
+      .expect(200);
+  });
+
+  it('GET /stores requires admin token and returns stores', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/stores')
+      .expect(401);
+
+    await request(app.getHttpServer())
+      .get('/api/v1/stores')
+      .set('Authorization', 'Bearer client-token')
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .get('/api/v1/stores')
+      .set('Authorization', 'Bearer root-token')
+      .expect(403);
+
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/stores')
+      .set('Authorization', 'Bearer admin-token')
+      .expect(200);
+
+    expect(Array.isArray(response.body)).toBe(true);
+    expect(response.body.length).toBeGreaterThan(0);
+    expect(response.body[0]).toHaveProperty('storeId');
+  });
+
+  it('POST /stores creates store (admin only)', async () => {
+    await request(app.getHttpServer())
+      .post('/api/v1/stores')
+      .send({
+        name: 'Nueva Tienda',
+        address: 'Calle 123',
+        city: 'Santiago',
+      })
+      .expect(401);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/stores')
+      .set('Authorization', 'Bearer client-token')
+      .send({
+        name: 'Nueva Tienda',
+        address: 'Calle 123',
+        city: 'Santiago',
+      })
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/stores')
+      .set('Authorization', 'Bearer root-token')
+      .send({
+        name: 'Nueva Tienda',
+        address: 'Calle 123',
+        city: 'Santiago',
+      })
+      .expect(403);
+
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/stores')
+      .set('Authorization', 'Bearer admin-token')
+      .send({
+        name: 'Nueva Tienda',
+        address: 'Calle 123',
+        city: 'Santiago',
+      })
+      .expect(201);
+
+    expect(response.body).toHaveProperty('storeId');
+    expect(response.body.name).toBe('Nueva Tienda');
+  });
+
+  it('PUT /stores/:id updates store (admin only)', async () => {
+    await request(app.getHttpServer())
+      .put('/api/v1/stores/1')
+      .send({
+        name: 'Inkora Centro Editada',
+      })
+      .expect(401);
+
+    await request(app.getHttpServer())
+      .put('/api/v1/stores/1')
+      .set('Authorization', 'Bearer client-token')
+      .send({
+        name: 'Inkora Centro Editada',
+      })
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .put('/api/v1/stores/1')
+      .set('Authorization', 'Bearer root-token')
+      .send({
+        name: 'Inkora Centro Editada',
+      })
+      .expect(403);
+
+    const response = await request(app.getHttpServer())
+      .put('/api/v1/stores/1')
+      .set('Authorization', 'Bearer admin-token')
+      .send({
+        name: 'Inkora Centro Editada',
+      })
+      .expect(200);
+
+    expect(response.body.storeId).toBe(1);
+    expect(response.body.name).toBe('Inkora Centro Editada');
+  });
+
+  it('PUT /books/:id updates book (admin only)', async () => {
+    await request(app.getHttpServer())
+      .put('/api/v1/books/3')
+      .send({
+        title: 'Disponible Dos Editado',
+      })
+      .expect(401);
+
+    await request(app.getHttpServer())
+      .put('/api/v1/books/3')
+      .set('Authorization', 'Bearer client-token')
+      .send({
+        title: 'Disponible Dos Editado',
+      })
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .put('/api/v1/books/3')
+      .set('Authorization', 'Bearer root-token')
+      .send({
+        title: 'Disponible Dos Editado',
+      })
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .put('/api/v1/books/3')
+      .set('Authorization', 'Bearer admin-token')
+      .send({
+        title: 'Disponible Dos Editado',
+      })
+      .expect(200);
+  });
+
   it('POST /books/:id/cover returns 401 without token', async () => {
     await request(app.getHttpServer())
       .post('/api/v1/books/1/cover')
@@ -606,6 +894,7 @@ describe('Catalog (e2e)', () => {
         expect.stringContaining('/books'),
         expect.stringContaining('/books/{id}'),
         expect.stringContaining('/categories'),
+        expect.stringContaining('/stores'),
       ]),
     );
 

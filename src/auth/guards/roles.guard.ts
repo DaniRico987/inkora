@@ -29,11 +29,6 @@ export class RolesGuard implements CanActivate {
       throw new UnauthorizedException('Usuario no autenticado');
     }
 
-    // Regla de negocio: root gestiona administradores; admin tiene acceso amplio
-    if (user.userType === 'root') {
-      return true;
-    }
-
     if (user.userType === 'admin') {
       const isRootOnly = requiredRoles.length === 1 && requiredRoles[0] === 'root';
       if (isRootOnly) {

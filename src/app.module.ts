@@ -7,6 +7,7 @@ import { MailModule } from './mail/mail.module';
 import { RecaptchaModule } from './recaptcha/recaptcha.module';
 import { CategoriesModule } from './categories/categories.module';
 import { AdminModule } from './admin/admin.module';
+import { StoresModule } from './stores/stores.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { AdminModule } from './admin/admin.module';
     RecaptchaModule,
     CategoriesModule,
     AdminModule,
+    StoresModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -107,6 +107,7 @@ describe('AuthService', () => {
         lastName: 'Lovelace',
         userType: 'admin',
         status: 'active',
+        isTemporaryPassword: false,
       });
     });
 
