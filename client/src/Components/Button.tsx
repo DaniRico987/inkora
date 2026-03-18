@@ -20,11 +20,12 @@ export function Button({
   className = "",
 }: ButtonProps) {
   return (
-    <div className={`w-${'['+size+']' || 'full'}`}>
+    <div className="w-full flex justify-center">
       <button
         type={type}
         onClick={onClick}
         disabled={disabled || loading}
+        style={{width: size || "100%"}}
         className={`
         rounded-lg
         transition
