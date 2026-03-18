@@ -21,6 +21,9 @@ import { JwtPayload } from './interfaces/jwt-payload.interface';
 import { PrismaService } from 'prisma/prisma/prisma.service';
 
 const BCRYPT_SALT_ROUNDS = 10;
+const CAPTCHA_AFTER_FAILED_ATTEMPTS = 3;
+const MAX_LOGIN_FAILED_ATTEMPTS = 5;
+const DEFAULT_LOCK_DURATION_MINUTES = 15;
 
 @Injectable()
 export class AuthService {
@@ -37,11 +40,6 @@ export class AuthService {
     password: string,
     recaptchaToken: string,
   ): Promise<AuthenticatedUser> {
-    const isHuman = await this.recaptchaService.verify(recaptchaToken);
-    if (!isHuman) {
-      throw new UnauthorizedException('ReCAPTCHA verification failed');
-    }
-
     const user = await this.prisma.user.findFirst({
       where: {
         OR: [{ email: identifier }, { username: identifier }],
@@ -54,6 +52,8 @@ export class AuthService {
         lastName: true,
         userType: true,
         status: true,
+        failedAttempts: true,
+        blockedUntil: true,
         passwordHash: true,
         admin: {
           select: {
@@ -63,14 +63,121 @@ export class AuthService {
       },
     });
 
-    const genericError = new UnauthorizedException('Credenciales inválidas');
-    if (!user || user.status !== 'active') {
-      throw genericError;
+    if (!user) {
+      throw new UnauthorizedException('Credenciales inválidas');
+    }
+
+    const now = new Date();
+
+    if (user.status === 'blocked') {
+      if (user.blockedUntil && user.blockedUntil <= now) {
+        await this.prisma.user.update({
+          where: { userId: user.userId },
+          data: {
+            status: 'active',
+            failedAttempts: 0,
+            blockedUntil: null,
+          },
+        });
+        user.status = 'active';
+        user.failedAttempts = 0;
+        user.blockedUntil = null;
+      } else {
+        const remainingBlockSeconds = this.calculateRemainingBlockSeconds(
+          user.blockedUntil,
+          now,
+        );
+        throw new UnauthorizedException({
+          message: 'Cuenta bloqueada temporalmente',
+          accountBlocked: true,
+          blockedUntil: user.blockedUntil,
+          remainingBlockSeconds,
+          requiresCaptcha: true,
+          failedAttempts: user.failedAttempts,
+          attemptsRemaining: 0,
+        });
+      }
+    }
+
+    if (user.status !== 'active') {
+      throw new UnauthorizedException('Credenciales inválidas');
+    }
+
+    const requiresCaptcha =
+      user.failedAttempts >= CAPTCHA_AFTER_FAILED_ATTEMPTS;
+    if (requiresCaptcha) {
+      const isHuman = await this.recaptchaService.verify(recaptchaToken);
+      if (!isHuman) {
+        throw new UnauthorizedException({
+          message: 'ReCAPTCHA verification failed',
+          requiresCaptcha: true,
+          failedAttempts: user.failedAttempts,
+          attemptsRemaining: Math.max(
+            0,
+            MAX_LOGIN_FAILED_ATTEMPTS - user.failedAttempts,
+          ),
+        });
+      }
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
-      throw genericError;
+      const nextFailedAttempts = user.failedAttempts + 1;
+      const shouldBlock = nextFailedAttempts >= MAX_LOGIN_FAILED_ATTEMPTS;
+      const blockedUntil = shouldBlock
+        ? this.calculateBlockedUntil(now)
+        : null;
+
+      await this.prisma.user.update({
+        where: { userId: user.userId },
+        data: {
+          failedAttempts: nextFailedAttempts,
+          status: shouldBlock ? 'blocked' : user.status,
+          blockedUntil,
+        },
+      });
+
+      if (shouldBlock) {
+        await this.mailService.sendAccountBlockedNotification(
+          user.email,
+          user.firstName,
+          blockedUntil ?? now,
+        );
+
+        throw new UnauthorizedException({
+          message: 'Cuenta bloqueada temporalmente por múltiples intentos fallidos',
+          accountBlocked: true,
+          blockedUntil,
+          remainingBlockSeconds: this.calculateRemainingBlockSeconds(
+            blockedUntil,
+            now,
+          ),
+          requiresCaptcha: true,
+          failedAttempts: nextFailedAttempts,
+          attemptsRemaining: 0,
+        });
+      }
+
+      throw new UnauthorizedException({
+        message: 'Credenciales inválidas',
+        requiresCaptcha:
+          nextFailedAttempts >= CAPTCHA_AFTER_FAILED_ATTEMPTS,
+        failedAttempts: nextFailedAttempts,
+        attemptsRemaining: Math.max(
+          0,
+          MAX_LOGIN_FAILED_ATTEMPTS - nextFailedAttempts,
+        ),
+      });
+    }
+
+    if (user.failedAttempts > 0 || user.blockedUntil) {
+      await this.prisma.user.update({
+        where: { userId: user.userId },
+        data: {
+          failedAttempts: 0,
+          blockedUntil: null,
+        },
+      });
     }
 
     const { passwordHash: _passwordHash, admin, ...safeUser } = user;
@@ -426,5 +533,28 @@ export class AuthService {
     }
 
     return passwordChars.join('');
+  }
+
+  private calculateBlockedUntil(baseDate: Date): Date {
+    const lockDurationMinutesRaw = this.configService.get<string>(
+      'AUTH_LOCK_DURATION_MINUTES',
+    );
+    const lockDurationMinutes = Number.parseInt(lockDurationMinutesRaw ?? '', 10);
+    const durationMinutes = Number.isFinite(lockDurationMinutes)
+      ? lockDurationMinutes
+      : DEFAULT_LOCK_DURATION_MINUTES;
+    return new Date(baseDate.getTime() + durationMinutes * 60_000);
+  }
+
+  private calculateRemainingBlockSeconds(
+    blockedUntil: Date | null,
+    now: Date,
+  ): number {
+    if (!blockedUntil) {
+      return 0;
+    }
+
+    const millisecondsRemaining = blockedUntil.getTime() - now.getTime();
+    return Math.max(0, Math.ceil(millisecondsRemaining / 1000));
   }
 }

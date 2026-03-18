@@ -21,4 +21,14 @@ export class MailService {
       `Enviando contraseña temporal de administrador a ${email} (username: ${username}). Contraseña temporal: ${temporaryPassword}`,
     );
   }
+
+  async sendAccountBlockedNotification(
+    email: string,
+    firstName: string,
+    blockedUntil: Date,
+  ) {
+    this.logger.warn(
+      `Cuenta bloqueada temporalmente para ${email} (${firstName}) hasta ${blockedUntil.toISOString()}`,
+    );
+  }
 }

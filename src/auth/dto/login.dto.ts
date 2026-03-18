@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class LoginDto {
   @ApiProperty({
@@ -20,9 +20,11 @@ export class LoginDto {
 
   @ApiProperty({
     example: '03AFcWeA...',
-    description: 'Token de verificacion reCAPTCHA',
+    description:
+      'Token de verificacion reCAPTCHA (requerido desde el 3er intento fallido)',
+    required: false,
   })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  recaptchaToken: string;
+  recaptchaToken?: string;
 }
