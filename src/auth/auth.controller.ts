@@ -49,7 +49,34 @@ export class AuthController {
     type: LoginResponseDto,
   })
   @ApiUnauthorizedResponse({
-    description: 'Credenciales invalidas',
+    description:
+      'Credenciales invalidas, CAPTCHA requerido o cuenta bloqueada temporalmente',
+    schema: {
+      oneOf: [
+        {
+          example: {
+            statusCode: 401,
+            message: 'Credenciales inválidas',
+            requiresCaptcha: true,
+            failedAttempts: 3,
+            attemptsRemaining: 2,
+          },
+        },
+        {
+          example: {
+            statusCode: 401,
+            message:
+              'Cuenta bloqueada temporalmente por múltiples intentos fallidos',
+            accountBlocked: true,
+            blockedUntil: '2026-03-18T18:20:00.000Z',
+            remainingBlockSeconds: 900,
+            requiresCaptcha: true,
+            failedAttempts: 5,
+            attemptsRemaining: 0,
+          },
+        },
+      ],
+    },
   })
   async login(@Req() req: Request & { user: AuthenticatedUser }) {
     return this.authService.login(req.user);

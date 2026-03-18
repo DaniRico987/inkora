@@ -130,6 +130,7 @@ model User {
   status           UserStatus
   registrationDate DateTime   @default(now())
   failedAttempts   Int        @default(0)
+  blockedUntil     DateTime?
 
   // Relations
   client              Client?
