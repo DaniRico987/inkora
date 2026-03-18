@@ -1,5 +1,6 @@
 export const lightTheme = {
-  '--color-bg': '#ffffff',
+  '--color-bg': '#f5f5f5',
+  '--color-bg-secondary': '#ffffff',
   '--color-surface': '#f4f7fb',
   '--color-text': '#333333',
   '--color-text-muted': '#6b7d90',
@@ -7,7 +8,7 @@ export const lightTheme = {
   '--color-border-focus': '#4a5565',
   '--color-bg-input': '#f2f7fb',
   '--color-placeholder': '#9CA3AF',
-  '--color-label':'#8a9bb0',
+  '--color-label': '#8a9bb0',
 
   /* PRIMARY */
   '--color-primary-50': '#eef3f8',
@@ -60,6 +61,7 @@ export const lightTheme = {
 
 export const darkTheme = {
   '--color-bg': '#1a1c1e',
+  '--color-bg-secondary': '#1c2a38',
   '--color-surface': '#1c2a38',
   '--color-text': '#d4dde8',
   '--color-text-muted': '#6b7d90',
@@ -67,7 +69,7 @@ export const darkTheme = {
   '--color-border-focus': '#4a7fa5',
   '--color-bg-input': '#22262b',
   '--color-placeholder': '#4a5568',
-  '--color-label':'#8a9bb0',
+  '--color-label': '#8a9bb0',
 
   '--color-primary-50': '#eef3f8',
   '--color-primary-100': '#d6e0ea',

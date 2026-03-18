@@ -82,8 +82,8 @@ export function ResetPasswordPage() {
       : "bg-red-500";
 
   return (
-    <div className="min-h-screen bg-bg flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-bg-card rounded-2xl shadow-lg p-6 sm:p-8">
+    <div className="w-full flex items-center justify-center px-4">
+      <div className="w-full max-w-xl mx-auto bg-bg-card rounded-2xl shadow-lg p-6 sm:p-10">
         <h1 className="text-2xl font-semibold text-text mb-2">
           Restablecer contraseña
         </h1>

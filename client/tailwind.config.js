@@ -5,15 +5,15 @@ export default {
     extend: {
       colors: {
         bg: 'var(--color-bg)',
+        'bg-secondary': 'var(--color-bg-secondary)',
         surface: 'var(--color-surface)',
         text: 'var(--color-text)',
         'text-muted': 'var(--color-text-muted)',
         border: 'var(--color-border)',
         'border-focus': 'var(--color-border-focus)',
         'bg-input': 'var(--color-bg-input)',
-        'placeholder': 'var(--color-placeholder)',
-        'label': 'var(--color-label)',
-
+        placeholder: 'var(--color-placeholder)',
+        label: 'var(--color-label)',
 
         primary: {
           50: 'var(--color-primary-50)',
