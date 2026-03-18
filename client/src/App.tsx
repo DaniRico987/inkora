@@ -1,64 +1,27 @@
 
-import './App.css'
-import { Button } from './Components/Button'
-import { InputText,InputPassword,InputSelect,InputTextarea,Checkbox,InputSearch } from './Components/Inputs';
-import { Toggle } from './Components/Toggle'
+import "./App.css";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Toggle } from "./Components/Toggle";
 import { useTheme } from "./theme/useTheme";
+import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
+import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 
 function App() {
   useTheme();
   return (
-    <div className="bg-bg w-screen flex flex-col items-center justify-center gap-3.5 transition-all duration-300 ease-in-out">
-      {<Toggle />
-      }
-      <Button variant='primary' size="20rem" onClick={() => console.log('Primary button clicked!')}>
-        Click me
-      </Button>
-      <Button variant="secondary" size="20rem" onClick={() => console.log('Button clicked!')}>
-        Click me
-      </Button>
-      <Button variant="destructive" size="20rem" onClick={() => console.log('Destructive button clicked!')}>
-        Delete
-      </Button>
-
-      <div className="max-w-sm p-6 flex flex-col">
-        <InputText
-          label="Nombre completo"
-          value="Juan Pérez"
-        />
-
-        <InputText
-          label="Correo electrónico"
-          type="email"
-          placeholder="ejemplo@correo.com"
-        />
-
-        <InputPassword
-          label="Contraseña"
-          placeholder="Ingresa tu contraseña"
-        />
-
-        <InputTextarea
-          label="Descripción"
-          placeholder="Escribe aquí..."
-        />
-
-        <InputSelect
-          label="País"
-          options={[
-            { label: "Colombia", value: "co" },
-            { label: "México", value: "mx" },
-            { label: "Argentina", value: "ar" },
-          ]}
-        />
-
-        <Checkbox label="Acepto los términos y condiciones" />
-
-        <InputSearch placeholder="Buscar..." />
+    <BrowserRouter>
+      <div className="bg-bg min-h-screen flex flex-col items-center transition-all duration-300 ease-in-out">
+        <div className="w-full flex justify-end p-4">
+          <Toggle />
+        </div>
+        <Routes>
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+          {/* TODO: agregar aquí /login y demás rutas cuando estén listas */}
+        </Routes>
       </div>
-
-    </div>
-  )
+    </BrowserRouter>
+  );
 }
 
-export default App
+export default App;
