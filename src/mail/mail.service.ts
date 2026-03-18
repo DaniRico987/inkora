@@ -11,4 +11,14 @@ export class MailService {
       `Enviando enlace de restablecimiento de contraseña a ${email}. Token: ${token}`,
     );
   }
+
+  async sendAdminTemporaryPassword(
+    email: string,
+    username: string,
+    temporaryPassword: string,
+  ) {
+    this.logger.log(
+      `Enviando contraseña temporal de administrador a ${email} (username: ${username}). Contraseña temporal: ${temporaryPassword}`,
+    );
+  }
 }

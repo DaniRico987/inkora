@@ -1,7 +1,9 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -53,6 +55,11 @@ export class AuthService {
         userType: true,
         status: true,
         passwordHash: true,
+        admin: {
+          select: {
+            isTemporaryPassword: true,
+          },
+        },
       },
     });
 
@@ -66,8 +73,11 @@ export class AuthService {
       throw genericError;
     }
 
-    const { passwordHash: _passwordHash, ...safeUser } = user;
-    return safeUser;
+    const { passwordHash: _passwordHash, admin, ...safeUser } = user;
+    return {
+      ...safeUser,
+      isTemporaryPassword: admin?.isTemporaryPassword ?? false,
+    };
   }
 
   async login(user: AuthenticatedUser): Promise<LoginResponseDto> {
@@ -101,6 +111,11 @@ export class AuthService {
         userType: true,
         status: true,
         registrationDate: true,
+        admin: {
+          select: {
+            isTemporaryPassword: true,
+          },
+        },
       },
     });
 
@@ -108,7 +123,10 @@ export class AuthService {
       throw new UnauthorizedException('Usuario no autorizado');
     }
 
-    return user;
+    return {
+      ...user,
+      isTemporaryPassword: user.admin?.isTemporaryPassword ?? false,
+    };
   }
 
   async forgotPassword(dto: ForgotPasswordDto) {
@@ -258,7 +276,7 @@ export class AuthService {
   }
 
   async createAdmin(dto: CreateAdminDto, rootUserId: number) {
-    const { email, username, password } = dto;
+    const { email, username } = dto;
 
     const existingEmail = await this.prisma.user.findUnique({
       where: { email },
@@ -274,7 +292,8 @@ export class AuthService {
       throw new ConflictException('Username already exists');
     }
 
-    const passwordHash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
+    const temporaryPassword = this.generateTemporaryPassword();
+    const passwordHash = await bcrypt.hash(temporaryPassword, BCRYPT_SALT_ROUNDS);
 
     const adminUser = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
@@ -298,33 +317,54 @@ export class AuthService {
         data: {
           userId: user.userId,
           createdByRootId: rootUserId,
-          isTemporaryPassword: false,
+          isTemporaryPassword: true,
         },
       });
 
       return user;
     });
 
+    await this.mailService.sendAdminTemporaryPassword(
+      email,
+      username,
+      temporaryPassword,
+    );
+
     const { passwordHash: _passwordHash, ...safeUser } = adminUser;
     return safeUser;
   }
 
-  async deleteAdmin(adminUserId: number) {
+  /**
+   * Desactiva un administrador (soft delete). Solo root.
+   * No borra filas; el historial (AuditLog, etc.) permanece intacto.
+   * Las sesiones del admin quedan invalidadas al rechazar status !== 'active' en JWT.
+   */
+  async deactivateAdmin(adminUserId: number, rootUserId: number) {
     const adminRecord = await this.prisma.admin.findUnique({
       where: { userId: adminUserId },
       include: { user: true },
     });
 
-    if (!adminRecord || adminRecord.user.userType !== 'admin') {
-      throw new BadRequestException('El usuario indicado no es administrador');
+    if (
+      !adminRecord ||
+      adminRecord.user.userType !== 'admin' ||
+      adminRecord.user.status === 'inactive'
+    ) {
+      throw new NotFoundException(
+        'Administrador no encontrado o ya está inactivo',
+      );
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.admin.delete({ where: { userId: adminUserId } });
-      await tx.user.delete({ where: { userId: adminUserId } });
+    if (adminUserId === rootUserId) {
+      throw new ForbiddenException('No puede desactivar su propia cuenta');
+    }
+
+    await this.prisma.user.update({
+      where: { userId: adminUserId },
+      data: { status: 'inactive' },
     });
 
-    return { message: 'Administrador eliminado correctamente' };
+    return { message: 'Administrador desactivado correctamente' };
   }
 
   async validateUniqueFields(email: string, username: string) {
@@ -353,5 +393,38 @@ export class AuthService {
       .replace(/\//g, '_');
     const timestampPart = Date.now().toString(36);
     return `${timestampPart}.${entropyPart}`;
+  }
+
+  private generateTemporaryPassword(length = 12): string {
+    const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const lower = 'abcdefghijklmnopqrstuvwxyz';
+    const digits = '0123456789';
+    const symbols = '!@#$%^&*';
+
+    const all = upper + lower + digits + symbols;
+
+    const pick = (charset: string) =>
+      charset[Math.floor(Math.random() * charset.length)];
+
+    const requiredChars = [
+      pick(upper),
+      pick(lower),
+      pick(digits),
+      pick(symbols),
+    ];
+
+    const remainingLength = Math.max(length - requiredChars.length, 0);
+    const remainingChars = Array.from({ length: remainingLength }, () =>
+      pick(all),
+    );
+
+    const passwordChars = [...requiredChars, ...remainingChars];
+
+    for (let i = passwordChars.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [passwordChars[i], passwordChars[j]] = [passwordChars[j], passwordChars[i]];
+    }
+
+    return passwordChars.join('');
   }
 }

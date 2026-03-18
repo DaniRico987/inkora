@@ -6,4 +6,5 @@ export interface AuthenticatedUser {
   lastName: string;
   userType: 'client' | 'admin' | 'root';
   status: 'active' | 'inactive' | 'blocked';
+  isTemporaryPassword?: boolean;
 }

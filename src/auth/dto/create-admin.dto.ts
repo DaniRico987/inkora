@@ -5,8 +5,6 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
-  MinLength,
-  Matches,
 } from 'class-validator';
 
 export class CreateAdminDto {
@@ -52,13 +50,4 @@ export class CreateAdminDto {
   @IsString()
   @IsNotEmpty()
   username: string;
-
-  @ApiProperty({ example: 'Admin1234', minLength: 8 })
-  @IsString()
-  @MinLength(8)
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/, {
-    message:
-      'La contraseña debe contener al menos una mayúscula, una minúscula y un número.',
-  })
-  password: string;
 }

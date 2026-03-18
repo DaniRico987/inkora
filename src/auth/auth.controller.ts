@@ -91,17 +91,29 @@ export class AuthController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('root')
   @ApiBearerAuth('JWT')
-  @ApiOperation({ summary: 'Eliminar administrador (solo root)' })
+  @ApiOperation({
+    summary: 'Desactivar administrador (solo root)',
+    description:
+      'Desactiva la cuenta del administrador. No borra datos; el historial permanece intacto.',
+  })
   @ApiResponse({
     status: 200,
-    description: 'Administrador eliminado exitosamente',
+    description: 'Administrador desactivado correctamente',
   })
   @ApiResponse({
     status: 403,
-    description: 'Solo root puede eliminar administradores',
+    description:
+      'Solo root puede desactivar administradores. No puede desactivar su propia cuenta',
   })
-  async deleteAdmin(@Param('userId', ParseIntPipe) userId: number) {
-    return this.authService.deleteAdmin(userId);
+  @ApiResponse({
+    status: 404,
+    description: 'Administrador no encontrado o ya inactivo',
+  })
+  async deleteAdmin(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Req() req: Request & { user: AuthenticatedUser },
+  ) {
+    return this.authService.deactivateAdmin(userId, req.user.userId);
   }
 
   @Post('forgot-password')
