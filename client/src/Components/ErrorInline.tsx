@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ErrorLineProps } from "../interfaces/ErrorLineInterface";
+import type { ErrorInlineProps } from "../interfaces/ErrorInlineInterface";
 
 function pad2(n: number) {
   return String(Math.max(0, Math.floor(n))).padStart(2, "0");
@@ -22,7 +22,7 @@ export function ErrorLine({
   countdown,
   countdownLabel = "Tiempo restante:",
   onExpire,
-}: ErrorLineProps) {
+}: ErrorInlineProps) {
   const initialSeconds = useMemo(() => {
     if (!countdown) return null;
     if (typeof (countdown as { seconds?: unknown }).seconds === "number") {
