@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { InputText, InputPassword, Checkbox } from '../Components/Inputs';
+import { Link, useNavigate } from 'react-router-dom';
+import { InputText, InputPassword } from '../Components/Inputs';
 import { Button } from '../Components/Button';
 import { useTheme } from '../theme/useTheme';
 import { extractAuthError, login } from '../api/auth';
+import { getRoleFromToken, saveAccessToken } from '../auth/session';
 
 export function LoginPage() {
 	useTheme();
@@ -12,10 +13,10 @@ export function LoginPage() {
 	const [password, setPassword] = useState('');
 	const [recaptchaToken, setRecaptchaToken] = useState('captcha-ok');
 	const [requiresCaptcha, setRequiresCaptcha] = useState(false);
-	const [rememberMe, setRememberMe] = useState(false);
 	const [loading, setLoading] = useState(false);
 	const [errorMessage, setErrorMessage] = useState('');
 	const [successMessage, setSuccessMessage] = useState('');
+	const navigate = useNavigate();
 
 	const formatBlockedUntil = (blockedUntil?: string) => {
 		if (!blockedUntil) {
@@ -48,16 +49,18 @@ export function LoginPage() {
 				recaptchaToken: requiresCaptcha ? recaptchaToken : undefined,
 			});
 
-			if (rememberMe) {
-				localStorage.setItem('accessToken', response.accessToken);
-				sessionStorage.removeItem('accessToken');
-			} else {
-				sessionStorage.setItem('accessToken', response.accessToken);
-				localStorage.removeItem('accessToken');
-			}
+			saveAccessToken(response.accessToken);
+			const role = getRoleFromToken(response.accessToken);
 
 			setRequiresCaptcha(false);
-			setSuccessMessage('Inicio de sesión exitoso. Tu token fue almacenado correctamente.');
+			setSuccessMessage('Inicio de sesión exitoso.');
+
+			if (role === 'admin' || role === 'root') {
+				navigate('/admin', { replace: true });
+				return;
+			}
+
+			navigate('/', { replace: true });
 		} catch (error) {
 			const authError = extractAuthError(error);
 			setRequiresCaptcha(Boolean(authError.requiresCaptcha));
@@ -66,19 +69,11 @@ export function LoginPage() {
 				const blockedUntilText = formatBlockedUntil(authError.blockedUntil);
 				setErrorMessage(
 					blockedUntilText
-						? `Tu cuenta está bloqueada temporalmente hasta ${blockedUntilText}.`
-						: 'Tu cuenta está bloqueada temporalmente por múltiples intentos fallidos.',
+						? `No fue posible iniciar sesión. Intenta de nuevo después de ${blockedUntilText}.`
+						: 'No fue posible iniciar sesión. Inténtalo más tarde.',
 				);
 			} else {
-				const baseMessage = authError.message || 'No se pudo iniciar sesión.';
-				const attemptsMessage =
-					typeof authError.attemptsRemaining === 'number'
-						? ` Intentos restantes: ${authError.attemptsRemaining}.`
-						: '';
-				const captchaMessage = authError.requiresCaptcha
-					? ' Debes completar reCAPTCHA para continuar.'
-					: '';
-				setErrorMessage(`${baseMessage}${attemptsMessage}${captchaMessage}`.trim());
+				setErrorMessage('Usuario o contraseña inválidos.');
 			}
 		} finally {
 			setLoading(false);
@@ -127,7 +122,7 @@ export function LoginPage() {
 						className="space-y-4 [&_input]:border-border [&_input]:bg-bg-input [&_input]:text-text [&_input]:placeholder:text-placeholder [&_input]:focus:border-border-focus [&_input]:shadow-none [&_label>span:first-of-type]:border-border [&_label>span:last-of-type]:text-label"
 						>
 							<InputText
-								label="Correo o usuario"
+								label="Username"
 								type="text"
 								autoComplete="username"
 								value={identifier}
@@ -141,13 +136,7 @@ export function LoginPage() {
 								onChange={(e) => setPassword(e.target.value)}
 							/>
 
-							<div className="flex items-center justify-between gap-3">
-								<Checkbox
-									label="Recordarme"
-									checked={rememberMe}
-									onChange={(e) => setRememberMe(e.target.checked)}
-								/>
-
+							<div className="flex items-center justify-end gap-3">
 								<Link
 									to="/forgot-password"
 									className="text-sm text-primary-500 hover:text-primary-600 transition-colors"
