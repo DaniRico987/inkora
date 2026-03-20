@@ -43,7 +43,8 @@ export function InputText({ label, value, onChange, ...props }: InputTextProps) 
   const [internalVal, setInternalVal] = useState("");
 
   const currentVal = value !== undefined ? String(value) : internalVal;
-  const lifted = focused || currentVal.length > 0;
+  const isDateInput = props.type === "date";
+  const lifted = isDateInput ? true : focused || currentVal.length > 0;
 
   return (
     <div className={wrapper}>
