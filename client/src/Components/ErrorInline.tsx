@@ -15,7 +15,7 @@ function formatRemaining(totalSeconds: number) {
 
 const errorText = "text-sm text-red-500";
 
-export function ErrorLine({
+export function ErrorInLine({
   title = "Tu cuenta ha sido bloqueada temporalmente por seguridad.",
   failedAttempts,
   className = "",
@@ -70,9 +70,11 @@ export function ErrorLine({
       ].join(" ")}
     >
       <div className={`${errorText} leading-5 wrap-break-word`}>{title}</div>
-      <div className={`${errorText} leading-5 wrap-break-word mt-0.5`}>
-        Intentos fallidos: {failedAttempts.current}/{failedAttempts.max}
-      </div>
+      {failedAttempts && (
+        <div className={`${errorText} leading-5 wrap-break-word mt-0.5`}>
+          Intentos fallidos: {failedAttempts.current}/{failedAttempts.max}
+        </div>
+      )}
       {timeText && (
         <div className={`${errorText} leading-5 wrap-break-word mt-0.5`}>
           {countdownLabel} {timeText}

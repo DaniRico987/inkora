@@ -73,7 +73,16 @@ export class AuthService {
     const now = new Date();
 
     if (user.status === 'blocked') {
-      if (user.blockedUntil && user.blockedUntil <= now) {
+      if (!user.blockedUntil) {
+        const recoveredBlockedUntil = this.calculateBlockedUntil(now);
+        await this.prisma.user.update({
+          where: { userId: user.userId },
+          data: { blockedUntil: recoveredBlockedUntil },
+        });
+        user.blockedUntil = recoveredBlockedUntil;
+      }
+
+      if (user.blockedUntil <= now) {
         await this.prisma.user.update({
           where: { userId: user.userId },
           data: {
@@ -91,7 +100,7 @@ export class AuthService {
           now,
         );
         throw new UnauthorizedException({
-          message: 'Cuenta bloqueada temporalmente',
+          message: 'Cuenta bloqueada temporalmente por múltiples intentos fallidos',
           accountBlocked: true,
           blockedUntil: user.blockedUntil,
           remainingBlockSeconds,
@@ -111,13 +120,57 @@ export class AuthService {
     if (requiresCaptcha) {
       const isHuman = await this.recaptchaService.verify(recaptchaToken);
       if (!isHuman) {
+        const nextFailedAttempts = user.failedAttempts + 1;
+        const shouldBlock = nextFailedAttempts >= MAX_LOGIN_FAILED_ATTEMPTS;
+        const blockedUntil = shouldBlock
+          ? this.calculateBlockedUntil(now)
+          : null;
+
+        await this.prisma.user.update({
+          where: { userId: user.userId },
+          data: {
+            failedAttempts: nextFailedAttempts,
+            status: shouldBlock ? 'blocked' : user.status,
+            blockedUntil,
+          },
+        });
+
+        if (shouldBlock) {
+          try {
+            await this.mailService.sendAccountBlockedNotification(
+              user.email,
+              user.firstName,
+              blockedUntil ?? now,
+            );
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : 'unknown error';
+            this.logger.warn(
+              `No se pudo enviar correo de bloqueo a ${user.email}: ${message}`,
+            );
+          }
+
+          throw new UnauthorizedException({
+            message: 'Cuenta bloqueada temporalmente por múltiples intentos fallidos',
+            accountBlocked: true,
+            blockedUntil,
+            remainingBlockSeconds: this.calculateRemainingBlockSeconds(
+              blockedUntil,
+              now,
+            ),
+            requiresCaptcha: true,
+            failedAttempts: nextFailedAttempts,
+            attemptsRemaining: 0,
+          });
+        }
+
         throw new UnauthorizedException({
           message: 'ReCAPTCHA verification failed',
           requiresCaptcha: true,
-          failedAttempts: user.failedAttempts,
+          failedAttempts: nextFailedAttempts,
           attemptsRemaining: Math.max(
             0,
-            MAX_LOGIN_FAILED_ATTEMPTS - user.failedAttempts,
+            MAX_LOGIN_FAILED_ATTEMPTS - nextFailedAttempts,
           ),
         });
       }

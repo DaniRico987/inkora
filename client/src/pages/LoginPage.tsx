@@ -2,51 +2,70 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { InputText, InputPassword } from '../Components/Inputs';
 import { Button } from '../Components/Button';
+import { ErrorInLine } from '../Components/ErrorInline';
 import { useTheme } from '../theme/useTheme';
 import { extractAuthError, login } from '../api/auth';
 import { getRoleFromToken, saveAccessToken } from '../auth/session';
+
+type LoginErrorState = {
+	title: string;
+	failedAttempts?: { current: number; max: number };
+	countdown?: { seconds: number };
+};
+
+function getRecaptchaApi() {
+	return (window as Window & {
+		grecaptcha?: {
+			ready: (cb: () => void) => void;
+			execute: (siteKey: string, options: { action: string }) => Promise<string>;
+		};
+	}).grecaptcha;
+}
+
+async function getRecaptchaV3Token(): Promise<string | undefined> {
+	const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined;
+	if (!siteKey) return undefined;
+
+	const grecaptcha = getRecaptchaApi();
+	if (!grecaptcha) return undefined;
+
+	await new Promise<void>((resolve) => grecaptcha.ready(resolve));
+	return grecaptcha.execute(siteKey, { action: 'login' });
+}
 
 export function LoginPage() {
 	useTheme();
 
 	const [identifier, setIdentifier] = useState('');
 	const [password, setPassword] = useState('');
-	const [recaptchaToken, setRecaptchaToken] = useState('captcha-ok');
 	const [requiresCaptcha, setRequiresCaptcha] = useState(false);
 	const [loading, setLoading] = useState(false);
-	const [errorMessage, setErrorMessage] = useState('');
+	const [errorState, setErrorState] = useState<LoginErrorState | null>(null);
 	const [successMessage, setSuccessMessage] = useState('');
 	const navigate = useNavigate();
 
-	const formatBlockedUntil = (blockedUntil?: string) => {
-		if (!blockedUntil) {
-			return '';
-		}
-
-		const parsedDate = new Date(blockedUntil);
-		if (Number.isNaN(parsedDate.getTime())) {
-			return blockedUntil;
-		}
-
-		return parsedDate.toLocaleString('es-CO');
-	};
-
 	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
-		setErrorMessage('');
+		setErrorState(null);
 		setSuccessMessage('');
 
 		if (!identifier.trim() || !password.trim()) {
-			setErrorMessage('Completa tu usuario/correo y contraseña para continuar.');
+			setErrorState({
+				title: 'Completa tu usuario/correo y contraseña para continuar.',
+			});
 			return;
 		}
 
 		setLoading(true);
 		try {
+			const recaptchaToken = requiresCaptcha
+				? await getRecaptchaV3Token()
+				: undefined;
+
 			const response = await login({
 				identifier: identifier.trim(),
 				password,
-				recaptchaToken: requiresCaptcha ? recaptchaToken : undefined,
+				recaptchaToken,
 			});
 
 			saveAccessToken(response.accessToken);
@@ -66,14 +85,29 @@ export function LoginPage() {
 			setRequiresCaptcha(Boolean(authError.requiresCaptcha));
 
 			if (authError.accountBlocked) {
-				const blockedUntilText = formatBlockedUntil(authError.blockedUntil);
-				setErrorMessage(
-					blockedUntilText
-						? `No fue posible iniciar sesión. Intenta de nuevo después de ${blockedUntilText}.`
-						: 'No fue posible iniciar sesión. Inténtalo más tarde.',
-				);
+				const blockedReason = authError.message || 'Cuenta bloqueada temporalmente por múltiples intentos fallidos';
+				setErrorState({
+					title: blockedReason,
+					failedAttempts: {
+						current: authError.failedAttempts ?? 5,
+						max: 5,
+					},
+					countdown:
+						typeof authError.remainingBlockSeconds === 'number'
+							? { seconds: authError.remainingBlockSeconds }
+							: undefined,
+				});
 			} else {
-				setErrorMessage('Usuario o contraseña inválidos.');
+				const defaultMessage = authError.requiresCaptcha
+					? 'Se validará reCAPTCHA automáticamente. La cuenta se bloquea al quinto intento fallido.'
+					: 'Usuario o contraseña inválidos.';
+				setErrorState({
+					title: authError.message || defaultMessage,
+					failedAttempts:
+						typeof authError.failedAttempts === 'number'
+							? { current: authError.failedAttempts, max: 5 }
+							: undefined,
+				});
 			}
 		} finally {
 			setLoading(false);
@@ -145,21 +179,13 @@ export function LoginPage() {
 								</Link>
 							</div>
 
-							{requiresCaptcha && (
-								<div className="space-y-2">
-									<InputText
-										label="Token reCAPTCHA"
-										type="text"
-										value={recaptchaToken}
-										onChange={(e) => setRecaptchaToken(e.target.value)}
-									/>
-									<p className="text-xs text-text-muted">
-										Completa aquí el token de reCAPTCHA cuando se habilite el widget.
-									</p>
-								</div>
+							{errorState && (
+								<ErrorInLine
+									title={errorState.title}
+									failedAttempts={errorState.failedAttempts}
+									countdown={errorState.countdown}
+								/>
 							)}
-
-							{errorMessage && <div className="text-sm text-red-300">{errorMessage}</div>}
 
 							{successMessage && (
 								<div className="text-sm text-emerald-300">{successMessage}</div>

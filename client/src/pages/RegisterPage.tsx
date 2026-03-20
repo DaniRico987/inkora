@@ -127,6 +127,7 @@ export function RegisterPage() {
 		if (!username.trim()) nextErrors.username = 'El username es requerido.';
 		if (!password.trim()) nextErrors.password = 'La contraseña es requerida.';
 		if (!confirmPassword.trim()) nextErrors.confirmPassword = 'Debes confirmar la contraseña.';
+		
 
 		if (dni.length < 6 || dni.length > 20) {
 			nextErrors.dni = 'El DNI debe tener entre 6 y 20 caracteres.';

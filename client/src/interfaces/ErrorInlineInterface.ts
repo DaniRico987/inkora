@@ -6,7 +6,7 @@ export interface ErrorInlineProps {
   /** Por defecto: "Tu cuenta ha sido bloqueada temporalmente por seguridad." */
   title?: string;
   /** Intentos fallidos actuales y máximo (render: "Intentos fallidos: X/Y") */
-  failedAttempts: { current: number; max: number };
+  failedAttempts?: { current: number; max: number };
   className?: string;
 
   /**
