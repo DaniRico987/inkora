@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -27,6 +28,8 @@ const DEFAULT_LOCK_DURATION_MINUTES = 15;
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
@@ -138,11 +141,19 @@ export class AuthService {
       });
 
       if (shouldBlock) {
-        await this.mailService.sendAccountBlockedNotification(
-          user.email,
-          user.firstName,
-          blockedUntil ?? now,
-        );
+        try {
+          await this.mailService.sendAccountBlockedNotification(
+            user.email,
+            user.firstName,
+            blockedUntil ?? now,
+          );
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : 'unknown error';
+          this.logger.warn(
+            `No se pudo enviar correo de bloqueo a ${user.email}: ${message}`,
+          );
+        }
 
         throw new UnauthorizedException({
           message: 'Cuenta bloqueada temporalmente por múltiples intentos fallidos',
@@ -268,7 +279,14 @@ export class AuthService {
       },
     });
 
-    await this.mailService.sendPasswordReset(email, rawToken);
+    try {
+      await this.mailService.sendPasswordReset(email, rawToken);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'unknown error';
+      this.logger.warn(
+        `No se pudo enviar correo de reset para ${email}: ${message}`,
+      );
+    }
 
     return { message: 'Si el correo existe, recibirás un enlace.' };
   }

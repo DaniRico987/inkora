@@ -1,0 +1,4 @@
+Hola Daniela,
+Detectamos multiples intentos fallidos de inicio de sesion y tu cuenta fue bloqueada temporalmente por seguridad.
+Disponible nuevamente: 2026-03-21T03:00:00.000Z
+Si no fuiste tu, te recomendamos cambiar tu contrasena cuando recuperes acceso.
