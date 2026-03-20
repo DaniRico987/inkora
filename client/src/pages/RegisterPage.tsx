@@ -64,6 +64,7 @@ export function RegisterPage() {
 	const [formErrors, setFormErrors] = useState<FormErrors>({});
 	const [errorMessage, setErrorMessage] = useState('');
 	const [successMessage, setSuccessMessage] = useState('');
+	const hasPassword = formData.password.trim().length > 0;
 	const passwordStrength = useMemo(() => getPasswordStrength(formData.password), [formData.password]);
 
 	useEffect(() => {
@@ -464,21 +465,27 @@ export function RegisterPage() {
 							</div>
 
 							<div className="mb-3">
-								<div className="flex items-center gap-2 text-xs mb-1">
-									<span className="text-text-muted">Fortaleza de contraseña:</span>
-									<span className="capitalize text-text">{passwordStrength}</span>
-								</div>
+								{hasPassword && (
+									<div className="flex items-center gap-2 text-xs mb-1">
+										<span className="text-text-muted">Fortaleza de contraseña:</span>
+										<span className="capitalize text-text">{passwordStrength}</span>
+									</div>
+								)}
 								<div className="h-1.5 rounded-full bg-border overflow-hidden">
 									<div
 										className={`h-full transition-all duration-300 ${
-											passwordStrength === 'fuerte'
+											!hasPassword
+												? 'bg-transparent'
+												: passwordStrength === 'fuerte'
 												? 'bg-emerald-500'
 												: passwordStrength === 'media'
 													? 'bg-amber-500'
 													: 'bg-red-500'
 										}`}
 										style={{
-											width:
+											width: !hasPassword
+												? '0%'
+												:
 												passwordStrength === 'fuerte'
 													? '100%'
 													: passwordStrength === 'media'
