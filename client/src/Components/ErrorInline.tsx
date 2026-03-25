@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { ErrorInlineProps } from "../interfaces/ErrorInlineInterface";
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ErrorInlineProps } from '../interfaces/ErrorInlineInterface';
 
 function pad2(n: number) {
-  return String(Math.max(0, Math.floor(n))).padStart(2, "0");
+  return String(Math.max(0, Math.floor(n))).padStart(2, '0');
 }
 
 function formatRemaining(totalSeconds: number) {
@@ -10,32 +10,42 @@ function formatRemaining(totalSeconds: number) {
   const hours = Math.floor(s / 3600);
   const minutes = Math.floor((s % 3600) / 60);
   const seconds = s % 60;
-  return hours > 0 ? `${hours}:${pad2(minutes)}:${pad2(seconds)}` : `${pad2(minutes)}:${pad2(seconds)}`;
+  return hours > 0
+    ? `${hours}:${pad2(minutes)}:${pad2(seconds)}`
+    : `${pad2(minutes)}:${pad2(seconds)}`;
 }
 
-const errorText = "text-sm text-red-500";
-
 export function ErrorInLine({
-  title = "Tu cuenta ha sido bloqueada temporalmente por seguridad.",
+  title = 'Tu cuenta ha sido bloqueada temporalmente por seguridad.',
   failedAttempts,
-  className = "",
+  className = '',
   countdown,
-  countdownLabel = "Tiempo restante:",
+  countdownLabel = 'Tiempo restante:',
   onExpire,
 }: ErrorInlineProps) {
   const initialSeconds = useMemo(() => {
     if (!countdown) return null;
-    if (typeof (countdown as { seconds?: unknown }).seconds === "number") {
-      return Math.max(0, Math.floor((countdown as { seconds: number }).seconds));
+    if (typeof (countdown as { seconds?: unknown }).seconds === 'number') {
+      return Math.max(
+        0,
+        Math.floor((countdown as { seconds: number }).seconds),
+      );
     }
-    if (typeof (countdown as { expiresAtMs?: unknown }).expiresAtMs === "number") {
-      const delta = Math.ceil(((countdown as { expiresAtMs: number }).expiresAtMs - Date.now()) / 1000);
+    if (
+      typeof (countdown as { expiresAtMs?: unknown }).expiresAtMs === 'number'
+    ) {
+      const delta = Math.ceil(
+        ((countdown as { expiresAtMs: number }).expiresAtMs - Date.now()) /
+          1000,
+      );
       return Math.max(0, delta);
     }
     return null;
   }, [countdown]);
 
-  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(initialSeconds);
+  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(
+    initialSeconds,
+  );
   const expiredRef = useRef(false);
 
   useEffect(() => {
@@ -58,29 +68,42 @@ export function ErrorInLine({
     return () => window.clearInterval(id);
   }, [remainingSeconds, onExpire]);
 
-  const timeText = remainingSeconds !== null ? formatRemaining(remainingSeconds) : null;
+  const timeText =
+    remainingSeconds !== null ? formatRemaining(remainingSeconds) : null;
 
   return (
     <div
       role="alert"
       className={[
-        "w-full",
-        "transition-all duration-200",
+        'w-full',
+        'rounded-xl border border-red-200 bg-red-50/60',
+        'text-left',
+        'transition-all duration-200',
+        'p-3.5 sm:p-4',
         className,
-      ].join(" ")}
+      ].join(' ')}
     >
-      <div className={`${errorText} leading-5 wrap-break-word`}>{title}</div>
-      {failedAttempts && (
-        <div className={`${errorText} leading-5 wrap-break-word mt-0.5`}>
-          Intentos fallidos: {failedAttempts.current}/{failedAttempts.max}
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1 border-l-2 border-red-200 pl-3">
+          <p className="text-sm sm:text-[0.95rem] font-medium leading-6 text-red-600 wrap-break-word">
+            {title}
+          </p>
+
+          <div className="mt-1.5 space-y-1">
+            {failedAttempts && (
+              <p className="text-xs sm:text-sm text-red-600">
+                Intentos fallidos: {failedAttempts.current}/{failedAttempts.max}
+              </p>
+            )}
+
+            {timeText && (
+              <p className="text-xs sm:text-sm text-text-muted">
+                {countdownLabel} {timeText}
+              </p>
+            )}
+          </div>
         </div>
-      )}
-      {timeText && (
-        <div className={`${errorText} leading-5 wrap-break-word mt-0.5`}>
-          {countdownLabel} {timeText}
-        </div>
-      )}
+      </div>
     </div>
   );
 }
-
