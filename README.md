@@ -31,6 +31,43 @@
 $ npm install
 ```
 
+## Email Setup (Gmail SMTP)
+
+This project uses Gmail SMTP (Nodemailer) for transactional emails.
+
+Required environment variables:
+
+- `MAIL_HOST` (recommended: `smtp.gmail.com`)
+- `MAIL_PORT` (`465` for SSL or `587` for TLS)
+- `MAIL_USER` (your Gmail account)
+- `MAIL_PASSWORD` (Google App Password)
+- `MAIL_FROM` (example: `INKORA <your_mail@gmail.com>`)
+- `MAIL_REPLY_TO` (optional)
+- `MAIL_LOGO_URL` (optional public URL for your logo in email header)
+- `FRONTEND_URL` (used to build password reset links)
+
+Note: for Gmail you must enable 2-step verification and create an App Password.
+
+Logo strategy:
+
+- If `MAIL_LOGO_URL` is set, it is used as-is.
+- If `MAIL_LOGO_URL` is not set, the system uses `${FRONTEND_URL}/branding/inkora-logo.png`.
+- If neither is available in local preview generation, a dummy placeholder image is used.
+
+Current email flows:
+
+- Forgot password (`/auth/forgot-password`)
+- Admin temporary password delivery (admin creation)
+- Account blocked notification after repeated failed login attempts
+
+Template preview (without sending emails):
+
+```bash
+$ npm run mail:preview
+```
+
+This command generates HTML/TXT previews under `mail-previews/`.
+
 ## Compile and run the project
 
 ```bash

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ErrorLineProps } from "../interfaces/ErrorLineInterface";
+import type { ErrorInlineProps } from "../interfaces/ErrorInlineInterface";
 
 function pad2(n: number) {
   return String(Math.max(0, Math.floor(n))).padStart(2, "0");
@@ -15,14 +15,14 @@ function formatRemaining(totalSeconds: number) {
 
 const errorText = "text-sm text-red-500";
 
-export function ErrorLine({
+export function ErrorInLine({
   title = "Tu cuenta ha sido bloqueada temporalmente por seguridad.",
   failedAttempts,
   className = "",
   countdown,
   countdownLabel = "Tiempo restante:",
   onExpire,
-}: ErrorLineProps) {
+}: ErrorInlineProps) {
   const initialSeconds = useMemo(() => {
     if (!countdown) return null;
     if (typeof (countdown as { seconds?: unknown }).seconds === "number") {
@@ -70,9 +70,11 @@ export function ErrorLine({
       ].join(" ")}
     >
       <div className={`${errorText} leading-5 wrap-break-word`}>{title}</div>
-      <div className={`${errorText} leading-5 wrap-break-word mt-0.5`}>
-        Intentos fallidos: {failedAttempts.current}/{failedAttempts.max}
-      </div>
+      {failedAttempts && (
+        <div className={`${errorText} leading-5 wrap-break-word mt-0.5`}>
+          Intentos fallidos: {failedAttempts.current}/{failedAttempts.max}
+        </div>
+      )}
       {timeText && (
         <div className={`${errorText} leading-5 wrap-break-word mt-0.5`}>
           {countdownLabel} {timeText}
