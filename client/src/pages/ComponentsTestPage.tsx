@@ -8,7 +8,7 @@ import {
   InputText,
   InputTextarea,
 } from '../Components/Inputs';
-import { ErrorLine } from '../Components/ErrorLine';
+import { ErrorInLine } from '../Components/ErrorInline';
 import { useSnackbar } from '../Components/SnackbarProvider';
 
 export function ComponentsTestPage() {
@@ -105,7 +105,7 @@ export function ComponentsTestPage() {
 
             <div className="mt-4 rounded-xl border border-border p-4 bg-bg-card/30">
               <h3 className="text-sm font-medium text-text mb-2">ErrorLine con countdown</h3>
-              <ErrorLine
+              <ErrorInLine
                 title="Cuenta bloqueada por intentos fallidos de ejemplo."
                 failedAttempts={{ current: 5, max: 5 }}
                 countdown={{ expiresAtMs: errorCountdownSeed + 90000 }}
