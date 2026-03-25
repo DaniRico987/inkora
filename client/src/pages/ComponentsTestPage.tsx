@@ -10,6 +10,7 @@ import {
 } from '../Components/Inputs';
 import { ErrorInLine } from '../Components/ErrorInline';
 import { useSnackbar } from '../Components/SnackbarProvider';
+import { NavBar } from '../Components/NavBar';
 
 export function ComponentsTestPage() {
   const { info, success, warning, error } = useSnackbar();
@@ -24,6 +25,7 @@ export function ComponentsTestPage() {
 
   return (
     <div className="w-full px-4 py-8">
+      <NavBar variant="client" />
       <div className="w-full max-w-5xl mx-auto bg-bg-secondary rounded-2xl shadow-lg p-6 sm:p-8">
         <h1 className="text-2xl font-semibold text-text mb-2">Pagina de prueba de componentes</h1>
         <p className="text-sm text-text-muted mb-8">
