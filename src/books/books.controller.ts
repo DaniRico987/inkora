@@ -55,6 +55,8 @@ export class BooksController {
   })
   @ApiBody({ type: CreateBookDto })
   @ApiResponse({ status: 201, description: 'Libro creado' })
+  @ApiResponse({ status: 400, description: 'Datos inválidos' })
+  @ApiResponse({ status: 409, description: 'Conflicto - ISBN ya está registrado' })
   @ApiUnauthorizedResponse({ description: 'Token inválido o ausente' })
   @ApiForbiddenResponse({ description: 'No tienes permisos para crear libros' })
   async adminCreate(@Body() dto: CreateBookDto) {
@@ -70,7 +72,9 @@ export class BooksController {
   })
   @ApiBody({ type: UpdateBookDto })
   @ApiResponse({ status: 200, description: 'Libro actualizado' })
+  @ApiResponse({ status: 400, description: 'Datos inválidos' })
   @ApiResponse({ status: 404, description: 'Libro no encontrado' })
+  @ApiResponse({ status: 409, description: 'Conflicto - ISBN ya está registrado' })
   @ApiUnauthorizedResponse({ description: 'Token inválido o ausente' })
   @ApiForbiddenResponse({ description: 'No tienes permisos para editar libros' })
   async adminUpdate(

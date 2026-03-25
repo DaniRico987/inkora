@@ -36,6 +36,7 @@ export class StoresController {
   @ApiOperation({ summary: 'Registrar nueva tienda (admin)' })
   @ApiBody({ type: CreateStoreDto })
   @ApiResponse({ status: 201, description: 'Tienda creada' })
+  @ApiResponse({ status: 400, description: 'Datos inválidos' })
   @ApiUnauthorizedResponse({ description: 'Token inválido o ausente' })
   @ApiForbiddenResponse({ description: 'No tienes permisos para crear tiendas' })
   async create(@Body() dto: CreateStoreDto) {
@@ -46,6 +47,7 @@ export class StoresController {
   @ApiOperation({ summary: 'Editar tienda (admin)' })
   @ApiBody({ type: UpdateStoreDto })
   @ApiResponse({ status: 200, description: 'Tienda actualizada' })
+  @ApiResponse({ status: 400, description: 'Datos inválidos' })
   @ApiResponse({ status: 404, description: 'Tienda no encontrada' })
   @ApiUnauthorizedResponse({ description: 'Token inválido o ausente' })
   @ApiForbiddenResponse({ description: 'No tienes permisos para editar tiendas' })
