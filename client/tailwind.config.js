@@ -1,11 +1,73 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        bg: 'var(--color-bg)',
+        'bg-secondary': 'var(--color-bg-secondary)',
+        surface: 'var(--color-surface)',
+        text: 'var(--color-text)',
+        'text-muted': 'var(--color-text-muted)',
+        border: 'var(--color-border)',
+        'border-focus': 'var(--color-border-focus)',
+        'bg-input': 'var(--color-bg-input)',
+        placeholder: 'var(--color-placeholder)',
+        label: 'var(--color-label)',
+
+        primary: {
+          50: 'var(--color-primary-50)',
+          100: 'var(--color-primary-100)',
+          200: 'var(--color-primary-200)',
+          300: 'var(--color-primary-300)',
+          400: 'var(--color-primary-400)',
+          500: 'var(--color-primary-500)',
+          600: 'var(--color-primary-600)',
+          700: 'var(--color-primary-700)',
+          800: 'var(--color-primary-800)',
+          900: 'var(--color-primary-900)',
+        },
+
+        skyblue: {
+          50: 'var(--color-skyblue-50)',
+          100: 'var(--color-skyblue-100)',
+          200: 'var(--color-skyblue-200)',
+          300: 'var(--color-skyblue-300)',
+          400: 'var(--color-skyblue-400)',
+          500: 'var(--color-skyblue-500)',
+          600: 'var(--color-skyblue-600)',
+          700: 'var(--color-skyblue-700)',
+          800: 'var(--color-skyblue-800)',
+          900: 'var(--color-skyblue-900)',
+        },
+
+        babyblue: {
+          50: 'var(--color-babyblue-50)',
+          100: 'var(--color-babyblue-100)',
+          200: 'var(--color-babyblue-200)',
+          300: 'var(--color-babyblue-300)',
+          400: 'var(--color-babyblue-400)',
+          500: 'var(--color-babyblue-500)',
+          600: 'var(--color-babyblue-600)',
+          700: 'var(--color-babyblue-700)',
+          800: 'var(--color-babyblue-800)',
+          900: 'var(--color-babyblue-900)',
+        },
+
+        metallicgold: {
+          50: 'var(--color-metallicgold-50)',
+          100: 'var(--color-metallicgold-100)',
+          200: 'var(--color-metallicgold-200)',
+          300: 'var(--color-metallicgold-300)',
+          400: 'var(--color-metallicgold-400)',
+          500: 'var(--color-metallicgold-500)',
+          600: 'var(--color-metallicgold-600)',
+          700: 'var(--color-metallicgold-700)',
+          800: 'var(--color-metallicgold-800)',
+          900: 'var(--color-metallicgold-900)',
+        },
+      },
+    },
   },
   plugins: [],
-}
+};

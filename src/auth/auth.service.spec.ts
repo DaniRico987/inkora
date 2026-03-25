@@ -13,6 +13,7 @@ describe('AuthService', () => {
   let prisma: {
     user: {
       findFirst: jest.Mock;
+      update: jest.Mock;
     };
   };
   let recaptchaService: {
@@ -24,11 +25,16 @@ describe('AuthService', () => {
   let configService: {
     get: jest.Mock;
   };
+  let mailService: {
+    sendPasswordReset: jest.Mock;
+    sendAccountBlockedNotification: jest.Mock;
+  };
 
   beforeEach(async () => {
     prisma = {
       user: {
         findFirst: jest.fn(),
+        update: jest.fn(),
       },
     };
 
@@ -41,7 +47,16 @@ describe('AuthService', () => {
     };
 
     configService = {
-      get: jest.fn().mockReturnValue('1h'),
+      get: jest.fn((key: string) => {
+        if (key === 'JWT_EXPIRES_IN') return '1h';
+        if (key === 'AUTH_LOCK_DURATION_MINUTES') return '15';
+        return undefined;
+      }),
+    };
+
+    mailService = {
+      sendPasswordReset: jest.fn(),
+      sendAccountBlockedNotification: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -53,7 +68,7 @@ describe('AuthService', () => {
         },
         {
           provide: MailService,
-          useValue: { sendPasswordReset: jest.fn() },
+          useValue: mailService,
         },
         {
           provide: RecaptchaService,
@@ -88,7 +103,12 @@ describe('AuthService', () => {
         lastName: 'Lovelace',
         userType: 'admin',
         status: 'active',
+        failedAttempts: 0,
+        blockedUntil: null,
         passwordHash,
+        admin: {
+          isTemporaryPassword: false,
+        },
       });
 
       const result = await service.validateUser(
@@ -97,7 +117,7 @@ describe('AuthService', () => {
         'captcha-token',
       );
 
-      expect(recaptchaService.verify).toHaveBeenCalledWith('captcha-token');
+      expect(recaptchaService.verify).not.toHaveBeenCalled();
       expect(prisma.user.findFirst).toHaveBeenCalled();
       expect(result).toEqual({
         userId: 10,
@@ -107,6 +127,8 @@ describe('AuthService', () => {
         lastName: 'Lovelace',
         userType: 'admin',
         status: 'active',
+        failedAttempts: 0,
+        blockedUntil: null,
         isTemporaryPassword: false,
       });
     });
@@ -133,7 +155,10 @@ describe('AuthService', () => {
         lastName: 'Doe',
         userType: 'client',
         status: 'active',
+        failedAttempts: 0,
+        blockedUntil: null,
         passwordHash,
+        admin: null,
       });
 
       await expect(
@@ -143,6 +168,170 @@ describe('AuthService', () => {
       await expect(
         service.validateUser('clientuser', 'IncorrectPass', 'captcha'),
       ).rejects.toThrow('Credenciales inválidas');
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { userId: 20 },
+        data: {
+          failedAttempts: 1,
+          status: 'active',
+          blockedUntil: null,
+        },
+      });
+    });
+
+    it('should require recaptcha after third failed attempt', async () => {
+      const passwordHash = await bcrypt.hash('CorrectPass123', 4);
+      prisma.user.findFirst.mockResolvedValue({
+        userId: 21,
+        email: 'client2@inkora.com',
+        username: 'clientuser2',
+        firstName: 'Ana',
+        lastName: 'Doe',
+        userType: 'client',
+        status: 'active',
+        failedAttempts: 3,
+        blockedUntil: null,
+        passwordHash,
+        admin: null,
+      });
+      recaptchaService.verify.mockResolvedValue(false);
+
+      await expect(
+        service.validateUser('clientuser2', 'IncorrectPass', ''),
+      ).rejects.toThrow('ReCAPTCHA verification failed');
+
+      expect(recaptchaService.verify).toHaveBeenCalledWith('');
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { userId: 21 },
+        data: {
+          failedAttempts: 4,
+          status: 'active',
+          blockedUntil: null,
+        },
+      });
+    });
+
+    it('should block account on fifth failed attempt when recaptcha verification fails', async () => {
+      const passwordHash = await bcrypt.hash('CorrectPass123', 4);
+      prisma.user.findFirst.mockResolvedValue({
+        userId: 22,
+        email: 'captcha-block@inkora.com',
+        username: 'captchauser',
+        firstName: 'Captcha',
+        lastName: 'Blocked',
+        userType: 'client',
+        status: 'active',
+        failedAttempts: 4,
+        blockedUntil: null,
+        passwordHash,
+        admin: null,
+      });
+      recaptchaService.verify.mockResolvedValue(false);
+
+      await expect(
+        service.validateUser('captchauser', 'IncorrectPass', ''),
+      ).rejects.toThrow('Cuenta bloqueada temporalmente por múltiples intentos fallidos');
+
+      expect(prisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: 22 },
+          data: expect.objectContaining({
+            failedAttempts: 5,
+            status: 'blocked',
+          }),
+        }),
+      );
+      expect(mailService.sendAccountBlockedNotification).toHaveBeenCalled();
+    });
+
+    it('should block account on fifth failed attempt and notify by email', async () => {
+      const passwordHash = await bcrypt.hash('CorrectPass123', 4);
+      prisma.user.findFirst.mockResolvedValue({
+        userId: 30,
+        email: 'blocked@inkora.com',
+        username: 'blockeduser',
+        firstName: 'Blocked',
+        lastName: 'User',
+        userType: 'client',
+        status: 'active',
+        failedAttempts: 4,
+        blockedUntil: null,
+        passwordHash,
+        admin: null,
+      });
+      recaptchaService.verify.mockResolvedValue(true);
+
+      await expect(
+        service.validateUser('blockeduser', 'IncorrectPass', 'captcha-token'),
+      ).rejects.toThrow('Cuenta bloqueada temporalmente por múltiples intentos fallidos');
+
+      expect(prisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: 30 },
+          data: expect.objectContaining({
+            failedAttempts: 5,
+            status: 'blocked',
+          }),
+        }),
+      );
+      expect(mailService.sendAccountBlockedNotification).toHaveBeenCalled();
+    });
+
+    it('should persist blockedUntil when a blocked user has no lock timestamp', async () => {
+      const passwordHash = await bcrypt.hash('CorrectPass123', 4);
+      prisma.user.findFirst.mockResolvedValue({
+        userId: 32,
+        email: 'missinglock@inkora.com',
+        username: 'missinglock',
+        firstName: 'Missing',
+        lastName: 'Lock',
+        userType: 'client',
+        status: 'blocked',
+        failedAttempts: 5,
+        blockedUntil: null,
+        passwordHash,
+        admin: null,
+      });
+
+      await expect(
+        service.validateUser('missinglock', 'CorrectPass123', 'captcha-token'),
+      ).rejects.toThrow('Cuenta bloqueada temporalmente por múltiples intentos fallidos');
+
+      expect(prisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: 32 },
+          data: expect.objectContaining({
+            blockedUntil: expect.any(Date),
+          }),
+        }),
+      );
+    });
+
+    it('should reset failed attempts after successful login', async () => {
+      const passwordHash = await bcrypt.hash('S3gura123!', 4);
+      prisma.user.findFirst.mockResolvedValue({
+        userId: 31,
+        email: 'reset@inkora.com',
+        username: 'resetuser',
+        firstName: 'Reset',
+        lastName: 'User',
+        userType: 'client',
+        status: 'active',
+        failedAttempts: 2,
+        blockedUntil: null,
+        passwordHash,
+        admin: null,
+      });
+
+      await service.validateUser('resetuser', 'S3gura123!', '');
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { userId: 31 },
+        data: {
+          failedAttempts: 0,
+          blockedUntil: null,
+        },
+      });
     });
   });
 

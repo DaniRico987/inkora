@@ -1,35 +1,94 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import './App.css';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Toggle } from './Components/Toggle';
+import { useTheme } from './theme/useTheme';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
+import { LoginPage } from './pages/LoginPage';
+import { RegisterPage } from './pages/RegisterPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
+import { SnackbarProvider } from './Components/SnackbarProvider';
+import { getAccessToken, getRoleFromToken } from './auth/session';
+import { AdminPage } from './pages/AdminPage';
+import { ClientHomePage } from './pages/ClientHomePage';
 
-function App() {
-  const [count, setCount] = useState(0)
+function ProtectedClientRoute() {
+  const token = getAccessToken();
+  const role = getRoleFromToken(token);
 
-  return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+  if (!token || !role) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (role === 'admin' || role === 'root') {
+    return <Navigate to="/admin" replace />;
+  }
+
+  return <ClientHomePage />;
 }
 
-export default App
+function ProtectedAdminRoute() {
+  const token = getAccessToken();
+  const role = getRoleFromToken(token);
+
+  if (!token || !role) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (role !== 'admin' && role !== 'root') {
+    return <Navigate to="/" replace />;
+  }
+
+  return <AdminPage />;
+}
+
+function PublicLoginRoute() {
+  const token = getAccessToken();
+  const role = getRoleFromToken(token);
+
+  if (!token || !role) {
+    return <LoginPage />;
+  }
+
+  if (role === 'admin' || role === 'root') {
+    return <Navigate to="/admin" replace />;
+  }
+
+  return <Navigate to="/" replace />;
+}
+
+function App() {
+  useTheme();
+  return (
+    <BrowserRouter>
+      <SnackbarProvider
+        config={{
+          position: 'bottom-center',
+          maxVisible: 3,
+          maxQueue: 20,
+          dedupeWindowMs: 1500,
+        }}
+      >
+        <div className="bg-bg w-screen min-h-screen flex flex-col transition-all duration-300 ease-in-out">
+          <header className="w-full flex justify-end p-4">
+            <Toggle />
+          </header>
+          <main className="flex-1 flex items-center justify-center">
+            <Routes>
+              <Route path="/" element={<ProtectedClientRoute />} />
+              <Route path="/admin" element={<ProtectedAdminRoute />} />
+              <Route path="/login" element={<PublicLoginRoute />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route
+                path="/reset-password/:token"
+                element={<ResetPasswordPage />}
+              />
+            </Routes>
+          </main>
+        </div>
+      </SnackbarProvider>
+    </BrowserRouter>
+  );
+}
+
+export default App;
