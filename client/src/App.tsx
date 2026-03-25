@@ -6,6 +6,7 @@ import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
+import { ComponentsTestPage } from './pages/ComponentsTestPage';
 import { SnackbarProvider } from './Components/SnackbarProvider';
 import { getAccessToken, getRoleFromToken } from './auth/session';
 import { AdminPage } from './pages/AdminPage';
@@ -83,6 +84,8 @@ function App() {
                 path="/reset-password/:token"
                 element={<ResetPasswordPage />}
               />
+              <Route path="/components-test" element={<ComponentsTestPage />} />
+              {/* TODO: agregar aquí /login y demás rutas cuando estén listas */}
             </Routes>
           </main>
         </div>
