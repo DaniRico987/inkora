@@ -1,7 +1,7 @@
 export const lightTheme = {
   '--color-bg': '#f5f5f5',
   '--color-bg-secondary': '#ffffff',
-  '--color-surface': '#f4f7fb',
+  '--color-surface': '#aaa',
   '--color-text': '#333333',
   '--color-text-muted': '#6b7d90',
   '--color-border': '#e0e0e0',

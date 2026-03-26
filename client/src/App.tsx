@@ -4,6 +4,7 @@ import { Toggle } from './Components/Toggle';
 import { useTheme } from './theme/useTheme';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
+import { CatalogPage } from './pages/catalog';
 
 function App() {
   useTheme();
@@ -20,6 +21,7 @@ function App() {
               path="/reset-password/:token"
               element={<ResetPasswordPage />}
             />
+            <Route path="/catalog" element={<CatalogPage />} />
             {/* TODO: agregar aquí /login y demás rutas cuando estén listas */}
           </Routes>
         </main>
