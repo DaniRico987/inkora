@@ -92,6 +92,24 @@ describe('RolesGuard', () => {
     ).toThrow(ForbiddenException);
   });
 
+  it('should deny root when admin role is required', () => {
+    reflector.getAllAndOverride.mockReturnValue(['admin']);
+
+    expect(() =>
+      guard.canActivate(
+        createContext({
+          userId: 10,
+          email: 'root@inkora.com',
+          username: 'root',
+          firstName: 'Root',
+          lastName: 'User',
+          userType: 'root',
+          status: 'active',
+        }),
+      ),
+    ).toThrow(ForbiddenException);
+  });
+
   it('should throw unauthorized when user is missing', () => {
     reflector.getAllAndOverride.mockReturnValue(['admin']);
 

@@ -1,10 +1,17 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from 'prisma/prisma/prisma.service';
 import { BookDetailDto } from './dto/book-detail.dto';
 import { BookListItemDto } from './dto/book-list-item.dto';
+import { CreateBookDto } from './dto/create-book.dto';
 import { GetBooksQueryDto } from './dto/get-books-query.dto';
 import { PaginatedBooksResponseDto } from './dto/paginated-books-response.dto';
+import { UpdateBookDto } from './dto/update-book.dto';
 import { UploadBookCoverResponseDto } from './dto/upload-book-cover-response.dto';
 import { S3Service } from '../storage/s3.service';
 import { UploadedFile } from '../storage/interfaces/uploaded-file.interface';
@@ -217,5 +224,95 @@ export class BooksService {
       id: updatedBook.bookId,
       coverUrl: updatedBook.coverUrl ?? url,
     };
+  }
+
+  async adminCreate(dto: CreateBookDto) {
+    let created: { bookId: number };
+    try {
+      created = await this.prisma.book.create({
+        data: {
+          title: dto.title,
+          author: dto.author,
+          publicationYear: dto.publicationYear ?? null,
+          publisher: dto.publisher ?? null,
+          isbn: dto.isbn ?? null,
+          language: dto.language ?? null,
+          pageCount: dto.pageCount ?? null,
+          price: dto.price,
+          condition: dto.condition ?? null,
+          isAvailable: dto.isAvailable ?? true,
+          description: dto.description ?? null,
+          coverUrl: dto.coverUrl ?? null,
+          previewUrl: dto.previewUrl ?? null,
+        },
+        select: {
+          bookId: true,
+        },
+      });
+    } catch (error: any) {
+      if (error?.code === 'P2002') {
+        throw new ConflictException('El ISBN ya está registrado');
+      }
+      throw error;
+    }
+
+    return { id: created.bookId };
+  }
+
+  async adminUpdate(id: number, dto: UpdateBookDto) {
+    await this.assertBookExists(id);
+
+    let updated: { bookId: number };
+    try {
+      updated = await this.prisma.book.update({
+        where: { bookId: id },
+        data: {
+          ...(dto.title !== undefined ? { title: dto.title } : {}),
+          ...(dto.author !== undefined ? { author: dto.author } : {}),
+          ...(dto.publicationYear !== undefined
+            ? { publicationYear: dto.publicationYear }
+            : {}),
+          ...(dto.publisher !== undefined ? { publisher: dto.publisher } : {}),
+          ...(dto.isbn !== undefined ? { isbn: dto.isbn } : {}),
+          ...(dto.language !== undefined ? { language: dto.language } : {}),
+          ...(dto.pageCount !== undefined ? { pageCount: dto.pageCount } : {}),
+          ...(dto.price !== undefined ? { price: dto.price } : {}),
+          ...(dto.condition !== undefined ? { condition: dto.condition } : {}),
+          ...(dto.isAvailable !== undefined ? { isAvailable: dto.isAvailable } : {}),
+          ...(dto.description !== undefined ? { description: dto.description } : {}),
+          ...(dto.coverUrl !== undefined ? { coverUrl: dto.coverUrl } : {}),
+          ...(dto.previewUrl !== undefined ? { previewUrl: dto.previewUrl } : {}),
+        },
+        select: {
+          bookId: true,
+        },
+      });
+    } catch (error: any) {
+      if (error?.code === 'P2002') {
+        throw new ConflictException('El ISBN ya está registrado');
+      }
+      throw error;
+    }
+
+    return { id: updated.bookId };
+  }
+
+  async adminDelete(id: number) {
+    await this.assertBookExists(id);
+    await this.prisma.book.delete({
+      where: { bookId: id },
+      select: { bookId: true },
+    });
+    return { id };
+  }
+
+  private async assertBookExists(id: number) {
+    const existing = await this.prisma.book.findUnique({
+      where: { bookId: id },
+      select: { bookId: true },
+    });
+    if (!existing) {
+      throw new NotFoundException('Libro no encontrado');
+    }
   }
 }

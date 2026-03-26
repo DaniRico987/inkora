@@ -1,11 +1,16 @@
 import {
   BadRequestException,
+  Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseFilePipeBuilder,
   ParseIntPipe,
   Post,
+  Put,
   Query,
   UploadedFile,
   UseInterceptors,
@@ -26,8 +31,10 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { BooksService } from './books.service';
 import { BookDetailDto } from './dto/book-detail.dto';
+import { CreateBookDto } from './dto/create-book.dto';
 import { GetBooksQueryDto } from './dto/get-books-query.dto';
 import { PaginatedBooksResponseDto } from './dto/paginated-books-response.dto';
+import { UpdateBookDto } from './dto/update-book.dto';
 import { UploadBookCoverResponseDto } from './dto/upload-book-cover-response.dto';
 import { UploadedFile as UploadedFileType } from '../storage/interfaces/uploaded-file.interface';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -38,6 +45,60 @@ import { Roles } from '../auth/roles.decorator';
 @Controller('books')
 export class BooksController {
   constructor(private readonly booksService: BooksService) {}
+
+  @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth('JWT')
+  @ApiOperation({
+    summary: 'Crear libro (admin)',
+  })
+  @ApiBody({ type: CreateBookDto })
+  @ApiResponse({ status: 201, description: 'Libro creado' })
+  @ApiResponse({ status: 400, description: 'Datos inválidos' })
+  @ApiResponse({ status: 409, description: 'Conflicto - ISBN ya está registrado' })
+  @ApiUnauthorizedResponse({ description: 'Token inválido o ausente' })
+  @ApiForbiddenResponse({ description: 'No tienes permisos para crear libros' })
+  async adminCreate(@Body() dto: CreateBookDto) {
+    return this.booksService.adminCreate(dto);
+  }
+
+  @Put(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth('JWT')
+  @ApiOperation({
+    summary: 'Editar libro existente (admin)',
+  })
+  @ApiBody({ type: UpdateBookDto })
+  @ApiResponse({ status: 200, description: 'Libro actualizado' })
+  @ApiResponse({ status: 400, description: 'Datos inválidos' })
+  @ApiResponse({ status: 404, description: 'Libro no encontrado' })
+  @ApiResponse({ status: 409, description: 'Conflicto - ISBN ya está registrado' })
+  @ApiUnauthorizedResponse({ description: 'Token inválido o ausente' })
+  @ApiForbiddenResponse({ description: 'No tienes permisos para editar libros' })
+  async adminUpdate(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateBookDto,
+  ) {
+    return this.booksService.adminUpdate(id, dto);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth('JWT')
+  @ApiOperation({
+    summary: 'Eliminar libro (admin)',
+  })
+  @ApiResponse({ status: 200, description: 'Libro eliminado' })
+  @ApiResponse({ status: 404, description: 'Libro no encontrado' })
+  @ApiUnauthorizedResponse({ description: 'Token inválido o ausente' })
+  @ApiForbiddenResponse({ description: 'No tienes permisos para eliminar libros' })
+  async adminDelete(@Param('id', ParseIntPipe) id: number) {
+    return this.booksService.adminDelete(id);
+  }
 
   @Get()
   @ApiOperation({
