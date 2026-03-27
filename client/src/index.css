@@ -1,6 +1,7 @@
 @import "tailwindcss";
 /* stylelint-disable-next-line */
 @config "../tailwind.config.js";
+@custom-variant hover (&:hover);
 
 
 :root {
