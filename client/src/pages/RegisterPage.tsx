@@ -105,6 +105,10 @@ export function RegisterPage() {
 	};
 
 	const toggleCategory = (categoryId: number) => {
+		if (!Number.isFinite(categoryId)) {
+			return;
+		}
+
 		setFormData((prev) => ({
 			...prev,
 			categoryIds: prev.categoryIds.includes(categoryId)
@@ -444,12 +448,14 @@ export function RegisterPage() {
 								) : (
 									<div className="flex flex-wrap gap-2">
 										{categories.map((category) => {
-											const selected = formData.categoryIds.includes(category.categoryId);
+											const categoryId = Number(category.categoryId);
+											const selected = Number.isFinite(categoryId) && formData.categoryIds.includes(categoryId);
 											return (
 												<button
-													key={category.categoryId}
+													key={categoryId}
 													type="button"
-													onClick={() => toggleCategory(category.categoryId)}
+													onClick={() => toggleCategory(categoryId)}
+													disabled={!Number.isFinite(categoryId)}
 													className={`rounded-full border px-3 py-1 text-xs transition-colors ${
 														selected
 															? 'border-primary-500 bg-primary-500/20 text-primary-200'

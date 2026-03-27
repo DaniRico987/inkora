@@ -20,16 +20,16 @@ function getNavItems(variant: NavBarVariant): NavBarItem[] {
 
     if (variant === 'visitor') {
         return [
-            { label: 'Inicio', to: '/' },
-            { label: 'Catalogo', to: '/' },
+            { label: 'Inicio', to: '/catalog' },
+            { label: 'Catalogo', to: '/catalog' },
         ];
     }
 
     return [
         { label: 'Inicio', to: '/' },
-        { label: 'Catalogo', to: '/' },
-        { label: 'Novedades', to: '/' },
-        { label: 'Tiendas', to: '/' },
+        { label: 'Catalogo', to: '/catalog' },
+        { label: 'Novedades', to: '/catalog' },
+        { label: 'Tiendas', to: '/catalog' },
     ];
 }
 
@@ -57,16 +57,17 @@ export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
     };
 
     return (
-        <div className="w-full h-24 sm:h-28">
+        <div className="w-full h-24 sm:h-28 z-100">
             <nav className="fixed top-0 left-0 right-0 z-50 px-3 sm:px-5 pt-3 sm:pt-4">
-                <div className="max-w-7xl mx-auto rounded-2xl border border-white/90 bg-primary-500 shadow-xl">
+                <div className="max-w-7xl mx-auto rounded-2xl border border-white/90 bg-primary-400 shadow-xl">
                     <div className="relative flex items-center justify-between h-16 px-4 sm:px-6">
-                        <div className="shrink-0 min-w-28 text-left">
+                        <div className="shrink-0 min-w-28 text-left flex justify-center items-center">
                             <Link
                                 to={variant === 'admin' ? '/admin' : '/'}
-                                className="text-xl sm:text-2xl font-semibold tracking-wide text-babyblue-50"
+                                className="text-xl sm:text-2xl gap-2 font-semibold flex justify-center item-center tracking-wide text-babyblue-50"
                             >
-                                Inkora
+                                {/*<img src="/inkoraICO.svg" alt="Inkora Logo" className="w-8 h-auto" />*/}
+                                INKORA
                             </Link>
                         </div>
 

@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AdminLayout } from '../Components/AdminLayout';
 import { DataTable, type DataTableColumn, type DataTableAction } from '../Components/DataTable';
 import { FormModal } from '../Components/FormModal';
 import { ConfirmationModal } from '../Components/ConfirmationModal';
 import { useSnackbar } from '../Components/SnackbarProvider';
+import { getRoleFromToken, getAccessToken } from '../auth/session';
 import {
   getBooks,
   getBookDetail,
@@ -15,6 +17,10 @@ import {
 import type { Book } from '../interfaces/admin';
 
 export function BooksManagementPage() {
+  const navigate = useNavigate();
+  const token = getAccessToken();
+  const role = getRoleFromToken(token);
+  
   const { success, error } = useSnackbar();
   const [books, setBooks] = useState<Book[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -26,6 +32,13 @@ export function BooksManagementPage() {
     isOpen: boolean;
     bookId?: string;
   }>({ isOpen: false });
+
+  // Redirect root users
+  useEffect(() => {
+    if (role === 'root') {
+      navigate('/admin/create-admin', { replace: true });
+    }
+  }, [role, navigate]);
 
   // Fetch books
   useEffect(() => {

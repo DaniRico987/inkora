@@ -129,9 +129,28 @@ async function seedCategories() {
   console.log('Categories seeded successfully.');
 }
 
+function getSeedMode(): 'all' | 'categories' {
+  const onlyArg = process.argv.find((arg) => arg.startsWith('--only='));
+  if (!onlyArg) {
+    return 'all';
+  }
+
+  const value = onlyArg.split('=')[1]?.trim().toLowerCase();
+  if (value === 'categories') {
+    return 'categories';
+  }
+
+  throw new Error(`Unsupported seed mode: ${value}. Use --only=categories.`);
+}
+
 async function main() {
   try {
-    await seedRootUser();
+    const mode = getSeedMode();
+
+    if (mode === 'all') {
+      await seedRootUser();
+    }
+
     await seedCategories();
   } catch (error) {
     console.error('An error occurred during seeding:');

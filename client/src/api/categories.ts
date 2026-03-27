@@ -11,6 +11,13 @@ export type Category = {
 };
 
 export async function getCategories() {
-  const { data } = await api.get<Category[]>('/categories');
-  return data;
+  const { data } = await api.get<Array<{ id?: number; categoryId?: number; name: string; description?: string | null }>>('/categories');
+
+  return data
+    .map((category) => ({
+      categoryId: Number(category.categoryId ?? category.id),
+      name: category.name,
+      description: category.description ?? null,
+    }))
+    .filter((category) => Number.isFinite(category.categoryId));
 }

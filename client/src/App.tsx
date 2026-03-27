@@ -7,7 +7,8 @@ import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
-import { ComponentsTestPage } from './pages/ComponentsTestPage';
+import { CatalogPage } from './pages/catalog';
+//import { ComponentsTestPage } from './pages/ComponentsTestPage';
 import { SnackbarProvider } from './Components/SnackbarProvider';
 import { getAccessToken, getRoleFromToken } from './auth/session';
 import { ClientHomePage } from './pages/ClientHomePage';
@@ -15,13 +16,14 @@ import { AdminDashboard } from './pages/AdminDashboard';
 import { BooksManagementPage } from './pages/BooksManagementPage';
 import { StoresManagementPage } from './pages/StoresManagementPage';
 import { AdminsManagementPage } from './pages/AdminsManagementPage';
+import { RootAdminCreationPage } from './pages/RootAdminCreationPage';
 
 function ProtectedClientRoute() {
   const token = getAccessToken();
   const role = getRoleFromToken(token);
 
   if (!token || !role) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/catalog" replace />;
   }
 
   if (role === 'admin' || role === 'root') {
@@ -43,10 +45,15 @@ function ProtectedAdminRoute() {
     return <Navigate to="/" replace />;
   }
 
+  // Redirect root users to admin creation page instead of dashboard
+  if (role === 'root') {
+    return <Navigate to="/admin/create-admin" replace />;
+  }
+
   return <AdminDashboard />;
 }
 
-function ProtectedAdminSubRoute({ element }: { element: React.ReactNode }) {
+function ProtectedAdminOnlyRoute({ element }: { element: React.ReactNode }) {
   const token = getAccessToken();
   const role = getRoleFromToken(token);
 
@@ -54,8 +61,23 @@ function ProtectedAdminSubRoute({ element }: { element: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
-  if (role !== 'admin' && role !== 'root') {
-    return <Navigate to="/" replace />;
+  if (role !== 'admin') {
+    return <Navigate to="/admin" replace />;
+  }
+
+  return <>{element}</>;
+}
+
+function ProtectedRootOnlyRoute({ element }: { element: React.ReactNode }) {
+  const token = getAccessToken();
+  const role = getRoleFromToken(token);
+
+  if (!token || !role) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (role !== 'root') {
+    return <Navigate to="/admin" replace />;
   }
 
   return <>{element}</>;
@@ -69,7 +91,11 @@ function PublicLoginRoute() {
     return <LoginPage />;
   }
 
-  if (role === 'admin' || role === 'root') {
+  if (role === 'root') {
+    return <Navigate to="/admin/create-admin" replace />;
+  }
+
+  if (role === 'admin') {
     return <Navigate to="/admin" replace />;
   }
 
@@ -93,7 +119,7 @@ function getNavBarVariant(): NavBarVariant {
 
 function AppContent() {
   const location = useLocation();
-  const shouldHideNavBar = location.pathname === '/login' || location.pathname === '/register' || location.pathname.startsWith('/admin');
+  const shouldHideNavBar = location.pathname === '/login' || location.pathname === '/register' || location.pathname.startsWith('/admin') || location.pathname === '/forgot-password' || location.pathname.startsWith('/reset-password') || location.pathname === '/create-admin';
   const navBarVariant = getNavBarVariant();
 
   return (
@@ -106,20 +132,22 @@ function AppContent() {
       </header>
       <main className={`flex-1 ${location.pathname.startsWith('/admin') ? '' : 'flex items-center justify-center'}`}>
         <Routes>
-          <Route path="/" element={<ProtectedClientRoute />} />
-          <Route path="/admin" element={<ProtectedAdminRoute />} />
-          <Route path="/admin/books" element={<ProtectedAdminSubRoute element={<BooksManagementPage />} />} />
-          <Route path="/admin/stores" element={<ProtectedAdminSubRoute element={<StoresManagementPage />} />} />
-          <Route path="/admin/admins" element={<ProtectedAdminSubRoute element={<AdminsManagementPage />} />} />
+          {/* Públicas */}
           <Route path="/login" element={<PublicLoginRoute />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/catalog" element={<CatalogPage />} />
+
+          {/* Privadas */}
+          <Route path="/" element={<ProtectedClientRoute />} />
+          <Route path="/admin" element={<ProtectedAdminRoute />} />
+          <Route path="/admin/books" element={<ProtectedAdminOnlyRoute element={<BooksManagementPage />} />} />
+          <Route path="/admin/stores" element={<ProtectedAdminOnlyRoute element={<StoresManagementPage />} />} />
+          <Route path="/admin/admins" element={<ProtectedRootOnlyRoute element={<AdminsManagementPage />} />} />
+          <Route path="/admin/create-admin" element={<ProtectedRootOnlyRoute element={<RootAdminCreationPage />} />} />
+
+          {/* Otros */}
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route
-            path="/reset-password/:token"
-            element={<ResetPasswordPage />}
-          />
-          <Route path="/components-test" element={<ComponentsTestPage />} />
-          {/* TODO: agregar aqui /login y demas rutas cuando esten listas */}
+          <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
         </Routes>
       </main>
     </div>

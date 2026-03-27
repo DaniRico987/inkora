@@ -1,5 +1,5 @@
 
-export type Variant = "primary" | "secondary" | "destructive";
+export type Variant = "primary" | "secondary" | "destructive" | "tags-active" | "tags";
 
 export interface ButtonProps {
   children: React.ReactNode;

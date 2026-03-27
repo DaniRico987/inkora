@@ -83,14 +83,20 @@ $ npm run start:prod
 
 ## Database Seeding
 
-To seed the database with initial data (like the root user), run:
+To seed the database with initial data (root user + book categories), run:
 
 ```bash
 # Seed the database
-$ npx prisma db seed
+$ npm run seed:db
 ```
 
-This will create a default root user using the credentials defined in your `.env` file (see `.env.example`).
+This creates a default root user using the credentials defined in your `.env` file (see `.env.example`) and upserts the predefined book categories.
+
+If you only want to seed categories:
+
+```bash
+$ npm run seed:categories
+```
 
 ## Run tests
 

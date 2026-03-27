@@ -545,6 +545,33 @@ export class AuthService {
     return { message: 'Administrador desactivado correctamente' };
   }
 
+  /**
+   * Activa un administrador previamente desactivado. Solo root.
+   */
+  async activateAdmin(adminUserId: number, rootUserId: number) {
+    const adminRecord = await this.prisma.admin.findUnique({
+      where: { userId: adminUserId },
+      include: { user: true },
+    });
+
+    if (
+      !adminRecord ||
+      adminRecord.user.userType !== 'admin' ||
+      adminRecord.user.status === 'active'
+    ) {
+      throw new NotFoundException(
+        'Administrador no encontrado o ya está activo',
+      );
+    }
+
+    await this.prisma.user.update({
+      where: { userId: adminUserId },
+      data: { status: 'active' },
+    });
+
+    return { message: 'Administrador activado correctamente' };
+  }
+
   async validateUniqueFields(email: string, username: string) {
     const existing = await this.prisma.user.findFirst({
       where: { OR: [{ email }, { username }] },

@@ -7,7 +7,9 @@ import {
   HttpStatus,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -90,8 +92,11 @@ export class AdminController {
     status: 403,
     description: 'Solo root puede listar administradores',
   })
-  async findAllActive() {
-    return this.adminService.findActiveAdmins();
+  async findAllActive(
+    @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 10,
+  ) {
+    return this.adminService.findActiveAdmins(page, limit);
   }
 
   @Delete(':id')
@@ -125,6 +130,38 @@ export class AdminController {
     @Req() req: { user: AuthenticatedUser },
   ) {
     return this.authService.deactivateAdmin(id, req.user.userId);
+  }
+
+  @Patch(':id/activate')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('root')
+  @ApiOperation({
+    summary: 'Activar administrador',
+    description:
+      'El usuario root puede activar la cuenta de un administrador previamente desactivado. El id es el userId del administrador.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Administrador activado correctamente',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'No autenticado',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Solo root puede activar administradores',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Administrador no encontrado o ya está activo',
+  })
+  async activateAdmin(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: { user: AuthenticatedUser },
+  ) {
+    return this.authService.activateAdmin(id, req.user.userId);
   }
 }
 

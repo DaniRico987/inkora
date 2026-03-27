@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AdminLayout } from '../Components/AdminLayout';
 import { DataTable, type DataTableColumn, type DataTableAction } from '../Components/DataTable';
 import { useSnackbar } from '../Components/SnackbarProvider';
@@ -13,6 +14,7 @@ import type { Admin } from '../interfaces/admin';
 import { StatusBadge } from '../Components/StatusBadge';
 
 export function AdminsManagementPage() {
+  const navigate = useNavigate();
   const { success, error } = useSnackbar();
   const token = getAccessToken();
   const currentUserRole = getRoleFromToken(token);
@@ -22,12 +24,19 @@ export function AdminsManagementPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [actionConfirm, setActionConfirm] = useState<{
     isOpen: boolean;
-    adminId?: string;
+    userId?: number;
     action?: 'deactivate' | 'activate';
   }>({ isOpen: false });
 
   // Only root can see this page
   const isRootOnly = currentUserRole !== 'root';
+
+  // Redirect non-root users
+  useEffect(() => {
+    if (isRootOnly) {
+      navigate('/admin', { replace: true });
+    }
+  }, [isRootOnly, navigate]);
 
   // Fetch admins
   useEffect(() => {
@@ -51,22 +60,22 @@ export function AdminsManagementPage() {
   }, [currentPage, error, isRootOnly]);
 
   const handleActionClick = (
-    adminId: string,
+    userId: number,
     action: 'deactivate' | 'activate'
   ) => {
-    setActionConfirm({ isOpen: true, adminId, action });
+    setActionConfirm({ isOpen: true, userId, action });
   };
 
   const handleActionConfirm = async () => {
-    if (!actionConfirm.adminId || !actionConfirm.action) return;
+    if (!actionConfirm.userId || !actionConfirm.action) return;
 
     try {
       setIsLoading(true);
       if (actionConfirm.action === 'deactivate') {
-        await deactivateAdmin(actionConfirm.adminId);
+        await deactivateAdmin(actionConfirm.userId.toString());
         success('Administrador desactivado exitosamente');
       } else {
-        await activateAdmin(actionConfirm.adminId);
+        await activateAdmin(actionConfirm.userId.toString());
         success('Administrador activado exitosamente');
       }
       setCurrentPage(1);
@@ -114,30 +123,21 @@ export function AdminsManagementPage() {
     {
       label: 'Desactivar',
       icon: '🔒',
-      onClick: (admin) => handleActionClick(admin.adminId, 'deactivate'),
+      onClick: (admin) => handleActionClick(admin.userId, 'deactivate'),
       variant: 'destructive',
       show: (admin) => admin.isActive,
     },
     {
       label: 'Activar',
       icon: '🔓',
-      onClick: (admin) => handleActionClick(admin.adminId, 'activate'),
+      onClick: (admin) => handleActionClick(admin.userId, 'activate'),
       variant: 'secondary',
       show: (admin) => !admin.isActive,
     },
   ];
 
   if (isRootOnly) {
-    return (
-      <AdminLayout>
-        <div className="rounded-2xl border border-red-600 bg-red-600/10 px-6 py-12 text-center">
-          <h2 className="text-2xl font-bold text-red-600">Acceso Denegado</h2>
-          <p className="text-red-600/80 mt-2">
-            Solo los administradores root pueden acceder a esta página.
-          </p>
-        </div>
-      </AdminLayout>
-    );
+    return null;
   }
 
   return (
