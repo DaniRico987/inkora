@@ -112,12 +112,10 @@ export class MailService {
       return explicitLogoUrl;
     }
 
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL')?.trim();
-    if (!frontendUrl) {
-      return undefined;
-    }
-
-    return `${frontendUrl.replace(/\/$/, '')}/branding/inkora-logo.png`;
+    const apiUrl = this.configService.get<string>('API_URL')?.trim() || 
+                   `http://localhost:${this.configService.get<string>('PORT') || '3000'}`;
+    
+    return `${apiUrl.replace(/\/$/, '')}/branding/inkora-logo.png`;
   }
 
   private async sendEmail(params: {
