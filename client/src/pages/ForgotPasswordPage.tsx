@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { InputText } from '../Components/Inputs';
 import { Button } from '../Components/Button';
+import { AuthHomeButton } from '../Components/AuthHomeButton';
 import { useTheme } from '../theme/useTheme';
 import { forgotPassword } from '../api/auth';
 
@@ -42,6 +43,9 @@ export function ForgotPasswordPage() {
   return (
     <div className="w-full flex items-center justify-center px-4">
       <div className="w-full max-w-xl mx-auto bg-bg-secondary rounded-2xl shadow-lg p-6 sm:p-10">
+        <div className="mb-2 flex items-center justify-end">
+          <AuthHomeButton />
+        </div>
         <h1 className="text-2xl font-semibold text-text mb-2">
           ¿Olvidaste tu contraseña?
         </h1>

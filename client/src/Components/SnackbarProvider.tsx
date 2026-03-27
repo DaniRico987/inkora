@@ -125,7 +125,7 @@ export function SnackbarProvider({
       {children}
       <div
         className={[
-          "fixed z-50",
+          "fixed z-9999",
           "flex flex-col gap-2",
           "pointer-events-none",
           posClasses(position),

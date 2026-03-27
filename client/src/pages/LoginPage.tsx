@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { InputText, InputPassword } from '../Components/Inputs';
 import { Button } from '../Components/Button';
+import { AuthHomeButton } from '../Components/AuthHomeButton';
 import { ErrorInLine } from '../Components/ErrorInline';
 import { useTheme } from '../theme/useTheme';
 import { extractAuthError, login } from '../api/auth';
@@ -43,6 +44,11 @@ export function LoginPage() {
 	const [errorState, setErrorState] = useState<LoginErrorState | null>(null);
 	const [successMessage, setSuccessMessage] = useState('');
 	const navigate = useNavigate();
+	const location = useLocation();
+	const authOriginState =
+		typeof location.state === 'object' && location.state !== null && 'from' in location.state
+			? { from: (location.state as { from?: string }).from }
+			: undefined;
 
 	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
@@ -141,9 +147,12 @@ export function LoginPage() {
 					</div>
 
 					<div className="px-6 py-8 sm:px-9 sm:py-10 md:px-10 md:py-12 bg-bg-secondary">
-						<p className="text-xs uppercase tracking-[0.16em] text-text-muted mb-2">
-							Acceso seguro
-						</p>
+						<div className="mb-2 flex items-center justify-between gap-3">
+							<p className="text-xs uppercase tracking-[0.16em] text-text-muted">
+								Acceso seguro
+							</p>
+							<AuthHomeButton />
+						</div>
 						<h1 className="text-2xl sm:text-3xl font-semibold text-text mb-2">
 							Iniciar sesión
 						</h1>
@@ -173,6 +182,7 @@ export function LoginPage() {
 							<div className="flex items-center justify-end gap-3">
 								<Link
 									to="/forgot-password"
+									state={authOriginState}
 									className="text-sm text-primary-500 hover:text-primary-600 transition-colors"
 								>
 									¿Olvidaste tu contraseña?
@@ -206,6 +216,7 @@ export function LoginPage() {
 							¿Aún no tienes cuenta?{' '}
 							<Link
 								to="/register"
+								state={authOriginState}
 								className="text-sm text-primary-500 hover:text-primary-600 transition-colors font-medium"
 							>
 								Crear cuenta

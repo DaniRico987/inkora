@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { InputText, InputPassword, InputSelect } from '../Components/Inputs';
 import { Button } from '../Components/Button';
+import { AuthHomeButton } from '../Components/AuthHomeButton';
 import { useTheme } from '../theme/useTheme';
 import { extractAuthError, login, register } from '../api/auth';
 import { getCategories, type Category } from '../api/categories';
@@ -42,6 +43,11 @@ function getPasswordStrength(password: string): PasswordStrength {
 export function RegisterPage() {
 	useTheme();
 	const navigate = useNavigate();
+	const location = useLocation();
+	const authOriginState =
+		typeof location.state === 'object' && location.state !== null && 'from' in location.state
+			? { from: (location.state as { from?: string }).from }
+			: undefined;
 
 	const [formData, setFormData] = useState<FormData>({
 		dni: '',
@@ -287,9 +293,12 @@ export function RegisterPage() {
 					</div>
 
 					<div className="px-6 py-8 sm:px-9 sm:py-10 md:px-10 md:py-12 bg-bg-secondary overflow-y-auto max-h-screen md:max-h-none">
-						<p className="text-xs uppercase tracking-[0.16em] text-text-muted mb-2">
-							Creación de cuenta
-						</p>
+						<div className="mb-2 flex items-center justify-between gap-3">
+							<p className="text-xs uppercase tracking-[0.16em] text-text-muted">
+								Creación de cuenta
+							</p>
+							<AuthHomeButton />
+						</div>
 						<h1 className="text-2xl sm:text-3xl font-semibold text-text mb-2">
 							Crear cuenta
 						</h1>
@@ -529,6 +538,7 @@ export function RegisterPage() {
 							¿Ya tienes cuenta?{' '}
 							<Link
 								to="/login"
+								state={authOriginState}
 								className="text-sm text-primary-500 hover:text-primary-600 transition-colors font-medium"
 							>
 								Inicia sesión
