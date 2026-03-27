@@ -16,6 +16,7 @@ import { AdminDashboard } from './pages/AdminDashboard';
 import { BooksManagementPage } from './pages/BooksManagementPage';
 import { StoresManagementPage } from './pages/StoresManagementPage';
 import { AdminsManagementPage } from './pages/AdminsManagementPage';
+import { RootAdminCreationPage } from './pages/RootAdminCreationPage';
 
 function ProtectedClientRoute() {
   const token = getAccessToken();
@@ -44,6 +45,11 @@ function ProtectedAdminRoute() {
     return <Navigate to="/" replace />;
   }
 
+  // Redirect root users to admin creation page instead of dashboard
+  if (role === 'root') {
+    return <Navigate to="/admin/create-admin" replace />;
+  }
+
   return <AdminDashboard />;
 }
 
@@ -62,6 +68,36 @@ function ProtectedAdminSubRoute({ element }: { element: React.ReactNode }) {
   return <>{element}</>;
 }
 
+function ProtectedAdminOnlyRoute({ element }: { element: React.ReactNode }) {
+  const token = getAccessToken();
+  const role = getRoleFromToken(token);
+
+  if (!token || !role) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (role !== 'admin') {
+    return <Navigate to="/admin" replace />;
+  }
+
+  return <>{element}</>;
+}
+
+function ProtectedRootOnlyRoute({ element }: { element: React.ReactNode }) {
+  const token = getAccessToken();
+  const role = getRoleFromToken(token);
+
+  if (!token || !role) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (role !== 'root') {
+    return <Navigate to="/admin" replace />;
+  }
+
+  return <>{element}</>;
+}
+
 function PublicLoginRoute() {
   const token = getAccessToken();
   const role = getRoleFromToken(token);
@@ -70,7 +106,11 @@ function PublicLoginRoute() {
     return <LoginPage />;
   }
 
-  if (role === 'admin' || role === 'root') {
+  if (role === 'root') {
+    return <Navigate to="/admin/create-admin" replace />;
+  }
+
+  if (role === 'admin') {
     return <Navigate to="/admin" replace />;
   }
 
@@ -115,9 +155,10 @@ function AppContent() {
           {/* Privadas */}
           <Route path="/" element={<ProtectedClientRoute />} />
           <Route path="/admin" element={<ProtectedAdminRoute />} />
-          <Route path="/admin/books" element={<ProtectedAdminSubRoute element={<BooksManagementPage />} />} />
-          <Route path="/admin/stores" element={<ProtectedAdminSubRoute element={<StoresManagementPage />} />} />
-          <Route path="/admin/admins" element={<ProtectedAdminSubRoute element={<AdminsManagementPage />} />} />
+          <Route path="/admin/books" element={<ProtectedAdminOnlyRoute element={<BooksManagementPage />} />} />
+          <Route path="/admin/stores" element={<ProtectedAdminOnlyRoute element={<StoresManagementPage />} />} />
+          <Route path="/admin/admins" element={<ProtectedRootOnlyRoute element={<AdminsManagementPage />} />} />
+          <Route path="/admin/create-admin" element={<ProtectedRootOnlyRoute element={<RootAdminCreationPage />} />} />
 
           {/* Otros */}
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />

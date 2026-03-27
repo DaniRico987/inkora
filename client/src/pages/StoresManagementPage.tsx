@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AdminLayout } from '../Components/AdminLayout';
 import { DataTable, type DataTableColumn, type DataTableAction } from '../Components/DataTable';
 import { FormModal } from '../Components/FormModal';
 import { ConfirmationModal } from '../Components/ConfirmationModal';
 import { useSnackbar } from '../Components/SnackbarProvider';
+import { getRoleFromToken, getAccessToken } from '../auth/session';
 import {
   getStores,
   deleteStore,
@@ -13,6 +15,10 @@ import {
 import type { Store } from '../interfaces/admin';
 
 export function StoresManagementPage() {
+  const navigate = useNavigate();
+  const token = getAccessToken();
+  const role = getRoleFromToken(token);
+  
   const { success, error } = useSnackbar();
   const [stores, setStores] = useState<Store[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -24,6 +30,13 @@ export function StoresManagementPage() {
     isOpen: boolean;
     storeId?: string;
   }>({ isOpen: false });
+
+  // Redirect root users
+  useEffect(() => {
+    if (role === 'root') {
+      navigate('/admin/create-admin', { replace: true });
+    }
+  }, [role, navigate]);
 
   // Fetch stores
   useEffect(() => {

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AdminLayout } from '../Components/AdminLayout';
 import { DataTable, type DataTableColumn, type DataTableAction } from '../Components/DataTable';
 import { useSnackbar } from '../Components/SnackbarProvider';
@@ -13,6 +14,7 @@ import type { Admin } from '../interfaces/admin';
 import { StatusBadge } from '../Components/StatusBadge';
 
 export function AdminsManagementPage() {
+  const navigate = useNavigate();
   const { success, error } = useSnackbar();
   const token = getAccessToken();
   const currentUserRole = getRoleFromToken(token);
@@ -28,6 +30,13 @@ export function AdminsManagementPage() {
 
   // Only root can see this page
   const isRootOnly = currentUserRole !== 'root';
+
+  // Redirect non-root users
+  useEffect(() => {
+    if (isRootOnly) {
+      navigate('/admin', { replace: true });
+    }
+  }, [isRootOnly, navigate]);
 
   // Fetch admins
   useEffect(() => {
@@ -128,16 +137,7 @@ export function AdminsManagementPage() {
   ];
 
   if (isRootOnly) {
-    return (
-      <AdminLayout>
-        <div className="rounded-2xl border border-red-600 bg-red-600/10 px-6 py-12 text-center">
-          <h2 className="text-2xl font-bold text-red-600">Acceso Denegado</h2>
-          <p className="text-red-600/80 mt-2">
-            Solo los administradores root pueden acceder a esta página.
-          </p>
-        </div>
-      </AdminLayout>
-    );
+    return null;
   }
 
   return (

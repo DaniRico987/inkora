@@ -104,3 +104,25 @@ export async function getAdminDetail(adminId: string) {
     throw error;
   }
 }
+
+export interface CreateAdminRequest {
+  dni: string;
+  firstName: string;
+  lastName: string;
+  birthDate: string;
+  birthPlace?: string;
+  address?: string;
+  gender?: string;
+  email: string;
+  username: string;
+}
+
+export async function createAdmin(data: CreateAdminRequest) {
+  try {
+    const response = await apiClient.post('/admin', data);
+    return response.data;
+  } catch (error) {
+    console.error('Error creating admin:', error);
+    throw error;
+  }
+}
