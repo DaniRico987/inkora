@@ -5,7 +5,20 @@ import { PrismaService } from 'prisma/prisma/prisma.service';
 export class AdminService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findActiveAdmins() {
+  async findActiveAdmins(page: number = 1, limit: number = 10) {
+    const skip = (page - 1) * limit;
+
+    // Get total count
+    const totalCount = await this.prisma.admin.count({
+      where: {
+        user: {
+          status: 'active',
+          userType: 'admin',
+        },
+      },
+    });
+
+    // Get paginated admins
     const admins = await this.prisma.admin.findMany({
       where: {
         user: {
@@ -19,20 +32,29 @@ export class AdminService {
       orderBy: {
         adminId: 'asc',
       },
+      skip,
+      take: limit,
     });
 
-    return admins.map((admin) => ({
-      adminId: admin.adminId,
+    const items = admins.map((admin) => ({
+      adminId: admin.userId.toString(),
       userId: admin.userId,
-      dni: admin.user.dni,
-      firstName: admin.user.firstName,
-      lastName: admin.user.lastName,
-      email: admin.user.email,
       username: admin.user.username,
-      createdByRootId: admin.createdByRootId,
-      isTemporaryPassword: admin.isTemporaryPassword,
+      email: admin.user.email,
+      isActive: admin.user.status === 'active',
+      createdAt: admin.user.registrationDate?.toISOString(),
     }));
+
+    const totalPages = Math.ceil(totalCount / limit);
+
+    return {
+      items,
+      totalPages,
+      currentPage: page,
+      totalCount,
+    };
   }
 }
+
 
 
