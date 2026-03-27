@@ -32,6 +32,7 @@ export interface Store {
 
 export interface Admin {
   adminId: string;
+  userId: number;
   username: string;
   email: string;
   isActive: boolean;

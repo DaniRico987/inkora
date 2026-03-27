@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -91,8 +92,11 @@ export class AdminController {
     status: 403,
     description: 'Solo root puede listar administradores',
   })
-  async findAllActive() {
-    return this.adminService.findActiveAdmins();
+  async findAllActive(
+    @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 10,
+  ) {
+    return this.adminService.findActiveAdmins(page, limit);
   }
 
   @Delete(':id')

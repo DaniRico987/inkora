@@ -24,7 +24,7 @@ export function AdminsManagementPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [actionConfirm, setActionConfirm] = useState<{
     isOpen: boolean;
-    adminId?: string;
+    userId?: number;
     action?: 'deactivate' | 'activate';
   }>({ isOpen: false });
 
@@ -60,22 +60,22 @@ export function AdminsManagementPage() {
   }, [currentPage, error, isRootOnly]);
 
   const handleActionClick = (
-    adminId: string,
+    userId: number,
     action: 'deactivate' | 'activate'
   ) => {
-    setActionConfirm({ isOpen: true, adminId, action });
+    setActionConfirm({ isOpen: true, userId, action });
   };
 
   const handleActionConfirm = async () => {
-    if (!actionConfirm.adminId || !actionConfirm.action) return;
+    if (!actionConfirm.userId || !actionConfirm.action) return;
 
     try {
       setIsLoading(true);
       if (actionConfirm.action === 'deactivate') {
-        await deactivateAdmin(actionConfirm.adminId);
+        await deactivateAdmin(actionConfirm.userId.toString());
         success('Administrador desactivado exitosamente');
       } else {
-        await activateAdmin(actionConfirm.adminId);
+        await activateAdmin(actionConfirm.userId.toString());
         success('Administrador activado exitosamente');
       }
       setCurrentPage(1);
@@ -123,14 +123,14 @@ export function AdminsManagementPage() {
     {
       label: 'Desactivar',
       icon: '🔒',
-      onClick: (admin) => handleActionClick(admin.adminId, 'deactivate'),
+      onClick: (admin) => handleActionClick(admin.userId, 'deactivate'),
       variant: 'destructive',
       show: (admin) => admin.isActive,
     },
     {
       label: 'Activar',
       icon: '🔓',
-      onClick: (admin) => handleActionClick(admin.adminId, 'activate'),
+      onClick: (admin) => handleActionClick(admin.userId, 'activate'),
       variant: 'secondary',
       show: (admin) => !admin.isActive,
     },
