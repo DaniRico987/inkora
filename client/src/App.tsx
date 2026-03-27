@@ -53,21 +53,6 @@ function ProtectedAdminRoute() {
   return <AdminDashboard />;
 }
 
-function ProtectedAdminSubRoute({ element }: { element: React.ReactNode }) {
-  const token = getAccessToken();
-  const role = getRoleFromToken(token);
-
-  if (!token || !role) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (role !== 'admin' && role !== 'root') {
-    return <Navigate to="/" replace />;
-  }
-
-  return <>{element}</>;
-}
-
 function ProtectedAdminOnlyRoute({ element }: { element: React.ReactNode }) {
   const token = getAccessToken();
   const role = getRoleFromToken(token);
@@ -134,7 +119,7 @@ function getNavBarVariant(): NavBarVariant {
 
 function AppContent() {
   const location = useLocation();
-  const shouldHideNavBar = location.pathname === '/login' || location.pathname === '/register' || location.pathname.startsWith('/admin');
+  const shouldHideNavBar = location.pathname === '/login' || location.pathname === '/register' || location.pathname.startsWith('/admin') || location.pathname === '/forgot-password' || location.pathname.startsWith('/reset-password') || location.pathname === '/create-admin';
   const navBarVariant = getNavBarVariant();
 
   return (
