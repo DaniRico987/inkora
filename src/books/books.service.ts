@@ -21,7 +21,7 @@ export class BooksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly s3Service: S3Service,
-  ) {}
+  ) { }
 
   async findAll(query: GetBooksQueryDto): Promise<PaginatedBooksResponseDto> {
     const page = query.page ?? 1;
@@ -44,6 +44,11 @@ export class BooksService {
           price: true,
           condition: true,
           isAvailable: true,
+          inventories: {
+            select: {
+              availableQuantity: true,
+            },
+          },
         },
       }),
       this.prisma.book.count({ where }),
@@ -56,6 +61,10 @@ export class BooksService {
         title: book.title,
         author: book.author,
         price: Number(book.price),
+        quantity: book.inventories.reduce(
+          (totalQuantity, inventory) => totalQuantity + inventory.availableQuantity,
+          0,
+        ),
         status: book.condition,
         isAvailable: book.isAvailable,
       })),
@@ -77,6 +86,13 @@ export class BooksService {
 
     const where: Prisma.BookWhereInput = {
       isAvailable: true,
+      inventories: {
+        some: {
+          availableQuantity: {
+            gt: 0,
+          },
+        },
+      },
     };
 
     if (query.title) {
@@ -148,6 +164,11 @@ export class BooksService {
     const book = await this.prisma.book.findUnique({
       where: { bookId: id },
       include: {
+        inventories: {
+          select: {
+            availableQuantity: true,
+          },
+        },
         bookImages: {
           orderBy: { displayOrder: 'asc' },
         },
@@ -176,6 +197,10 @@ export class BooksService {
       language: book.language,
       pageCount: book.pageCount,
       price: Number(book.price),
+      quantity: book.inventories.reduce(
+        (totalQuantity, inventory) => totalQuantity + inventory.availableQuantity,
+        0,
+      ),
       status: book.condition,
       isAvailable: book.isAvailable,
       description: book.description,

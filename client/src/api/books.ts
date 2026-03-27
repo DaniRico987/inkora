@@ -2,6 +2,72 @@ import axios from 'axios';
 import type { CreateBookRequest, UpdateBookRequest } from '../interfaces/admin';
 import { getAccessToken } from '../auth/session';
 
+export interface GetBooksQueryParams {
+  title?: string;
+  author?: string;
+  categoryId?: number;
+  language?: string;
+  condition?: 'new' | 'used';
+  minPrice?: number;
+  maxPrice?: number;
+  year?: number;
+  page?: number;
+  limit?: number;
+  sortBy?: 'price' | 'publicationYear' | 'relevance';
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface BookCategoryItem {
+  id: number;
+  name: string;
+  description?: string | null;
+}
+
+export interface BookImageItem {
+  id: number;
+  url: string;
+  displayOrder: number;
+}
+
+export interface BookListItem {
+  id: number;
+  coverUrl?: string | null;
+  title: string;
+  author: string;
+  price: number;
+  quantity: number;
+  status?: string | null;
+  isAvailable: boolean;
+}
+
+export interface BookDetailItem {
+  id: number;
+  title: string;
+  author: string;
+  publicationYear?: number | null;
+  publisher?: string | null;
+  isbn?: string | null;
+  language?: string | null;
+  pageCount?: number | null;
+  price: number;
+  quantity: number;
+  status?: string | null;
+  isAvailable: boolean;
+  description?: string | null;
+  coverUrl?: string | null;
+  preview?: string | null;
+  images: BookImageItem[];
+  categories: BookCategoryItem[];
+}
+
+export interface PaginatedBooksResponse {
+  items: BookListItem[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
 const apiClient = axios.create({
   baseURL: '/api/v1',
 });
@@ -15,9 +81,12 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-export async function getBooks(page: number = 1, limit: number = 10) {
+export async function getBooks(
+  page: number = 1,
+  limit: number = 10,
+): Promise<PaginatedBooksResponse> {
   try {
-    const response = await apiClient.get('/books', {
+    const response = await apiClient.get<PaginatedBooksResponse>('/books', {
       params: { page, limit },
     });
     return response.data;
@@ -27,10 +96,21 @@ export async function getBooks(page: number = 1, limit: number = 10) {
   }
 }
 
-export async function searchBooks(query: string, page: number = 1) {
+export async function searchBooks(
+  query: string | GetBooksQueryParams,
+  page: number = 1,
+): Promise<PaginatedBooksResponse> {
   try {
-    const response = await apiClient.get('/books/search', {
-      params: { title: query, page },
+    const params =
+      typeof query === 'string'
+        ? {
+          title: query,
+          page,
+        }
+        : query;
+
+    const response = await apiClient.get<PaginatedBooksResponse>('/books/search', {
+      params,
     });
     return response.data;
   } catch (error) {
@@ -39,9 +119,11 @@ export async function searchBooks(query: string, page: number = 1) {
   }
 }
 
-export async function getBookDetail(bookId: string) {
+export async function getBookDetail(
+  bookId: number | string,
+): Promise<BookDetailItem> {
   try {
-    const response = await apiClient.get(`/books/${bookId}`);
+    const response = await apiClient.get<BookDetailItem>(`/books/${bookId}`);
     return response.data;
   } catch (error) {
     console.error('Error fetching book detail:', error);
