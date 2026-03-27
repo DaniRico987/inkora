@@ -1,0 +1,192 @@
+import { useState, useEffect } from 'react';
+import { AdminLayout } from '../Components/AdminLayout';
+import { DataTable, type DataTableColumn, type DataTableAction } from '../Components/DataTable';
+import { useSnackbar } from '../Components/SnackbarProvider';
+import { ConfirmationModal } from '../Components/ConfirmationModal';
+import {
+  getAdmins,
+  deactivateAdmin,
+  activateAdmin,
+} from '../api/admin';
+import { getRoleFromToken, getAccessToken } from '../auth/session';
+import type { Admin } from '../interfaces/admin';
+import { StatusBadge } from '../Components/StatusBadge';
+
+export function AdminsManagementPage() {
+  const { success, error } = useSnackbar();
+  const token = getAccessToken();
+  const currentUserRole = getRoleFromToken(token);
+  const [admins, setAdmins] = useState<Admin[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [actionConfirm, setActionConfirm] = useState<{
+    isOpen: boolean;
+    adminId?: string;
+    action?: 'deactivate' | 'activate';
+  }>({ isOpen: false });
+
+  // Only root can see this page
+  const isRootOnly = currentUserRole !== 'root';
+
+  // Fetch admins
+  useEffect(() => {
+    const fetchAdmins = async () => {
+      try {
+        setIsLoading(true);
+        const data = await getAdmins(currentPage, 10);
+        setAdmins(data.items || []);
+        setTotalPages(data.totalPages || 1);
+      } catch (err) {
+        error('Error al cargar administradores');
+        console.error(err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (!isRootOnly) {
+      fetchAdmins();
+    }
+  }, [currentPage, error, isRootOnly]);
+
+  const handleActionClick = (
+    adminId: string,
+    action: 'deactivate' | 'activate'
+  ) => {
+    setActionConfirm({ isOpen: true, adminId, action });
+  };
+
+  const handleActionConfirm = async () => {
+    if (!actionConfirm.adminId || !actionConfirm.action) return;
+
+    try {
+      setIsLoading(true);
+      if (actionConfirm.action === 'deactivate') {
+        await deactivateAdmin(actionConfirm.adminId);
+        success('Administrador desactivado exitosamente');
+      } else {
+        await activateAdmin(actionConfirm.adminId);
+        success('Administrador activado exitosamente');
+      }
+      setCurrentPage(1);
+      setActionConfirm({ isOpen: false });
+    } catch (err) {
+      error('Error en la operación');
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const columns: DataTableColumn<Admin>[] = [
+    {
+      key: 'username',
+      label: 'Usuario',
+      width: '25%',
+    },
+    {
+      key: 'email',
+      label: 'Email',
+      width: '35%',
+    },
+    {
+      key: 'isActive',
+      label: 'Estado',
+      render: (value: boolean) => (
+        <StatusBadge
+          label={value ? 'Activo' : 'Inactivo'}
+          tone={value ? 'success' : 'neutral'}
+        />
+      ),
+      width: '20%',
+    },
+    {
+      key: 'createdAt',
+      label: 'Creado',
+      render: (value: string) =>
+        value ? new Date(value).toLocaleDateString('es-ES') : '-',
+      width: '20%',
+    },
+  ];
+
+  const actions: DataTableAction<Admin>[] = [
+    {
+      label: 'Desactivar',
+      icon: '🔒',
+      onClick: (admin) => handleActionClick(admin.adminId, 'deactivate'),
+      variant: 'destructive',
+      show: (admin) => admin.isActive,
+    },
+    {
+      label: 'Activar',
+      icon: '🔓',
+      onClick: (admin) => handleActionClick(admin.adminId, 'activate'),
+      variant: 'secondary',
+      show: (admin) => !admin.isActive,
+    },
+  ];
+
+  if (isRootOnly) {
+    return (
+      <AdminLayout>
+        <div className="rounded-2xl border border-red-600 bg-red-600/10 px-6 py-12 text-center">
+          <h2 className="text-2xl font-bold text-red-600">Acceso Denegado</h2>
+          <p className="text-red-600/80 mt-2">
+            Solo los administradores root pueden acceder a esta página.
+          </p>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  return (
+    <AdminLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-bold text-text">
+            Gestión de Administradores
+          </h1>
+          <p className="text-text-muted mt-2">
+            Administra los permisos y estado de los administradores del sistema
+          </p>
+        </div>
+
+        {/* Data Table */}
+        <DataTable<Admin>
+          columns={columns}
+          data={admins}
+          actions={actions}
+          isLoading={isLoading}
+          pagination={{
+            currentPage,
+            totalPages,
+            onPageChange: setCurrentPage,
+          }}
+          emptyMessage="No hay administradores disponibles"
+        />
+      </div>
+
+      {/* Action Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={actionConfirm.isOpen}
+        title={
+          actionConfirm.action === 'deactivate'
+            ? 'Desactivar Administrador'
+            : 'Activar Administrador'
+        }
+        message={
+          actionConfirm.action === 'deactivate'
+            ? '¿Estás seguro de que deseas desactivar este administrador? No podrá iniciar sesión.'
+            : '¿Estás seguro de que deseas activar este administrador?'
+        }
+        confirmText={actionConfirm.action === 'deactivate' ? 'Desactivar' : 'Activar'}
+        cancelText="Cancelar"
+        onConfirm={handleActionConfirm}
+        onCancel={() => setActionConfirm({ isOpen: false })}
+        isConfirmLoading={isLoading}
+      />
+    </AdminLayout>
+  );
+}
