@@ -1,14 +1,27 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AdminLayout } from '../Components/AdminLayout';
 import { getAdminStats } from '../api/admin';
+import { getRoleFromToken, getAccessToken } from '../auth/session';
 import { Spinner } from '../Components/Spinner';
 import { Link } from 'react-router-dom';
 import type { AdminStats } from '../interfaces/admin';
 
 export function AdminDashboard() {
+  const navigate = useNavigate();
+  const token = getAccessToken();
+  const role = getRoleFromToken(token);
+  
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Redirect root users
+  useEffect(() => {
+    if (role === 'root') {
+      navigate('/admin/create-admin', { replace: true });
+    }
+  }, [role, navigate]);
 
   useEffect(() => {
     const fetchStats = async () => {

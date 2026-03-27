@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { getRoleFromToken, getAccessToken } from '../auth/session';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { getRoleFromToken, getAccessToken, clearAccessToken } from '../auth/session';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -16,35 +16,50 @@ interface MenuItem {
 export function AdminLayout({ children }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const token = getAccessToken();
   const role = getRoleFromToken(token);
 
-  const menuItems: MenuItem[] = [
-    {
-      label: 'Dashboard',
-      path: '/admin',
-      icon: '📊',
-      roles: ['admin', 'root'],
-    },
-    {
-      label: 'Libros',
-      path: '/admin/books',
-      icon: '📚',
-      roles: ['admin', 'root'],
-    },
-    {
-      label: 'Tiendas',
-      path: '/admin/stores',
-      icon: '🏪',
-      roles: ['admin', 'root'],
-    },
-    {
-      label: 'Administradores',
-      path: '/admin/admins',
-      icon: '👥',
-      roles: ['root'],
-    },
-  ];
+  const handleLogout = () => {
+    clearAccessToken();
+    navigate('/login', { replace: true });
+  };
+
+  const menuItems: MenuItem[] = role === 'root' 
+    ? [
+        {
+          label: 'Administradores',
+          path: '/admin/admins',
+          icon: '👥',
+          roles: ['root'],
+        },
+        {
+          label: 'Crear Administrador',
+          path: '/admin/create-admin',
+          icon: '➕',
+          roles: ['root'],
+        },
+      ]
+    : [
+        {
+          label: 'Dashboard',
+          path: '/admin',
+          icon: '📊',
+          roles: ['admin', 'root'],
+        },
+        {
+          label: 'Libros',
+          path: '/admin/books',
+          icon: '📚',
+          roles: ['admin', 'root'],
+        },
+        {
+          label: 'Tiendas',
+          path: '/admin/stores',
+          icon: '🏪',
+          roles: ['admin', 'root'],
+        },
+      ];
 
   const visibleMenuItems = menuItems.filter(
     (item) => role && (role === 'admin' || role === 'root') && item.roles.includes(role as 'admin' | 'root')
@@ -91,8 +106,17 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           </nav>
 
           {/* Footer */}
-          <div className="px-6 py-4 border-t border-border text-text-muted text-xs">
-            <p>{role === 'root' ? 'Root' : 'Admin'}</p>
+          <div className="px-6 py-4 border-t border-border space-y-3">
+            <p className="text-text-muted text-xs font-medium">
+              {role === 'root' ? '🔐 Root' : '👤 Administrador'}
+            </p>
+            <button
+              onClick={handleLogout}
+              className="w-full px-4 py-2 rounded-lg bg-red-600/10 text-red-600 hover:bg-red-600/20 transition-colors font-medium text-sm flex items-center justify-center gap-2"
+            >
+              <span>🚪</span>
+              <span>Cerrar sesión</span>
+            </button>
           </div>
         </div>
       </div>

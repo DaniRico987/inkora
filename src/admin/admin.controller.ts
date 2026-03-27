@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   Req,
   UseGuards,
@@ -125,6 +126,38 @@ export class AdminController {
     @Req() req: { user: AuthenticatedUser },
   ) {
     return this.authService.deactivateAdmin(id, req.user.userId);
+  }
+
+  @Patch(':id/activate')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('root')
+  @ApiOperation({
+    summary: 'Activar administrador',
+    description:
+      'El usuario root puede activar la cuenta de un administrador previamente desactivado. El id es el userId del administrador.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Administrador activado correctamente',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'No autenticado',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Solo root puede activar administradores',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Administrador no encontrado o ya está activo',
+  })
+  async activateAdmin(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: { user: AuthenticatedUser },
+  ) {
+    return this.authService.activateAdmin(id, req.user.userId);
   }
 }
 
