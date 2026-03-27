@@ -134,7 +134,7 @@ function getNavBarVariant(): NavBarVariant {
 
 function AppContent() {
   const location = useLocation();
-  const shouldHideNavBar = location.pathname === '/login' || location.pathname === '/register' || location.pathname.startsWith('/admin');
+  const shouldHideNavBar = location.pathname === '/login' || location.pathname === '/register' || location.pathname.startsWith('/admin') || location.pathname === '/forgot-password' || location.pathname.startsWith('/reset-password');
   const navBarVariant = getNavBarVariant();
 
   return (
