@@ -1,10 +1,10 @@
 import type { ItemProps } from '../interfaces/ItemInterface';
 
-export default function ItemRow({ synopsis, cuantity, image, title, author, tag, price }: ItemProps) {
+export default function ItemRow({ cuantity, image, title, author, tag, price }: ItemProps) {
   return (
     <article className="group relative flex items-center gap-4 bg-bg-secondary rounded-xl border border-border shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-500 ease-in-out p-3 cursor-pointer overflow-hidden">
       {/* Miniatura */}
-      <div className="relative shrink-0 w-16 h-16 rounded-xl overflow-hidden bg-babyblue-300">
+      <div className="relative shrink-0 w-18 h-18 rounded-xl overflow-hidden bg-babyblue-300">
         {image ? (
           <img
             src={image}
@@ -20,12 +20,26 @@ export default function ItemRow({ synopsis, cuantity, image, title, author, tag,
 
       {/* Info */}
       <div className="flex flex-col gap-1.5 min-w-0 flex-1">
-        <article className='relative flex flex-row justify-between'>
-          <h3 className="text-lg font-semibold text-text leading-snug text-start truncate">
-            {title}
-          </h3>
+        {tag && (
+          <span className="px-2.5 py-1 rounded-full bg-babyblue-400 text-primary-500 text-xs font-semibold tracking-wider uppercase backdrop-blur-sm max-w-32 truncate">
+            {tag}
+          </span>
+        )}
+        <h3 className="text-lg font-semibold text-text leading-snug text-start truncate">
+          {title}
+        </h3>
+        <article className='flex flex-row justify-between'>
+          <p className="text-sm text-text-muted font-medium tracking-widest uppercase text-start truncate">{author}</p>
+        </article>
+
+
+        <div className="flex items-center justify-between gap-3 min-w-0">
+
+          {price && (
+            <p className="text-lg font-bold text-skyblue-500 leading-relaxed text-start shrink-0">{'$' + price}</p>
+          )}
           {cuantity <= 10 && (
-            <span className="absolute z-10 flex items-center gap-1 top-2 left-2 rounded-full bg-red-100 text-primary-500 backdrop-blur-sm px-2 py-0.5">
+            <span className="z-10 flex items-center gap-1 rounded-full bg-red-100 text-primary-500 backdrop-blur-sm px-2 py-0.5">
               <svg viewBox="0 0 32 32" className="w-4 h-4 text-red-600 shrink-0">
                 <g id="SVGRepo_bgCarrier" strokeWidth="0" />
                 <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round" />
@@ -36,27 +50,14 @@ export default function ItemRow({ synopsis, cuantity, image, title, author, tag,
                   />
                 </g>
               </svg>
-              <span className="text-[10px] text-red-600 font-semibold uppercase whitespace-nowrap hidden sm:inline">
+              <span className="    text-xs text-red-600 font-semibold uppercase overflow-hidden
+    transition-all duration-500
+    opacity-100 w-auto h-auto
+    md:opacity-0 md:w-0 md:h-0 sd:text-[0.65rem]
+    md:group-hover:opacity-100 md:group-hover:w-auto md:group-hover:h-auto">
                 {cuantity === 1 ? 'ultima unidad' : `ultimas ${cuantity} unidades`}
               </span>
             </span>
-          )}
-        </article>
-        <article className='flex flex-row justify-between'>
-          <p className="text-sm text-text-muted font-medium tracking-widest uppercase text-start truncate">{author}</p>
-          {synopsis && <p className="hidden md:block text-sm text-text-muted line-clamp-2 w-[70%] h-full overflow-hidden">
-            {synopsis}
-          </p>}
-        </article>
-        {/* Tag */}
-        <div className="flex items-center justify-between gap-3 min-w-0">
-          {tag && (
-            <span className="px-2.5 py-1 rounded-full bg-babyblue-400 text-primary-500 text-xs font-semibold tracking-wider uppercase backdrop-blur-sm max-w-32 truncate">
-              {tag}
-            </span>
-          )}
-          {price && (
-            <p className="text-lg font-bold text-skyblue-500 leading-relaxed text-start shrink-0">{'$' + price}</p>
           )}
         </div>
       </div>

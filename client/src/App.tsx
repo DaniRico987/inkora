@@ -8,7 +8,7 @@ import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { CatalogPage } from './pages/catalog';
-import { ComponentsTestPage } from './pages/ComponentsTestPage';
+//import { ComponentsTestPage } from './pages/ComponentsTestPage';
 import { SnackbarProvider } from './Components/SnackbarProvider';
 import { getAccessToken, getRoleFromToken } from './auth/session';
 import { AdminPage } from './pages/AdminPage';
@@ -19,7 +19,7 @@ function ProtectedClientRoute() {
   const role = getRoleFromToken(token);
 
   if (!token || !role) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/catalog" replace />;
   }
 
   if (role === 'admin' || role === 'root') {
@@ -89,18 +89,18 @@ function AppContent() {
       </header>
       <main className="flex-1 flex items-center justify-center">
         <Routes>
-          <Route path="/" element={<ProtectedClientRoute />} />
-          <Route path="/admin" element={<ProtectedAdminRoute />} />
+          {/* Públicas */}
           <Route path="/login" element={<PublicLoginRoute />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/catalog" element={<CatalogPage />} />
+
+          {/* Privadas */}
+          <Route path="/" element={<ProtectedClientRoute />} />
+          <Route path="/admin" element={<ProtectedAdminRoute />} />
+
+          {/* Otros */}
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route
-            path="/reset-password/:token"
-            element={<ResetPasswordPage />}
-          />
-            <Route path="/catalog" element={<CatalogPage />} />
-          <Route path="/components-test" element={<ComponentsTestPage />} />
-          {/* TODO: agregar aqui /login y demas rutas cuando esten listas */}
+          <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
         </Routes>
       </main>
     </div>
