@@ -6,16 +6,39 @@ export class RecaptchaService {
   private readonly logger = new Logger(RecaptchaService.name);
   private readonly secret: string;
   private readonly enabled: boolean;
+  private readonly isProduction: boolean;
 
   constructor(private readonly configService: ConfigService) {
-    this.secret = this.configService.get<string>('RECAPTCHA_SECRET');
+    this.secret = this.configService.get<string>('RECAPTCHA_SECRET') ?? '';
     const enabledRaw = this.configService.get<string>('RECAPTCHA_ENABLED');
+    const nodeEnv = this.configService.get<string>('NODE_ENV') ?? 'development';
+    this.isProduction = nodeEnv === 'production';
     // Default: enabled unless explicitly set to "false"
     this.enabled = enabledRaw == null ? true : enabledRaw.toLowerCase() !== 'false';
   }
 
   async verify(token: string): Promise<boolean> {
     if (!this.enabled) {
+      return true;
+    }
+
+    // Development fallback while frontend reCAPTCHA widget is not integrated.
+    if (!this.isProduction && token === 'captcha-ok') {
+      this.logger.warn(
+        'Using development placeholder token for reCAPTCHA verification',
+      );
+      return true;
+    }
+
+    if (!this.secret) {
+      if (this.isProduction) {
+        this.logger.error('RECAPTCHA_SECRET is not configured in production');
+        return false;
+      }
+
+      this.logger.warn(
+        'RECAPTCHA_SECRET is not configured; skipping verification in non-production',
+      );
       return true;
     }
 
@@ -27,7 +50,7 @@ export class RecaptchaService {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: `secret=${this.secret}&response=${token}`,
+          body: `secret=${encodeURIComponent(this.secret)}&response=${encodeURIComponent(token)}`,
         },
       );
 
