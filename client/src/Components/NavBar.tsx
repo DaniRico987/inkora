@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { clearAccessToken } from '../auth/session';
 
 type NavBarItem = {
@@ -14,10 +14,6 @@ type NavBarProps = {
 };
 
 function getNavItems(variant: NavBarVariant): NavBarItem[] {
-    if (variant === 'admin') {
-        return [{ label: 'Panel Admin', to: '/admin' }];
-    }
-
     if (variant === 'visitor') {
         return [
             { label: 'Inicio', to: '/catalog' },
@@ -26,16 +22,21 @@ function getNavItems(variant: NavBarVariant): NavBarItem[] {
     }
 
     return [
-        { label: 'Inicio', to: '/' },
-        { label: 'Catalogo', to: '/catalog' },
-        { label: 'Novedades', to: '/catalog' },
-        { label: 'Tiendas', to: '/catalog' },
+        ...(variant === 'client'
+            ? [
+                  { label: 'Inicio', to: '/' },
+                  { label: 'Catalogo', to: '/catalog' },
+                  { label: 'Novedades', to: '/catalog' },
+                  { label: 'Tiendas', to: '/catalog' },
+              ]
+            : []),
     ];
 }
 
 export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
     const [isOpen, setIsOpen] = useState(false);
     const navigate = useNavigate();
+    const location = useLocation();
 
     const navItems = useMemo(() => getNavItems(variant), [variant]);
 
@@ -45,6 +46,9 @@ export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
         'rounded-lg p-2 text-babyblue-50/95 transition-colors duration-200 hover:bg-white/12 hover:text-metallicgold-100';
     const authLinkClass =
         'rounded-lg px-3 py-2 text-sm font-medium text-babyblue-50/95 transition-colors duration-200 hover:bg-white/12 hover:text-metallicgold-100';
+    const authOriginState = {
+        from: `${location.pathname}${location.search}${location.hash}`,
+    };
 
     const handleLogout = () => {
         clearAccessToken();
@@ -82,10 +86,10 @@ export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
                         <div className="flex items-center justify-end gap-1 sm:gap-2 min-w-28">
                             {variant === 'visitor' && (
                                 <>
-                                    <Link to="/login" className={authLinkClass}>
+                                    <Link to="/login" state={authOriginState} className={authLinkClass}>
                                         Iniciar sesion
                                     </Link>
-                                    <Link to="/register" className={authLinkClass}>
+                                    <Link to="/register" state={authOriginState} className={authLinkClass}>
                                         Registrarse
                                     </Link>
                                 </>
@@ -118,20 +122,22 @@ export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
                                 </button>
                             )}
 
-                            <button
-                                onClick={() => setIsOpen((prev) => !prev)}
-                                className="md:hidden inline-flex items-center justify-center rounded-lg p-2 text-babyblue-50/95 hover:bg-white/12"
-                                aria-expanded={isOpen}
-                                aria-label="Abrir menu"
-                            >
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                                </svg>
-                            </button>
+                            {variant !== 'admin' && (
+                                <button
+                                    onClick={() => setIsOpen((prev) => !prev)}
+                                    className="md:hidden inline-flex items-center justify-center rounded-lg p-2 text-babyblue-50/95 hover:bg-white/12"
+                                    aria-expanded={isOpen}
+                                    aria-label="Abrir menu"
+                                >
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                    </svg>
+                                </button>
+                            )}
                         </div>
                     </div>
 
-                    {isOpen && (
+                    {variant !== 'admin' && isOpen && (
                         <div className="md:hidden border-t border-white/20 px-4 pb-4 pt-3">
                             <div className="flex flex-col gap-2 text-left text-babyblue-50">
                                 {navItems.map((item) => (
@@ -147,10 +153,10 @@ export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
 
                                 {variant === 'visitor' && (
                                     <>
-                                        <Link to="/login" onClick={handleMobileLinkClick} className="rounded-md px-2 py-2 hover:bg-white/12">
+                                        <Link to="/login" state={authOriginState} onClick={handleMobileLinkClick} className="rounded-md px-2 py-2 hover:bg-white/12">
                                             Iniciar sesion
                                         </Link>
-                                        <Link to="/register" onClick={handleMobileLinkClick} className="rounded-md px-2 py-2 hover:bg-white/12">
+                                        <Link to="/register" state={authOriginState} onClick={handleMobileLinkClick} className="rounded-md px-2 py-2 hover:bg-white/12">
                                             Registrarse
                                         </Link>
                                     </>
