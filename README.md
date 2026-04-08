@@ -43,6 +43,7 @@ Required environment variables:
 - `MAIL_PASSWORD` (Google App Password)
 - `MAIL_FROM` (example: `INKORA <your_mail@gmail.com>`)
 - `MAIL_REPLY_TO` (optional)
+- `MAIL_LOGO_PATH` (optional local path to embed logo as CID, recommended)
 - `MAIL_LOGO_URL` (optional public URL for your logo in email header)
 - `FRONTEND_URL` (used to build password reset links)
 
@@ -50,9 +51,9 @@ Note: for Gmail you must enable 2-step verification and create an App Password.
 
 Logo strategy:
 
-- If `MAIL_LOGO_URL` is set, it is used as-is.
-- If `MAIL_LOGO_URL` is not set, the system uses `${FRONTEND_URL}/branding/inkora-logo.png`.
-- If neither is available in local preview generation, a dummy placeholder image is used.
+- If `MAIL_LOGO_PATH` exists, the logo is embedded as CID attachment (most reliable across email clients).
+- If `MAIL_LOGO_PATH` is not available and `MAIL_LOGO_URL` is set, it is used as-is.
+- If neither is set, the system uses `${FRONTEND_URL}/branding/inkora-logo.png`.
 
 Current email flows:
 

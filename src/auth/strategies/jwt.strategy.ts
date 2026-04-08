@@ -39,6 +39,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         lastName: true,
         userType: true,
         status: true,
+        client: {
+          select: {
+            clientId: true,
+          },
+        },
         admin: {
           select: {
             isTemporaryPassword: true,
@@ -54,6 +59,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const { admin, ...safeUser } = user;
     return {
       ...safeUser,
+      clientId: safeUser.client?.clientId,
       isTemporaryPassword: admin?.isTemporaryPassword ?? false,
     };
   }

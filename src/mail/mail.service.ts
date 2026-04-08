@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { existsSync } from 'fs';
+import { join } from 'path';
 import * as nodemailer from 'nodemailer';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import {
@@ -13,6 +15,8 @@ export class MailService {
   private readonly logger = new Logger(MailService.name);
   private readonly transporter: nodemailer.Transporter;
   private readonly logoUrl: string | undefined;
+  private readonly logoPath: string | undefined;
+  private readonly logoCid: string | undefined;
 
   constructor(private readonly configService: ConfigService) {
     const host = this.getRequiredConfig('MAIL_HOST');
@@ -20,7 +24,10 @@ export class MailService {
     const user = this.getRequiredConfig('MAIL_USER');
     const pass = this.getRequiredConfig('MAIL_PASSWORD');
     const secure = Number.parseInt(portRaw, 10) === 465;
-    this.logoUrl = this.resolveLogoUrl();
+    const logoConfig = this.resolveLogoConfig();
+    this.logoUrl = logoConfig.logoUrl;
+    this.logoPath = logoConfig.logoPath;
+    this.logoCid = logoConfig.logoCid;
 
     const transportOptions: SMTPTransport.Options = {
       host,
@@ -40,7 +47,7 @@ export class MailService {
     const resetLink = `${frontendUrl.replace(/\/$/, '')}/reset-password/${encodeURIComponent(token)}`;
     const template = buildPasswordResetTemplate(
       { resetLink },
-      { logoUrl: this.logoUrl },
+      { logoUrl: this.logoUrl, logoCid: this.logoCid },
     );
 
     await this.sendEmail({
@@ -62,6 +69,7 @@ export class MailService {
     },
     {
       logoUrl: this.logoUrl,
+      logoCid: this.logoCid,
     });
 
     await this.sendEmail({
@@ -84,6 +92,7 @@ export class MailService {
     },
     {
       logoUrl: this.logoUrl,
+      logoCid: this.logoCid,
     });
 
     await this.sendEmail({
@@ -106,16 +115,53 @@ export class MailService {
     return value;
   }
 
-  private resolveLogoUrl(): string | undefined {
+  private resolveLogoConfig(): {
+    logoUrl?: string;
+    logoPath?: string;
+    logoCid?: string;
+  } {
+    const explicitLogoPath = this.configService.get<string>('MAIL_LOGO_PATH')?.trim();
+    const cid = 'inkora-logo';
+
+    if (explicitLogoPath) {
+      if (existsSync(explicitLogoPath)) {
+        return {
+          logoPath: explicitLogoPath,
+          logoCid: cid,
+        };
+      }
+
+      this.logger.warn(
+        `MAIL_LOGO_PATH no existe o no es accesible: ${explicitLogoPath}. Se usara fallback por URL.`,
+      );
+    }
+
+    const defaultLogoPath = join(process.cwd(), 'public', 'branding', 'inkora-logo.png');
+    if (existsSync(defaultLogoPath)) {
+      return {
+        logoPath: defaultLogoPath,
+        logoCid: cid,
+      };
+    }
+
     const explicitLogoUrl = this.configService.get<string>('MAIL_LOGO_URL')?.trim();
     if (explicitLogoUrl) {
-      return explicitLogoUrl;
+      return { logoUrl: explicitLogoUrl };
+    }
+
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL')?.trim();
+    if (frontendUrl) {
+      return {
+        logoUrl: `${frontendUrl.replace(/\/$/, '')}/branding/inkora-logo.png`,
+      };
     }
 
     const apiUrl = this.configService.get<string>('API_URL')?.trim() || 
                    `http://localhost:${this.configService.get<string>('PORT') || '3000'}`;
-    
-    return `${apiUrl.replace(/\/$/, '')}/branding/inkora-logo.png`;
+
+    return {
+      logoUrl: `${apiUrl.replace(/\/$/, '')}/branding/inkora-logo.png`,
+    };
   }
 
   private async sendEmail(params: {
@@ -126,6 +172,15 @@ export class MailService {
   }): Promise<void> {
     const from = this.getRequiredConfig('MAIL_FROM');
     const replyTo = this.configService.get<string>('MAIL_REPLY_TO')?.trim();
+    const attachments = this.logoPath
+      ? [
+          {
+            filename: 'inkora-logo.png',
+            path: this.logoPath,
+            cid: this.logoCid || 'inkora-logo',
+          },
+        ]
+      : undefined;
 
     await this.transporter.sendMail({
       from,
@@ -134,6 +189,7 @@ export class MailService {
       html: params.html,
       text: params.text,
       ...(replyTo ? { replyTo } : {}),
+      ...(attachments ? { attachments } : {}),
     });
 
     this.logger.log(`Correo enviado a ${params.to} con asunto "${params.subject}"`);

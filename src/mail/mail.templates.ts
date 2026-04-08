@@ -6,6 +6,7 @@ type MailTemplate = {
 
 export type MailBrandingOptions = {
   logoUrl?: string;
+  logoCid?: string;
   brandName?: string;
 };
 
@@ -35,8 +36,14 @@ function escapeHtml(value: string): string {
 function buildLayout(params: LayoutParams): string {
   const brandName = params.branding?.brandName || BRAND_NAME;
   const logoUrl = params.branding?.logoUrl?.trim();
-  const headerContent = logoUrl
-    ? `<img src="${escapeHtml(logoUrl)}" alt="${escapeHtml(brandName)}" style="max-height:44px;max-width:180px;display:block;" />`
+  const logoCid = params.branding?.logoCid?.trim();
+  const logoSrc = logoCid
+    ? `cid:${escapeHtml(logoCid)}`
+    : logoUrl
+      ? escapeHtml(logoUrl)
+      : undefined;
+  const headerContent = logoSrc
+    ? `<img src="${logoSrc}" alt="${escapeHtml(brandName)}" style="max-height:44px;max-width:180px;display:block;" />`
     : `<span style="font-size:20px;font-weight:800;letter-spacing:0.6px;">${escapeHtml(brandName)}</span>`;
 
   return `

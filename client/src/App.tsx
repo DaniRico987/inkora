@@ -14,6 +14,7 @@ import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { CatalogPage } from './pages/catalog';
+import { CartPage } from './pages/CartPage';
 //import { ComponentsTestPage } from './pages/ComponentsTestPage';
 import { SnackbarProvider } from './Components/SnackbarProvider';
 import { getAccessToken, getRoleFromToken } from './auth/session';
@@ -168,6 +169,14 @@ function AppContent() {
 
           {/* Cliente */}
           <Route path="/" element={<ProtectedClientRoute />} />
+          <Route
+            path="/cart"
+            element={
+              <AccessGuard allowedRoles={['client']}>
+                <CartPage />
+              </AccessGuard>
+            }
+          />
 
           {/* Admin */}
           <Route path="/admin" element={<ProtectedAdminRoute />} />
