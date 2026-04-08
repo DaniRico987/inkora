@@ -1,11 +1,10 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 /* stylelint-disable-next-line */
 @config "../tailwind.config.js";
 @custom-variant hover (&:hover);
 
-
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: Inter, Aptos, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
@@ -15,9 +14,9 @@
   min-height: 100vh;
   height: auto;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  color-scheme: light;
+  color: rgb(15 23 42);
+  background: var(--color-bg);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -27,7 +26,17 @@
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
   width: 100vw;
+  min-height: 100vh;
+  background: transparent;
+  color: inherit;
+}
+
+html {
+  min-height: 100%;
+  background: var(--color-bg);
+}
+
+#root {
+  min-height: 100vh;
 }

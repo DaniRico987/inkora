@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { BooksModule } from './books/books.module';
+import { CartModule } from './cart/cart.module';
 import { MailModule } from './mail/mail.module';
 import { RecaptchaModule } from './recaptcha/recaptcha.module';
 import { CategoriesModule } from './categories/categories.module';
@@ -18,6 +19,7 @@ import { StoresModule } from './stores/stores.module';
     }),
     AuthModule,
     BooksModule,
+    CartModule,
     MailModule,
     RecaptchaModule,
     CategoriesModule,

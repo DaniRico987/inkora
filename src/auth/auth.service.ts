@@ -58,6 +58,11 @@ export class AuthService {
         failedAttempts: true,
         blockedUntil: true,
         passwordHash: true,
+        client: {
+          select: {
+            clientId: true,
+          },
+        },
         admin: {
           select: {
             isTemporaryPassword: true,
@@ -247,6 +252,7 @@ export class AuthService {
     const { passwordHash: _passwordHash, admin, ...safeUser } = user;
     return {
       ...safeUser,
+      clientId: safeUser.client?.clientId,
       isTemporaryPassword: admin?.isTemporaryPassword ?? false,
     };
   }

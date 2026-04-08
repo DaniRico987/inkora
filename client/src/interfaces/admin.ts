@@ -2,17 +2,17 @@ export interface Book {
   bookId: string;
   title: string;
   author: string;
-  publicationYear?: number;
-  publisher?: string;
-  isbn?: string;
-  language?: string;
-  pageCount?: number;
+  publicationYear?: number | null;
+  publisher?: string | null;
+  isbn?: string | null;
+  language?: string | null;
+  pageCount?: number | null;
   price: number;
   condition?: 'new' | 'used' | null;
-  isAvailable?: boolean;
-  description?: string;
-  coverUrl?: string;
-  previewUrl?: string;
+  isAvailable?: boolean | null;
+  description?: string | null;
+  coverUrl?: string | null;
+  previewUrl?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -35,16 +35,17 @@ export interface Admin {
   userId: number;
   username: string;
   email: string;
-  isActive: boolean;
+  role: string;
+  isActive?: boolean;
   createdAt?: string;
   updatedAt?: string;
-}
+  }
 
 export interface AdminStats {
-  totalBooks: number;
-  totalStores: number;
-  totalAdmins: number;
-  recentBooks?: Book[];
+  totalBooks?: number;
+  totalStores?: number;
+  totalOrders?: number;
+  totalAdmins?: number;
   recentStores?: Store[];
 }
 

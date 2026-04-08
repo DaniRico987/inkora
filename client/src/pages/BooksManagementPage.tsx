@@ -131,7 +131,7 @@ export function BooksManagementPage() {
         language: bookDetail.language,
         pageCount: bookDetail.pageCount,
         price: bookDetail.price,
-        condition: bookDetail.status,
+          condition: (bookDetail.status as 'new' | 'used' | null) || null,
         isAvailable: bookDetail.isAvailable,
         description: bookDetail.description,
         coverUrl: bookDetail.coverUrl,

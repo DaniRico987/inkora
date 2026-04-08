@@ -1,5 +1,5 @@
-import { mkdir, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { readFile, mkdir, writeFile } from 'node:fs/promises';
+import { extname, join } from 'node:path';
 import { config as loadEnv } from 'dotenv';
 import {
   buildAccountBlockedTemplate,
@@ -7,18 +7,52 @@ import {
   buildPasswordResetTemplate,
 } from '../src/mail/mail.templates';
 
+function getMimeType(filePath: string): string {
+  switch (extname(filePath).toLowerCase()) {
+    case '.png':
+      return 'image/png';
+    case '.jpg':
+    case '.jpeg':
+      return 'image/jpeg';
+    case '.gif':
+      return 'image/gif';
+    case '.webp':
+      return 'image/webp';
+    case '.svg':
+      return 'image/svg+xml';
+    default:
+      return 'application/octet-stream';
+  }
+}
+
+async function resolvePreviewLogoUrl(): Promise<string> {
+  const logoPath = process.env.MAIL_LOGO_PATH?.trim();
+  if (logoPath) {
+    try {
+      const logoBuffer = await readFile(logoPath);
+      const mimeType = getMimeType(logoPath);
+      return `data:${mimeType};base64,${logoBuffer.toString('base64')}`;
+    } catch {
+      // Fall through to URL-based preview when the local file is unavailable.
+    }
+  }
+
+  const frontendUrl = process.env.FRONTEND_URL?.trim();
+  return (
+    process.env.MAIL_LOGO_URL ||
+    (frontendUrl
+      ? `${frontendUrl.replace(/\/$/, '')}/branding/inkora-logo.png`
+      : undefined) ||
+    'https://dummyimage.com/280x72/0f172a/ffffff.png&text=INKORA'
+  );
+}
+
 async function generateMailPreviews() {
   loadEnv({ override: true });
   const outputDir = join(process.cwd(), 'mail-previews');
   await mkdir(outputDir, { recursive: true });
 
-  const frontendUrl = process.env.FRONTEND_URL?.trim();
-  const logoUrl =
-    process.env.MAIL_LOGO_URL ||
-    (frontendUrl
-      ? `${frontendUrl.replace(/\/$/, '')}/branding/inkora-logo.png`
-      : undefined) ||
-    'https://dummyimage.com/280x72/0f172a/ffffff.png&text=INKORA';
+  const logoUrl = await resolvePreviewLogoUrl();
   const branding = { logoUrl };
 
   const resetTemplate = buildPasswordResetTemplate({
