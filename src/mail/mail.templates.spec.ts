@@ -30,6 +30,34 @@ describe('Mail templates', () => {
       expect(template.html).toContain('<img');
       expect(template.html).toContain('alt="INKORA"');
     });
+
+    it('should render cid logo when branding logoCid is provided', () => {
+      const template = buildPasswordResetTemplate(
+        {
+          resetLink: 'http://localhost:5173/reset-password/token-123',
+        },
+        {
+          logoCid: 'inkora-logo',
+        },
+      );
+
+      expect(template.html).toContain('src="cid:inkora-logo"');
+    });
+
+    it('should prioritize logoCid over logoUrl when both are provided', () => {
+      const template = buildPasswordResetTemplate(
+        {
+          resetLink: 'http://localhost:5173/reset-password/token-123',
+        },
+        {
+          logoCid: 'inkora-logo',
+          logoUrl: 'https://example.com/inkora-logo.png',
+        },
+      );
+
+      expect(template.html).toContain('src="cid:inkora-logo"');
+      expect(template.html).not.toContain('https://example.com/inkora-logo.png');
+    });
   });
 
   describe('buildAdminTemporaryPasswordTemplate', () => {
