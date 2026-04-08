@@ -19,6 +19,9 @@ import { SnackbarProvider } from './Components/SnackbarProvider';
 import { getAccessToken, getRoleFromToken } from './auth/session';
 import { ClientHomePage } from './pages/ClientHomePage';
 import { AdminDashboard } from './pages/AdminDashboard';
+import { BooksManagementPage } from './pages/BooksManagementPage';
+import { StoresManagementPage } from './pages/StoresManagementPage';
+import { AdminsManagementPage } from './pages/AdminsManagementPage';
 import { RootAdminCreationPage } from './pages/RootAdminCreationPage';
 
 type AppRole = 'visitor' | 'client' | 'admin' | 'root';
@@ -197,18 +200,30 @@ function AppContent() {
             }
           />
 
-          {/* Bloqueadas */}
+          {/* Admin */}
           <Route
             path="/admin/books"
-            element={<Navigate to="/admin" replace />}
+            element={
+              <AccessGuard allowedRoles={['admin']}>
+                <BooksManagementPage />
+              </AccessGuard>
+            }
           />
           <Route
             path="/admin/stores"
-            element={<Navigate to="/admin" replace />}
+            element={
+              <AccessGuard allowedRoles={['admin']}>
+                <StoresManagementPage />
+              </AccessGuard>
+            }
           />
           <Route
             path="/admin/admins"
-            element={<Navigate to="/admin/create-admin" replace />}
+            element={
+              <AccessGuard allowedRoles={['root']}>
+                <AdminsManagementPage />
+              </AccessGuard>
+            }
           />
 
           {/* Fallback por rol */}
