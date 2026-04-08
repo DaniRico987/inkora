@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useCart } from '../hooks/useCart';
 import { CartItem } from './CartItem';
 import { CartSummary } from './CartSummary';
@@ -14,26 +15,52 @@ export const CartView: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Spinner />
+      <div className="px-4 py-14 sm:py-16">
+        <div className="mx-auto flex min-h-[55vh] max-w-6xl items-center justify-center rounded-3xl border border-border bg-bg-secondary shadow-sm">
+          <Spinner
+            size="lg"
+            tone="calm"
+            label="Preparando tu carrito..."
+            fullScreen={false}
+          />
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex min-h-screen items-center justify-center px-4">
-        <div className="max-w-md rounded-lg border border-red-300 bg-red-50 p-6">
-          <h2 className="mb-2 text-lg font-bold text-red-900">
-            Error al cargar el carrito
-          </h2>
-          <p className="mb-4 text-red-700">{error}</p>
-          <button
-            onClick={resetError}
-            className="rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700"
-          >
-            Reintentar
-          </button>
+      <div className="px-4 py-14 sm:py-16">
+        <div className="mx-auto flex min-h-[55vh] max-w-2xl items-center justify-center">
+          <div className="w-full rounded-3xl border border-red-300/70 bg-bg-secondary p-8 shadow-sm">
+            <div className="mb-4 inline-flex rounded-full bg-red-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-red-700">
+              Error de sincronización
+            </div>
+            <h2 className="text-2xl font-bold tracking-tight text-text sm:text-3xl">
+              Error al cargar el carrito
+            </h2>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-text-muted sm:text-base">
+              No pudimos sincronizar tu carrito en este momento. Tu sesión sigue
+              activa; prueba de nuevo o vuelve más tarde.
+            </p>
+            <div className="mt-6 rounded-2xl border border-red-100 bg-red-50/80 p-4 text-sm text-red-800">
+              {error}
+            </div>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <button
+                onClick={resetError}
+                className="inline-flex items-center justify-center rounded-full bg-red-600 px-5 py-3 font-semibold text-white shadow-lg shadow-red-500/20 transition hover:bg-red-700"
+              >
+                Reintentar
+              </button>
+              <Link
+                to="/catalog"
+                className="inline-flex items-center justify-center rounded-full border border-border bg-bg-secondary px-5 py-3 font-semibold text-text transition hover:border-babyblue-300 hover:text-babyblue-700"
+              >
+                Volver al catálogo
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -41,129 +68,186 @@ export const CartView: React.FC = () => {
 
   if (!cart || cart.items.length === 0) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-12">
-        <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 py-12">
-          <svg
-            className="mb-4 h-16 w-16 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-            />
-          </svg>
+      <div className="px-4 py-10 sm:py-12">
+        <div className="mx-auto max-w-5xl rounded-3xl border border-border bg-bg-secondary p-6 shadow-sm sm:p-8">
+          <div className="space-y-5 text-center">
+            <h1 className="text-3xl font-bold tracking-tight text-text sm:text-4xl">
+              Tu carrito está vacío
+            </h1>
+            <p className="mx-auto max-w-2xl text-base text-text-muted">
+              Cuando agregues libros podrás ajustar cantidad, ver subtotales en
+              tiempo real y continuar al checkout desde esta misma página.
+            </p>
 
-          <h2 className="mb-2 text-2xl font-bold text-gray-900">
-            Carrito vacío
-          </h2>
-          <p className="mb-6 text-gray-600">
-            No tienes libros en tu carrito. ¡Comienza a explorar nuestro
-            catálogo!
-          </p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+              <Link
+                to="/catalog"
+                className="inline-flex items-center justify-center rounded-full bg-babyblue-600 px-6 py-3 font-semibold text-white transition hover:bg-babyblue-700"
+              >
+                Explorar catálogo
+              </Link>
+              <div className="inline-flex items-center justify-center rounded-full border border-border bg-bg px-6 py-3 text-sm font-semibold text-text">
+                Checkout disponible al agregar ítems
+              </div>
+            </div>
 
-          <a
-            href="/catalog"
-            className="rounded-lg bg-babyblue-600 px-6 py-3 font-bold text-white transition-colors hover:bg-babyblue-700"
-          >
-            Ver Catálogo
-          </a>
+            <div className="grid gap-3 text-left sm:grid-cols-3">
+              {[
+                {
+                  title: 'Cantidad editable',
+                  text: 'Ajusta con + y - sin salir del carrito.',
+                },
+                {
+                  title: 'Total dinámico',
+                  text: 'Subtotal, impuestos y total se recalculan al instante.',
+                },
+                {
+                  title: 'Compra segura',
+                  text: 'Acceso directo a pago cuando lo decidas.',
+                },
+              ].map((item) => (
+                <div
+                  key={item.title}
+                  className="rounded-2xl border border-border bg-bg p-4"
+                >
+                  <h3 className="text-sm font-semibold text-text">
+                    {item.title}
+                  </h3>
+                  <p className="mt-1 text-sm text-text-muted">{item.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Mi Carrito</h1>
-        <p className="mt-1 text-gray-600">
-          {cart.itemCount} artículo{cart.itemCount !== 1 ? 's' : ''} en tu
-          carrito
-        </p>
-      </div>
+    <div className="px-4 py-8 sm:py-10 lg:px-6">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <section className="rounded-3xl border border-border bg-bg-secondary p-5 shadow-sm sm:p-7">
+          <div className="space-y-4">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight text-text sm:text-4xl">
+                  Mi carrito
+                </h1>
+                <p className="mt-1 text-base text-text-muted">
+                  Revisa tus libros, ajusta cantidades y continúa al pago cuando
+                  quieras.
+                </p>
+              </div>
 
-      {/* Error global */}
-      {error && (
-        <div className="mb-6 rounded-lg border border-red-300 bg-red-50 p-4">
-          <div className="flex items-start justify-between">
-            <div>
-              <h3 className="font-semibold text-red-900">Error</h3>
-              <p className="text-sm text-red-700">{error}</p>
+              <div className="grid gap-2 sm:grid-cols-3">
+                <div className="rounded-2xl border border-border bg-bg px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.16em] text-text-muted">
+                    Artículos
+                  </p>
+                  <p className="mt-1 text-lg font-bold text-text">
+                    {cart.itemCount}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-border bg-bg px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.16em] text-text-muted">
+                    Subtotal
+                  </p>
+                  <p className="mt-1 text-lg font-bold text-text">
+                    ${cart.subtotal.toFixed(2)}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-border bg-bg px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.16em] text-text-muted">
+                    Total
+                  </p>
+                  <p className="mt-1 text-lg font-bold text-text">
+                    ${cart.total.toFixed(2)}
+                  </p>
+                </div>
+              </div>
             </div>
-            <button
-              onClick={resetError}
-              className="text-red-600 hover:text-red-700"
+          </div>
+        </section>
+
+        {error && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/90 px-5 py-4 text-amber-900 shadow-sm backdrop-blur">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="font-semibold">Hay un detalle pendiente</h3>
+                <p className="mt-1 text-sm text-amber-800">{error}</p>
+              </div>
+              <button
+                onClick={resetError}
+                className="rounded-full border border-amber-200 bg-bg-secondary px-3 py-1.5 text-sm font-semibold text-amber-900 transition hover:bg-amber-100"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(340px,0.9fr)]">
+          <div className="space-y-4">
+            <div className="flex flex-col gap-2 px-1 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2 className="text-sm font-semibold uppercase tracking-[0.24em] text-text-muted">
+                  Ítems seleccionados
+                </h2>
+                <p className="mt-1 text-sm text-text-muted">
+                  Actualiza cantidades o elimina libros sin perder el contexto.
+                </p>
+              </div>
+              <div className="inline-flex w-fit rounded-full border border-border bg-bg px-4 py-2 text-sm font-semibold text-text">
+                Actualización inmediata
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {cart.items.map((item, index) => (
+                <CartItem
+                  key={item.cartItemId}
+                  item={item}
+                  onUpdate={updateItem}
+                  onRemove={removeItem}
+                  index={index}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="lg:pt-10">
+            <CartSummary cart={cart} />
+          </div>
+        </div>
+
+        <section className="grid gap-4 md:grid-cols-3">
+          {[
+            {
+              title: 'Envío rápido',
+              text: 'Recibe tus libros con una experiencia de compra clara y sin fricción.',
+            },
+            {
+              title: 'Edición instantánea',
+              text: 'Los controles + / - y el total se actualizan al momento.',
+            },
+            {
+              title: 'Checkout listo',
+              text: 'Cuando quieras, sigue al pago con un solo clic.',
+            },
+          ].map((card) => (
+            <div
+              key={card.title}
+              className="rounded-2xl border border-border bg-bg-secondary p-5 shadow-sm"
             >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Main layout */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Items list */}
-        <div className="lg:col-span-2">
-          <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-            {/* Header de tabla */}
-            <div className="hidden border-b border-gray-200 bg-gray-50 px-4 py-3 md:flex">
-              <div className="flex-1 text-xs font-semibold uppercase text-gray-700">
-                Producto
-              </div>
-              <div className="w-24 text-center text-xs font-semibold uppercase text-gray-700">
-                Cantidad
-              </div>
-              <div className="w-24 text-right text-xs font-semibold uppercase text-gray-700">
-                Subtotal
-              </div>
-              <div className="w-12"></div>
+              <h3 className="text-base font-bold text-text">
+                {card.title}
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-text-muted">
+                {card.text}
+              </p>
             </div>
-
-            {/* Items */}
-            {cart.items.map((item) => (
-              <CartItem
-                key={item.cartItemId}
-                item={item}
-                onUpdate={updateItem}
-                onRemove={removeItem}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Summary sidebar */}
-        <div className="lg:col-span-1">
-          <CartSummary cart={cart} />
-        </div>
-      </div>
-
-      {/* Información adicional */}
-      <div className="mt-8 grid gap-4 md:grid-cols-3">
-        <div className="rounded-lg border border-gray-200 bg-white p-4">
-          <h3 className="font-semibold text-gray-900">Envío Gratis</h3>
-          <p className="mt-1 text-sm text-gray-600">
-            En compras mayores a $500
-          </p>
-        </div>
-
-        <div className="rounded-lg border border-gray-200 bg-white p-4">
-          <h3 className="font-semibold text-gray-900">Devolución Fácil</h3>
-          <p className="mt-1 text-sm text-gray-600">
-            Hasta 30 días después de comprar
-          </p>
-        </div>
-
-        <div className="rounded-lg border border-gray-200 bg-white p-4">
-          <h3 className="font-semibold text-gray-900">Pago Seguro</h3>
-          <p className="mt-1 text-sm text-gray-600">
-            Transacciones encriptadas 100%
-          </p>
-        </div>
+          ))}
+        </section>
       </div>
     </div>
   );

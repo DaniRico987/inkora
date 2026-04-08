@@ -28,6 +28,7 @@ import { UpdateCartItemDto } from './dto/update-cart-item.dto';
 import { GetCartResponseDto } from './dto/get-cart-response.dto';
 import { CartItemResponseDto } from './dto/cart-item-response.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ForbiddenException } from '@nestjs/common';
 
 @ApiTags('Cart')
 @ApiBearerAuth()
@@ -54,6 +55,9 @@ export class CartController {
   @ApiUnauthorizedResponse({ description: 'Token JWT inválido o expirado' })
   async getCart(@Request() req): Promise<GetCartResponseDto> {
     const clientId = req.user.clientId;
+    if (!clientId) {
+      throw new ForbiddenException('Solo los clientes pueden acceder al carrito');
+    }
     return this.cartService.getActiveCart(clientId);
   }
 
@@ -81,6 +85,9 @@ export class CartController {
     @Body() dto: CreateCartItemDto,
   ): Promise<CartItemResponseDto> {
     const clientId = req.user.clientId;
+    if (!clientId) {
+      throw new ForbiddenException('Solo los clientes pueden acceder al carrito');
+    }
     return this.cartService.addItem(clientId, dto);
   }
 
@@ -115,6 +122,9 @@ export class CartController {
     @Body() dto: UpdateCartItemDto,
   ): Promise<CartItemResponseDto> {
     const clientId = req.user.clientId;
+    if (!clientId) {
+      throw new ForbiddenException('Solo los clientes pueden acceder al carrito');
+    }
     return this.cartService.updateItem(clientId, cartItemId, dto);
   }
 
@@ -143,6 +153,9 @@ export class CartController {
     @Param('id', ParseIntPipe) cartItemId: number,
   ): Promise<void> {
     const clientId = req.user.clientId;
+    if (!clientId) {
+      throw new ForbiddenException('Solo los clientes pueden acceder al carrito');
+    }
     await this.cartService.removeItem(clientId, cartItemId);
   }
 }
