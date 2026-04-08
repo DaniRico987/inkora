@@ -1,5 +1,11 @@
 import './App.css';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+} from 'react-router-dom';
 import { Toggle } from './Components/Toggle';
 import { NavBar, type NavBarVariant } from './Components/NavBar';
 import { useTheme } from './theme/useTheme';
@@ -13,93 +19,84 @@ import { SnackbarProvider } from './Components/SnackbarProvider';
 import { getAccessToken, getRoleFromToken } from './auth/session';
 import { ClientHomePage } from './pages/ClientHomePage';
 import { AdminDashboard } from './pages/AdminDashboard';
-import { BooksManagementPage } from './pages/BooksManagementPage';
-import { StoresManagementPage } from './pages/StoresManagementPage';
-import { AdminsManagementPage } from './pages/AdminsManagementPage';
 import { RootAdminCreationPage } from './pages/RootAdminCreationPage';
 
-function ProtectedClientRoute() {
+type AppRole = 'visitor' | 'client' | 'admin' | 'root';
+
+function resolveAppRole(): AppRole {
   const token = getAccessToken();
   const role = getRoleFromToken(token);
 
   if (!token || !role) {
+    return 'visitor';
+  }
+
+  if (role === 'client' || role === 'admin' || role === 'root') {
+    return role;
+  }
+
+  return 'visitor';
+}
+
+function getRoleHome(role: AppRole): string {
+  if (role === 'root') return '/admin/create-admin';
+  if (role === 'admin') return '/admin';
+  if (role === 'client') return '/';
+  return '/catalog';
+}
+
+function AccessGuard({
+  allowedRoles,
+  children,
+}: {
+  allowedRoles: AppRole[];
+  children: React.ReactNode;
+}) {
+  const role = resolveAppRole();
+
+  if (!allowedRoles.includes(role)) {
+    return <Navigate to={getRoleHome(role)} replace />;
+  }
+
+  return <>{children}</>;
+}
+
+function ProtectedClientRoute() {
+  const role = resolveAppRole();
+
+  if (role === 'visitor') {
     return <Navigate to="/catalog" replace />;
   }
 
-  if (role === 'admin' || role === 'root') {
-    return <Navigate to="/admin" replace />;
+  if (role !== 'client') {
+    return <Navigate to={getRoleHome(role)} replace />;
   }
 
   return <ClientHomePage />;
 }
 
 function ProtectedAdminRoute() {
-  const token = getAccessToken();
-  const role = getRoleFromToken(token);
+  const role = resolveAppRole();
 
-  if (!token || !role) {
-    return <Navigate to="/login" replace />;
+  if (role === 'visitor') {
+    return <Navigate to="/catalog" replace />;
   }
 
-  if (role !== 'admin' && role !== 'root') {
-    return <Navigate to="/" replace />;
-  }
-
-  // Redirect root users to admin creation page instead of dashboard
-  if (role === 'root') {
-    return <Navigate to="/admin/create-admin" replace />;
+  if (role !== 'admin') {
+    return <Navigate to={getRoleHome(role)} replace />;
   }
 
   return <AdminDashboard />;
 }
 
-function ProtectedAdminOnlyRoute({ element }: { element: React.ReactNode }) {
-  const token = getAccessToken();
-  const role = getRoleFromToken(token);
-
-  if (!token || !role) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (role !== 'admin') {
-    return <Navigate to="/admin" replace />;
-  }
-
-  return <>{element}</>;
-}
-
-function ProtectedRootOnlyRoute({ element }: { element: React.ReactNode }) {
-  const token = getAccessToken();
-  const role = getRoleFromToken(token);
-
-  if (!token || !role) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (role !== 'root') {
-    return <Navigate to="/admin" replace />;
-  }
-
-  return <>{element}</>;
-}
-
 function PublicLoginRoute() {
-  const token = getAccessToken();
-  const role = getRoleFromToken(token);
+  const role = resolveAppRole();
 
-  if (!token || !role) {
+  if (role === 'visitor') {
     return <LoginPage />;
   }
 
-  if (role === 'root') {
-    return <Navigate to="/admin/create-admin" replace />;
-  }
-
-  if (role === 'admin') {
-    return <Navigate to="/admin" replace />;
-  }
-
-  return <Navigate to="/" replace />;
+  return <Navigate to={getRoleHome(role)} replace />;
 }
 
 function getNavBarVariant(): NavBarVariant {
@@ -119,35 +116,106 @@ function getNavBarVariant(): NavBarVariant {
 
 function AppContent() {
   const location = useLocation();
-  const shouldHideNavBar = location.pathname === '/login' || location.pathname === '/register' || location.pathname.startsWith('/admin') || location.pathname === '/forgot-password' || location.pathname.startsWith('/reset-password') || location.pathname === '/create-admin';
+  const shouldHideNavBar =
+    location.pathname === '/login' ||
+    location.pathname === '/register' ||
+    location.pathname.startsWith('/admin') ||
+    location.pathname === '/forgot-password' ||
+    location.pathname.startsWith('/reset-password') ||
+    location.pathname === '/create-admin';
+  const hasTopNav = !shouldHideNavBar;
   const navBarVariant = getNavBarVariant();
 
   return (
     <div className="bg-bg w-screen min-h-screen flex flex-col transition-all duration-300 ease-in-out">
       {!shouldHideNavBar && <NavBar variant={navBarVariant} />}
-      <header className={`relative z-60 pointer-events-none w-full flex justify-end p-4 ${shouldHideNavBar && location.pathname.startsWith('/admin') ? 'hidden' : ''}`}>
-        <div className="pointer-events-auto">
-          <Toggle />
+      <header
+        className={`relative pointer-events-none w-full ${shouldHideNavBar && location.pathname.startsWith('/admin') ? 'hidden' : ''}`}
+      >
+        <div className={`mx-auto w-full px-4 ${hasTopNav ? 'max-w-7xl pt-1 pb-2' : 'pt-4 pb-2'}`}>
+          <div className="pointer-events-auto flex w-full justify-end">
+            <Toggle />
+          </div>
         </div>
       </header>
-      <main className={`flex-1 ${location.pathname.startsWith('/admin') ? '' : 'flex items-center justify-center'}`}>
+      <main
+        className={`flex-1 ${location.pathname.startsWith('/admin') ? '' : 'flex items-center justify-center'}`}
+      >
         <Routes>
-          {/* Públicas */}
+          {/* Login */}
           <Route path="/login" element={<PublicLoginRoute />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/catalog" element={<CatalogPage />} />
 
-          {/* Privadas */}
+          {/* Visitante y cliente */}
+          <Route
+            path="/register"
+            element={
+              <AccessGuard allowedRoles={['visitor']}>
+                <RegisterPage />
+              </AccessGuard>
+            }
+          />
+          <Route
+            path="/catalog"
+            element={
+              <AccessGuard allowedRoles={['visitor', 'client']}>
+                <CatalogPage />
+              </AccessGuard>
+            }
+          />
+
+          {/* Cliente */}
           <Route path="/" element={<ProtectedClientRoute />} />
-          <Route path="/admin" element={<ProtectedAdminRoute />} />
-          <Route path="/admin/books" element={<ProtectedAdminOnlyRoute element={<BooksManagementPage />} />} />
-          <Route path="/admin/stores" element={<ProtectedAdminOnlyRoute element={<StoresManagementPage />} />} />
-          <Route path="/admin/admins" element={<ProtectedRootOnlyRoute element={<AdminsManagementPage />} />} />
-          <Route path="/admin/create-admin" element={<ProtectedRootOnlyRoute element={<RootAdminCreationPage />} />} />
 
-          {/* Otros */}
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+          {/* Admin */}
+          <Route path="/admin" element={<ProtectedAdminRoute />} />
+
+          {/* Root */}
+          <Route
+            path="/admin/create-admin"
+            element={
+              <AccessGuard allowedRoles={['root']}>
+                <RootAdminCreationPage />
+              </AccessGuard>
+            }
+          />
+
+          {/* Permitidas para visitante y admin */}
+          <Route
+            path="/forgot-password"
+            element={
+              <AccessGuard allowedRoles={['visitor', 'admin']}>
+                <ForgotPasswordPage />
+              </AccessGuard>
+            }
+          />
+          <Route
+            path="/reset-password/:token"
+            element={
+              <AccessGuard allowedRoles={['visitor', 'admin']}>
+                <ResetPasswordPage />
+              </AccessGuard>
+            }
+          />
+
+          {/* Bloqueadas */}
+          <Route
+            path="/admin/books"
+            element={<Navigate to="/admin" replace />}
+          />
+          <Route
+            path="/admin/stores"
+            element={<Navigate to="/admin" replace />}
+          />
+          <Route
+            path="/admin/admins"
+            element={<Navigate to="/admin/create-admin" replace />}
+          />
+
+          {/* Fallback por rol */}
+          <Route
+            path="*"
+            element={<Navigate to={getRoleHome(resolveAppRole())} replace />}
+          />
         </Routes>
       </main>
     </div>

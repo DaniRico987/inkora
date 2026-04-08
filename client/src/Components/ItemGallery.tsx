@@ -19,11 +19,13 @@ function normalizeText(value: string): string {
 }
 
 export default function ItemGallery({ items, title }: ItemGalleryProps) {
-  const [isGrid, setIsGrid] = useState(false);
+  const PAGE_SIZE = 16;
+  const [isGrid, setIsGrid] = useState(true);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [searchValue, setSearchValue] = useState("");
   const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   const [selectedAuthor, setSelectedAuthor] = useState("");
   const [publicationYearFrom, setPublicationYearFrom] = useState("");
   const [publicationYearTo, setPublicationYearTo] = useState("");
@@ -128,6 +130,23 @@ export default function ItemGallery({ items, title }: ItemGalleryProps) {
     });
   }, [items, selectedTag, selectedAuthor, publicationYearFrom, publicationYearTo, selectedGenre, selectedStatus, selectedLanguage, queryTokens]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
+
+  const paginatedItems = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredItems.slice(start, start + PAGE_SIZE);
+  }, [filteredItems, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedTag, searchValue, selectedAuthor, publicationYearFrom, publicationYearTo, selectedGenre, selectedStatus, selectedLanguage, items]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   const clearAdvancedFilters = () => {
     setSelectedAuthor("");
     setPublicationYearFrom("");
@@ -197,15 +216,44 @@ export default function ItemGallery({ items, title }: ItemGalleryProps) {
               </div>
             ) : isGrid ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                {filteredItems.map((item) => (
+                {paginatedItems.map((item) => (
                   <ItemCard key={item.id} {...item} />
                 ))}
               </div>
             ) : (
               <div className="flex flex-col gap-3">
-                {filteredItems.map((item) => (
+                {paginatedItems.map((item) => (
                   <ItemRow key={item.id} {...item} />
                 ))}
+              </div>
+            )}
+
+            {filteredItems.length > 0 && (
+              <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <p className="text-sm text-text-muted">
+                  Mostrando {(currentPage - 1) * PAGE_SIZE + 1} - {Math.min(currentPage * PAGE_SIZE, filteredItems.length)} de {filteredItems.length}
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    size="auto"
+                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Anterior
+                  </Button>
+                  <span className="text-sm text-text-muted px-2">
+                    Pagina {currentPage} de {totalPages}
+                  </span>
+                  <Button
+                    variant="secondary"
+                    size="auto"
+                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Siguiente
+                  </Button>
+                </div>
               </div>
             )}
           </div>

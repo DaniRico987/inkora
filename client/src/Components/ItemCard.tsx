@@ -1,7 +1,14 @@
 import type { ItemProps } from '../interfaces/ItemInterface';
+import { useEffect, useState } from 'react';
 
 
 export default function ItemCard({ cuantity, image, title, author, tag, price }: ItemProps) {
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [image]);
+
   return (
     <article className="group flex flex-col bg-bg-secondary rounded-2xl overflow-hidden border border-border shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-500 ease-in-out cursor-pointer">
       {/* Imagen */}
@@ -45,11 +52,12 @@ export default function ItemCard({ cuantity, image, title, author, tag, price }:
             </span>
           </span>
         )}
-        {image ? (
+        {image && !imageFailed ? (
           <img
             src={image}
             alt={title}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            onError={() => setImageFailed(true)}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-text-muted">

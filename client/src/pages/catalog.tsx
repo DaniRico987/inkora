@@ -13,8 +13,8 @@ function mapTag(status?: string | null): string {
     return 'Catalogo';
 }
 
-function mapAvailabilityStatus(isAvailable: boolean, status?: string | null): string {
-    if (!isAvailable) return 'No disponible';
+function mapAvailabilityStatus(quantity: number, isAvailable: boolean, status?: string | null): string {
+    if (!isAvailable || quantity <= 0) return 'No disponible';
     if (status === 'new') return 'Nuevo';
     if (status === 'used') return 'Usado';
     return 'Disponible';
@@ -22,10 +22,11 @@ function mapAvailabilityStatus(isAvailable: boolean, status?: string | null): st
 
 function toGalleryItem(base: BookListItem, detail?: BookDetailItem): ItemGalleryProps['items'][number] {
     const status = detail?.status ?? base.status;
+    const quantity = detail?.quantity ?? base.quantity;
 
     return {
         id: base.id,
-        cuantity: base.isAvailable ? 1 : 0,
+        cuantity: quantity,
         image: detail?.coverUrl ?? base.coverUrl ?? null,
         synopsis: detail?.description ?? undefined,
         title: base.title,
@@ -34,7 +35,7 @@ function toGalleryItem(base: BookListItem, detail?: BookDetailItem): ItemGallery
         price: formatPrice(base.price),
         publicationYear: detail?.publicationYear ?? undefined,
         genre: detail?.categories?.[0]?.name ?? undefined,
-        status: mapAvailabilityStatus(base.isAvailable, status),
+        status: mapAvailabilityStatus(quantity, base.isAvailable, status),
         language: detail?.language ?? undefined,
     };
 }
@@ -52,10 +53,24 @@ export const CatalogPage: React.FC = () => {
                 setLoading(true);
                 setError(null);
 
-                const booksPage = await getBooks(1, 24);
+                const requestLimit = 100;
+                const firstPage = await getBooks(1, requestLimit);
+                const allBooks = [...firstPage.items];
+
+                if (firstPage.totalPages > 1) {
+                    const nextPages = await Promise.all(
+                        Array.from({ length: firstPage.totalPages - 1 }, (_, index) =>
+                            getBooks(index + 2, requestLimit),
+                        ),
+                    );
+
+                    nextPages.forEach((pageResult) => {
+                        allBooks.push(...pageResult.items);
+                    });
+                }
 
                 const mappedItems = await Promise.all(
-                    booksPage.items.map(async (book) => {
+                    allBooks.map(async (book) => {
                         try {
                             const detail = await getBookDetail(book.id);
                             return toGalleryItem(book, detail);
@@ -65,8 +80,10 @@ export const CatalogPage: React.FC = () => {
                     }),
                 );
 
+                const itemsWithInventory = mappedItems.filter((item) => item.cuantity > 0);
+
                 if (isMounted) {
-                    setItems(mappedItems);
+                    setItems(itemsWithInventory);
                 }
             } catch (err) {
                 if (isMounted) {
