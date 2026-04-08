@@ -125,14 +125,14 @@ export function AdminsManagementPage() {
       icon: '🔒',
       onClick: (admin) => handleActionClick(admin.userId, 'deactivate'),
       variant: 'destructive',
-      show: (admin) => admin.isActive,
+      show: (admin) => admin.isActive === true,
     },
     {
       label: 'Activar',
       icon: '🔓',
       onClick: (admin) => handleActionClick(admin.userId, 'activate'),
       variant: 'secondary',
-      show: (admin) => !admin.isActive,
+      show: (admin) => admin.isActive !== true,
     },
   ];
 
