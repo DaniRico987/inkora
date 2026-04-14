@@ -4,6 +4,6 @@ import { ApiProperty } from '@nestjs/swagger';
 export class UpdateCartItemDto {
   @ApiProperty({ example: 2, description: 'Nueva cantidad' })
   @IsInt({ message: 'quantity debe ser un entero' })
-  @Min(1, { message: 'quantity debe ser al menos 1' })
+  @Min(0, { message: 'quantity no puede ser menor a 0' })
   quantity: number;
 }

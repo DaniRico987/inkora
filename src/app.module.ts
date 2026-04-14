@@ -11,6 +11,7 @@ import { RecaptchaModule } from './recaptcha/recaptcha.module';
 import { CategoriesModule } from './categories/categories.module';
 import { AdminModule } from './admin/admin.module';
 import { StoresModule } from './stores/stores.module';
+import { PurchasesModule } from './purchases/purchases.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { StoresModule } from './stores/stores.module';
     CategoriesModule,
     AdminModule,
     StoresModule,
+    PurchasesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -32,11 +32,11 @@ export class BookListItemDto {
   })
   price: number;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Cantidad disponible total en inventario',
     example: 8,
   })
-  quantity: number;
+  quantity?: number;
 
   @ApiPropertyOptional({
     description: 'Estado o condición del libro',

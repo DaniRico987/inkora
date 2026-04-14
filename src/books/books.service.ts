@@ -61,10 +61,6 @@ export class BooksService {
         title: book.title,
         author: book.author,
         price: Number(book.price),
-        quantity: book.inventories.reduce(
-          (totalQuantity, inventory) => totalQuantity + inventory.availableQuantity,
-          0,
-        ),
         status: book.condition,
         isAvailable: book.isAvailable,
       })),
@@ -197,7 +193,7 @@ export class BooksService {
       language: book.language,
       pageCount: book.pageCount,
       price: Number(book.price),
-      quantity: book.inventories.reduce(
+      quantity: (book.inventories ?? []).reduce(
         (totalQuantity, inventory) => totalQuantity + inventory.availableQuantity,
         0,
       ),

@@ -8,6 +8,7 @@ import {
   buildAccountBlockedTemplate,
   buildAdminTemporaryPasswordTemplate,
   buildPasswordResetTemplate,
+  buildPurchaseInvoiceTemplate,
 } from './mail.templates';
 
 @Injectable()
@@ -105,6 +106,40 @@ export class MailService {
     this.logger.warn(
       `Notificacion de bloqueo enviada a ${email} hasta ${blockedUntilIso}`,
     );
+  }
+
+  async sendPurchaseInvoice(
+    email: string,
+    params: {
+      firstName: string;
+      purchaseId: number;
+      purchaseDateIso: string;
+      totalAmount: number;
+      paymentMethod?: string;
+      shippingAddress?: string;
+      deliveryMode?: 'homeDelivery' | 'storePickup';
+      pickupStoreName?: string;
+      estimatedDeliveryTime?: string;
+      status: 'inPreparation' | 'shipped' | 'delivered' | 'cancelled';
+      items: Array<{
+        title: string;
+        quantity: number;
+        unitPrice: number;
+        subtotal: number;
+      }>;
+    },
+  ) {
+    const template = buildPurchaseInvoiceTemplate(params, {
+      logoUrl: this.logoUrl,
+      logoCid: this.logoCid,
+    });
+
+    await this.sendEmail({
+      to: email,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
+    });
   }
 
   private getRequiredConfig(key: string): string {

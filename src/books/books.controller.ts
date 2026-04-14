@@ -202,7 +202,7 @@ export class BooksController {
 
   @Post(':id/cover')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'root')
+  @Roles('admin')
   @UseInterceptors(FileInterceptor('file'))
   @ApiBearerAuth('JWT')
   @ApiOperation({
