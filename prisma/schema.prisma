@@ -294,8 +294,9 @@ model Store {
   status    StoreStatus
 
   // Relations
-  inventories Inventory[]
-  purchases   Purchase[]
+  inventories      Inventory[]
+  purchases        Purchase[]
+  reservationItems ReservationItem[]
 
   @@map("store")
 }
@@ -402,10 +403,12 @@ model ReservationItem {
   reservationItemId Int @id @default(autoincrement())
   reservationId     Int
   bookId            Int
+  storeId           Int?
   quantity          Int
 
   reservation Reservation @relation(fields: [reservationId], references: [reservationId])
   book        Book        @relation(fields: [bookId], references: [bookId])
+  store       Store?      @relation(fields: [storeId], references: [storeId])
 
   @@map("reservation_item")
 }

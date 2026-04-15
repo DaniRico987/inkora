@@ -1,7 +1,8 @@
 import type { ItemProps } from '../interfaces/ItemInterface';
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 
-export default function ItemRow({ cuantity, image, title, author, tag, price }: ItemProps) {
+export default function ItemRow({ id, cuantity, image, title, author, tag, price }: ItemProps) {
   const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
@@ -9,7 +10,8 @@ export default function ItemRow({ cuantity, image, title, author, tag, price }: 
   }, [image]);
 
   return (
-    <article className="group relative flex items-center gap-4 bg-bg-secondary rounded-xl border border-border shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-500 ease-in-out p-3 cursor-pointer overflow-hidden">
+    <Link to={`/books/${id}`}>
+      <article className="group relative flex items-center gap-4 bg-bg-secondary rounded-xl border border-border shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-500 ease-in-out p-3 cursor-pointer overflow-hidden">
       {/* Miniatura */}
       <div className="relative shrink-0 w-18 h-18 rounded-xl overflow-hidden bg-babyblue-300">
         {image && !imageFailed ? (
@@ -78,7 +80,8 @@ export default function ItemRow({ cuantity, image, title, author, tag, price }: 
       </span>
 
       {/* Borde inferior animado */}
-      <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary-400 group-hover:w-full transition-all duration-300" />
-    </article>
+        <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary-400 group-hover:w-full transition-all duration-300" />
+      </article>
+    </Link>
   );
 }

@@ -1,8 +1,9 @@
 import type { ItemProps } from '../interfaces/ItemInterface';
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 
-export default function ItemCard({ cuantity, image, title, author, tag, price }: ItemProps) {
+export default function ItemCard({ id, cuantity, image, title, author, tag, price }: ItemProps) {
   const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
@@ -10,7 +11,8 @@ export default function ItemCard({ cuantity, image, title, author, tag, price }:
   }, [image]);
 
   return (
-    <article className="group flex flex-col bg-bg-secondary rounded-2xl overflow-hidden border border-border shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-500 ease-in-out cursor-pointer">
+    <Link to={`/books/${id}`}>
+      <article className="group flex flex-col bg-bg-secondary rounded-2xl overflow-hidden border border-border shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-500 ease-in-out cursor-pointer">
       {/* Imagen */}
       <div className="relative h-44 overflow-hidden bg-babyblue-300">
         {cuantity <= 10 && (
@@ -23,8 +25,8 @@ export default function ItemCard({ cuantity, image, title, author, tag, price }:
   "
           >
             <svg viewBox="0 0 32 32" className="w-5 h-5 text-red-600 shrink-0">
-              <g id="SVGRepo_bgCarrier" stroke-width="0" />
-              <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round" />
+              <g id="SVGRepo_bgCarrier" strokeWidth="0" />
+              <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round" />
               <g id="SVGRepo_iconCarrier">
                 <path
                   fill="currentColor"
@@ -84,7 +86,8 @@ export default function ItemCard({ cuantity, image, title, author, tag, price }:
       </div>
 
       {/* Borde inferior animado */}
-      <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary-400 group-hover:w-full transition-all duration-300" />
-    </article>
+        <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary-400 group-hover:w-full transition-all duration-300" />
+      </article>
+    </Link>
   );
 }

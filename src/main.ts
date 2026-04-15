@@ -56,6 +56,10 @@ async function bootstrap() {
     .addTag('Stores', 'Información sobre sucursales y puntos de venta físicos')
     .addTag('Purchases', 'Flujo de compras, seguimiento y actualización de estados')
     .addTag(
+      'Reservations',
+      'Reservas de libros con expiración automática de 24 horas',
+    )
+    .addTag(
       'Administradores',
       'Gestión de administradores (solo accesible para usuarios root)',
     )

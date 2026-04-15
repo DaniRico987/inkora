@@ -1,4 +1,5 @@
 export interface ItemProps {
+    id: number;
     image?: string | null;
     synopsis?: string;
     cuantity: number;

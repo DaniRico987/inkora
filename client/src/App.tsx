@@ -14,6 +14,7 @@ import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { CatalogPage } from './pages/catalog';
+import { BookDetailPage } from './pages/BookDetailPage';
 import { CartPage } from './pages/CartPage';
 import { OrderTrackingPage } from './pages/OrderTrackingPage';
 //import { ComponentsTestPage } from './pages/ComponentsTestPage';
@@ -164,6 +165,14 @@ function AppContent() {
             element={
               <AccessGuard allowedRoles={['visitor', 'client']}>
                 <CatalogPage />
+              </AccessGuard>
+            }
+          />
+          <Route
+            path="/books/:id"
+            element={
+              <AccessGuard allowedRoles={['visitor', 'client']}>
+                <BookDetailPage />
               </AccessGuard>
             }
           />
