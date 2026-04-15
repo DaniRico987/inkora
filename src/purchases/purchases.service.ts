@@ -200,6 +200,85 @@ export class PurchasesService {
     return this.mapPurchaseResponse(purchase);
   }
 
+  async updatePurchaseAddress(
+    purchaseId: number,
+    clientId: number,
+    shippingAddress: string,
+  ): Promise<PurchaseResponseDto> {
+    const purchase = await this.prisma.purchase.findUnique({
+      where: { purchaseId },
+      include: {
+        client: {
+          include: {
+            user: {
+              select: {
+                email: true,
+                firstName: true,
+              },
+            },
+          },
+        },
+        pickupStore: {
+          select: {
+            name: true,
+          },
+        },
+        purchaseItems: {
+          include: {
+            book: {
+              select: {
+                title: true,
+                author: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!purchase) {
+      throw new NotFoundException(`Compra con ID ${purchaseId} no encontrada`);
+    }
+
+    if (purchase.clientId !== clientId) {
+      throw new ForbiddenException('No tienes permiso para modificar esta compra');
+    }
+
+    if (purchase.status !== PurchaseStatus.inPreparation) {
+      throw new BadRequestException(
+        'El pedido ya fue despachado. Solo los pedidos en preparacion permiten cambiar la direccion de entrega.',
+      );
+    }
+
+    const nextEstimatedDeliveryTime = this.calculateEstimatedDeliveryTime(
+      purchase.deliveryMode ?? DeliveryMode.homeDelivery,
+      purchase.pickupStore?.name,
+      shippingAddress,
+    );
+
+    const updated = await this.prisma.purchase.update({
+      where: { purchaseId },
+      data: {
+        shippingAddress,
+        estimatedDeliveryTime: nextEstimatedDeliveryTime,
+      },
+      include: {
+        purchaseItems: {
+          include: {
+            book: {
+              select: {
+                title: true,
+                author: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return this.mapPurchaseResponse(updated);
+  }
+
   async updatePurchaseStatus(
     purchaseId: number,
     status: PurchaseStatus,
@@ -280,6 +359,7 @@ export class PurchasesService {
   private calculateEstimatedDeliveryTime(
     deliveryMode: DeliveryMode,
     pickupStoreName?: string,
+    shippingAddress?: string,
   ): string {
     const now = new Date();
 
@@ -296,7 +376,12 @@ export class PurchasesService {
     const maxDate = new Date(now);
     maxDate.setDate(maxDate.getDate() + 4);
 
-    return `Entrega estimada entre ${minDate.toLocaleDateString('es-AR')} y ${maxDate.toLocaleDateString('es-AR')}`;
+    const destinationSuffix =
+      deliveryMode === DeliveryMode.homeDelivery && shippingAddress?.trim()
+      ? ` para ${shippingAddress.trim()}`
+      : '';
+
+    return `Entrega estimada entre ${minDate.toLocaleDateString('es-AR')} y ${maxDate.toLocaleDateString('es-AR')}${destinationSuffix}`;
   }
 
   private mapPurchaseResponse(purchase: {

@@ -13,6 +13,7 @@ import {
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiBadRequestResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOperation,
@@ -27,6 +28,7 @@ import { Roles } from '../auth/roles.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
 import { PurchaseResponseDto } from './dto/purchase-response.dto';
+import { UpdatePurchaseAddressDto } from './dto/update-purchase-address.dto';
 import { UpdatePurchaseStatusDto } from './dto/update-purchase-status.dto';
 import { PurchasesService } from './purchases.service';
 
@@ -82,6 +84,44 @@ export class PurchasesController {
     @Param('id', ParseIntPipe) purchaseId: number,
   ): Promise<PurchaseResponseDto> {
     return this.purchasesService.getPurchaseById(purchaseId, req.user);
+  }
+
+  @Patch(':id/address')
+  @ApiOperation({
+    summary: 'Actualizar direccion de entrega',
+    description:
+      'Permite modificar la direccion de un pedido solo mientras permanece en preparacion.',
+  })
+  @ApiParam({ name: 'id', type: 'integer', example: 15 })
+  @ApiBody({ type: UpdatePurchaseAddressDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Direccion de entrega actualizada exitosamente',
+    type: PurchaseResponseDto,
+  })
+  @ApiNotFoundResponse({ description: 'Compra no encontrada' })
+  @ApiBadRequestResponse({
+    description:
+      'El pedido ya fue despachado o los datos de direccion son invalidos',
+  })
+  @ApiUnauthorizedResponse({ description: 'Token JWT invalido o expirado' })
+  @ApiForbiddenResponse({
+    description: 'No tienes permiso para modificar esta compra',
+  })
+  async updatePurchaseAddress(
+    @Req() req: { user: AuthenticatedUser },
+    @Param('id', ParseIntPipe) purchaseId: number,
+    @Body() dto: UpdatePurchaseAddressDto,
+  ): Promise<PurchaseResponseDto> {
+    if (!req.user.clientId) {
+      throw new ForbiddenException('Solo los clientes pueden modificar pedidos');
+    }
+
+    return this.purchasesService.updatePurchaseAddress(
+      purchaseId,
+      req.user.clientId,
+      dto.shippingAddress,
+    );
   }
 
   @Patch(':id/status')
