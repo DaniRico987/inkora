@@ -55,12 +55,12 @@ function isConnectorCompleted(
 export function OrderStatusStepper({ status }: OrderStatusStepperProps) {
   if (status === 'cancelled') {
     return (
-      <section className="rounded-3xl border border-red-300/60 bg-red-50/80 p-5 sm:p-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-700">
+      <section className="rounded-3xl border border-danger-300/60 bg-danger-50/80 p-5 sm:p-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-danger-700">
           Estado del pedido
         </p>
-        <h3 className="mt-2 text-xl font-bold text-red-800">Pedido cancelado</h3>
-        <p className="mt-2 text-sm text-red-700 sm:text-base">
+        <h3 className="mt-2 text-xl font-bold text-danger-800">Pedido cancelado</h3>
+        <p className="mt-2 text-sm text-danger-700 sm:text-base">
           Este pedido fue cancelado y no continuara en el flujo de despacho.
         </p>
       </section>
@@ -85,7 +85,7 @@ export function OrderStatusStepper({ status }: OrderStatusStepperProps) {
               {index < ORDER_STEPS.length - 1 && (
                 <span
                   className={[
-                    'absolute left-1/2 top-5 h-[2px] w-full -translate-x-0',
+                    'absolute left-1/2 top-5 h-0.5 w-full translate-x-0',
                     connectorDone ? 'bg-emerald-500' : 'bg-border',
                   ].join(' ')}
                   aria-hidden="true"
@@ -132,7 +132,7 @@ export function OrderStatusStepper({ status }: OrderStatusStepperProps) {
                 {index < ORDER_STEPS.length - 1 && (
                   <span
                     className={[
-                      'mt-1 h-8 w-[2px]',
+                      'mt-1 h-8 w-0.5',
                       connectorDone ? 'bg-emerald-500' : 'bg-border',
                     ].join(' ')}
                     aria-hidden="true"

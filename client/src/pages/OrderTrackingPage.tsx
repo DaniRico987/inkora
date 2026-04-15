@@ -30,8 +30,8 @@ export function OrderTrackingPage() {
   if (error || !purchase) {
     return (
       <div className="w-full px-4 py-10 sm:py-12">
-        <div className="mx-auto max-w-2xl rounded-3xl border border-red-300/60 bg-bg-secondary p-7 shadow-sm sm:p-8">
-          <div className="inline-flex rounded-full bg-red-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-red-700">
+        <div className="mx-auto max-w-2xl rounded-3xl border border-danger-300/60 bg-bg-secondary p-7 shadow-sm sm:p-8">
+          <div className="inline-flex rounded-full bg-danger-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-danger-700">
             Seguimiento no disponible
           </div>
           <h1 className="mt-4 text-3xl font-bold text-text">No pudimos abrir tu pedido</h1>

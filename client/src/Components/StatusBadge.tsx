@@ -10,7 +10,7 @@ const toneClasses: Record<BadgeTone, string> = {
   info: 'bg-skyblue-100/80 text-skyblue-800 border-skyblue-300/70',
   success: 'bg-emerald-100/80 text-emerald-700 border-emerald-300/80',
   warning: 'bg-amber-100/80 text-amber-700 border-amber-300/80',
-  danger: 'bg-red-100/80 text-red-700 border-red-300/80',
+  danger: 'bg-danger-100/80 text-danger-700 border-danger-300/80',
 };
 
 const sizeClasses: Record<BadgeSize, string> = {
@@ -23,7 +23,7 @@ const dotToneClasses: Record<BadgeTone, string> = {
   info: 'bg-skyblue-600',
   success: 'bg-emerald-600',
   warning: 'bg-amber-600',
-  danger: 'bg-red-600',
+  danger: 'bg-danger-600',
 };
 
 export function StatusBadge({
