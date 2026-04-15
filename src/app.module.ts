@@ -12,9 +12,12 @@ import { CategoriesModule } from './categories/categories.module';
 import { AdminModule } from './admin/admin.module';
 import { StoresModule } from './stores/stores.module';
 import { PurchasesModule } from './purchases/purchases.module';
+import { ReservationsModule } from './reservations/reservations.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'public'),
     }),
@@ -27,6 +30,7 @@ import { PurchasesModule } from './purchases/purchases.module';
     AdminModule,
     StoresModule,
     PurchasesModule,
+    ReservationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

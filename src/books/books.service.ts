@@ -161,8 +161,17 @@ export class BooksService {
       where: { bookId: id },
       include: {
         inventories: {
-          select: {
-            availableQuantity: true,
+          include: {
+            store: {
+              select: {
+                storeId: true,
+                name: true,
+                city: true,
+              },
+            },
+          },
+          orderBy: {
+            storeId: 'asc',
           },
         },
         bookImages: {
@@ -211,6 +220,12 @@ export class BooksService {
         id: bookCategory.category.categoryId,
         name: bookCategory.category.name,
         description: bookCategory.category.description,
+      })),
+      inventoriesByStore: book.inventories.map((inventory) => ({
+        storeId: inventory.store.storeId,
+        storeName: inventory.store.name,
+        city: inventory.store.city,
+        availableQuantity: inventory.availableQuantity,
       })),
     };
   }
