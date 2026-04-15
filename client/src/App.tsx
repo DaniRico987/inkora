@@ -261,7 +261,7 @@ function App() {
     <BrowserRouter>
       <SnackbarProvider
         config={{
-          position: 'bottom-center',
+          position: 'top-center',
           maxVisible: 3,
           maxQueue: 20,
           dedupeWindowMs: 1500,
