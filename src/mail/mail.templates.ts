@@ -4,6 +4,27 @@ type MailTemplate = {
   text: string;
 };
 
+type PurchaseInvoiceItem = {
+  title: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+};
+
+type PurchaseInvoiceParams = {
+  firstName: string;
+  purchaseId: number;
+  purchaseDateIso: string;
+  totalAmount: number;
+  paymentMethod?: string;
+  shippingAddress?: string;
+  deliveryMode?: 'homeDelivery' | 'storePickup';
+  pickupStoreName?: string;
+  estimatedDeliveryTime?: string;
+  status: 'inPreparation' | 'shipped' | 'delivered' | 'cancelled';
+  items: PurchaseInvoiceItem[];
+};
+
 export type MailBrandingOptions = {
   logoUrl?: string;
   logoCid?: string;
@@ -232,5 +253,109 @@ export function buildAccountBlockedTemplate(
       'Detectamos multiples intentos fallidos de inicio de sesion y tu cuenta fue bloqueada temporalmente por seguridad.\n' +
       `Disponible nuevamente: ${params.blockedUntilIso}\n` +
       'Si no fuiste tu, te recomendamos cambiar tu contrasena cuando recuperes acceso.',
+  };
+}
+
+export function buildPurchaseInvoiceTemplate(
+  params: PurchaseInvoiceParams,
+  branding?: MailBrandingOptions,
+): MailTemplate {
+  const safeFirstName = escapeHtml(params.firstName);
+  const safePurchaseDate = escapeHtml(params.purchaseDateIso);
+  const safeEstimatedTime = escapeHtml(
+    params.estimatedDeliveryTime || 'Sin estimacion disponible',
+  );
+  const safeDeliveryMode = escapeHtml(
+    params.deliveryMode === 'storePickup'
+      ? `Retiro en tienda${params.pickupStoreName ? ` (${params.pickupStoreName})` : ''}`
+      : 'Envio a domicilio',
+  );
+  const safeStatus = escapeHtml(params.status);
+  const safePaymentMethod = escapeHtml(params.paymentMethod || 'No informado');
+  const safeShippingAddress = escapeHtml(params.shippingAddress || 'No informada');
+
+  const itemsRows = params.items
+    .map((item) => {
+      return `
+        <tr>
+          <td style="padding:10px 12px;border:1px solid #e2e8f0;font-size:14px;color:#0f172a;">${escapeHtml(item.title)}</td>
+          <td style="padding:10px 12px;border:1px solid #e2e8f0;font-size:14px;color:#0f172a;text-align:center;">${item.quantity}</td>
+          <td style="padding:10px 12px;border:1px solid #e2e8f0;font-size:14px;color:#0f172a;text-align:right;">$${item.unitPrice.toFixed(2)}</td>
+          <td style="padding:10px 12px;border:1px solid #e2e8f0;font-size:14px;color:#0f172a;text-align:right;">$${item.subtotal.toFixed(2)}</td>
+        </tr>
+      `;
+    })
+    .join('');
+
+  const bodyHtml = `
+    <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#334155;">
+      Hola ${safeFirstName}, tu compra fue confirmada correctamente.
+    </p>
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;margin:0 0 16px 0;">
+      <tr>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-size:14px;color:#0f172a;"><strong>Compra</strong></td>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;font-size:14px;color:#0f172a;">#${params.purchaseId}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-size:14px;color:#0f172a;"><strong>Fecha</strong></td>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;font-size:14px;color:#0f172a;">${safePurchaseDate}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-size:14px;color:#0f172a;"><strong>Estado</strong></td>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;font-size:14px;color:#0f172a;">${safeStatus}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-size:14px;color:#0f172a;"><strong>Entrega</strong></td>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;font-size:14px;color:#0f172a;">${safeDeliveryMode}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-size:14px;color:#0f172a;"><strong>ETA</strong></td>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;font-size:14px;color:#0f172a;">${safeEstimatedTime}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-size:14px;color:#0f172a;"><strong>Pago</strong></td>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;font-size:14px;color:#0f172a;">${safePaymentMethod}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-size:14px;color:#0f172a;"><strong>Direccion</strong></td>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;font-size:14px;color:#0f172a;">${safeShippingAddress}</td>
+      </tr>
+    </table>
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;margin:0 0 16px 0;">
+      <thead>
+        <tr>
+          <th align="left" style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-size:13px;color:#0f172a;">Libro</th>
+          <th align="center" style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-size:13px;color:#0f172a;">Cant.</th>
+          <th align="right" style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-size:13px;color:#0f172a;">Unitario</th>
+          <th align="right" style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-size:13px;color:#0f172a;">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemsRows}
+      </tbody>
+    </table>
+    <p style="margin:0;font-size:16px;line-height:1.4;color:#0f172a;">
+      <strong>Total pagado: $${params.totalAmount.toFixed(2)}</strong>
+    </p>
+  `;
+
+  return {
+    subject: `Factura de compra #${params.purchaseId} - INKORA`,
+    html: buildLayout({
+      preheader: `Tu compra #${params.purchaseId} fue confirmada.`,
+      title: 'Factura de compra',
+      intro: 'Gracias por comprar en INKORA.',
+      bodyHtml,
+      footer:
+        'Conserva este correo como comprobante de tu compra. Si tienes dudas, contacta a soporte.',
+      branding,
+    }),
+    text:
+      `Compra #${params.purchaseId} confirmada\n` +
+      `Fecha: ${params.purchaseDateIso}\n` +
+      `Estado: ${params.status}\n` +
+      `Entrega: ${params.deliveryMode || 'N/D'}\n` +
+      `ETA: ${params.estimatedDeliveryTime || 'N/D'}\n` +
+      `Total: $${params.totalAmount.toFixed(2)}\n`,
   };
 }

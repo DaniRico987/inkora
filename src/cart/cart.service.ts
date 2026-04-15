@@ -26,11 +26,8 @@ export class CartService {
    * @returns DTO con carrito formateado y totales calculados
    */
   async getActiveCart(clientId: number): Promise<GetCartResponseDto> {
-    // Asegurar que existe un carrito activo
-    await this.ensureActiveCart(clientId);
-
     // Obtener carrito con items
-    const cart = await this.prisma.cart.findUnique({
+    let cart = await this.prisma.cart.findUnique({
       where: {
         clientId,
       },
@@ -49,7 +46,17 @@ export class CartService {
     });
 
     if (!cart) {
-      throw new NotFoundException('Carrito no encontrado');
+      const createdCart = await this.prisma.cart.create({
+        data: {
+          clientId,
+          status: 'active',
+        },
+      });
+
+      cart = {
+        ...createdCart,
+        cartItems: [],
+      };
     }
 
     // Mapear items y calcular subtotales
@@ -180,10 +187,6 @@ export class CartService {
     cartItemId: number,
     dto: UpdateCartItemDto,
   ): Promise<CartItemResponseDto> {
-    if (dto.quantity < 1) {
-      throw new BadRequestException('La cantidad debe ser al menos 1');
-    }
-
     // Verificar que el item pertenece al carrito del cliente
     const cartItem = await this.prisma.cartItem.findUnique({
       where: { cartItemId },
@@ -216,6 +219,10 @@ export class CartService {
       throw new BadRequestException(
         'Usa DELETE para eliminar el item del carrito',
       );
+    }
+
+    if (dto.quantity < 1) {
+      throw new BadRequestException('La cantidad debe ser al menos 1');
     }
 
     // Actualizar cantidad

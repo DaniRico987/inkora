@@ -15,6 +15,7 @@ import { RegisterPage } from './pages/RegisterPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { CatalogPage } from './pages/catalog';
 import { CartPage } from './pages/CartPage';
+import { OrderTrackingPage } from './pages/OrderTrackingPage';
 //import { ComponentsTestPage } from './pages/ComponentsTestPage';
 import { SnackbarProvider } from './Components/SnackbarProvider';
 import { getAccessToken, getRoleFromToken } from './auth/session';
@@ -174,6 +175,14 @@ function AppContent() {
             element={
               <AccessGuard allowedRoles={['client']}>
                 <CartPage />
+              </AccessGuard>
+            }
+          />
+          <Route
+            path="/orders/:id"
+            element={
+              <AccessGuard allowedRoles={['client']}>
+                <OrderTrackingPage />
               </AccessGuard>
             }
           />

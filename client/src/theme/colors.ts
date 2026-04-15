@@ -57,6 +57,18 @@ export const lightTheme = {
   '--color-metallicgold-700': '#565754',
   '--color-metallicgold-800': '#3d3e3c',
   '--color-metallicgold-900': '#252625',
+
+  /* DANGER */
+  '--color-danger-50': '#fef2f2',
+  '--color-danger-100': '#fee2e2',
+  '--color-danger-200': '#fecaca',
+  '--color-danger-300': '#fca5a5',
+  '--color-danger-400': '#f87171',
+  '--color-danger-500': '#ef4444',
+  '--color-danger-600': '#dc2626',
+  '--color-danger-700': '#b91c1c',
+  '--color-danger-800': '#991b1b',
+  '--color-danger-900': '#7f1d1d',
 } as const;
 
 export const darkTheme = {
@@ -114,4 +126,15 @@ export const darkTheme = {
   '--color-metallicgold-700': '#565754',
   '--color-metallicgold-800': '#3d3e3c',
   '--color-metallicgold-900': '#252625',
+
+  '--color-danger-50': '#2e1417',
+  '--color-danger-100': '#3a171b',
+  '--color-danger-200': '#5a1d25',
+  '--color-danger-300': '#7a2531',
+  '--color-danger-400': '#a33243',
+  '--color-danger-500': '#c24659',
+  '--color-danger-600': '#db5b6d',
+  '--color-danger-700': '#ea7988',
+  '--color-danger-800': '#f2a0aa',
+  '--color-danger-900': '#f7c9cf',
 } as const;
