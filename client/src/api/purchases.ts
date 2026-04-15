@@ -41,3 +41,17 @@ export async function getPurchaseById(purchaseId: number): Promise<Purchase> {
     throw normalizeApiError(error, 'No se pudo cargar el pedido');
   }
 }
+
+export async function updatePurchaseAddress(
+  purchaseId: number,
+  shippingAddress: string,
+): Promise<Purchase> {
+  try {
+    const response = await apiClient.patch<Purchase>(`/purchases/${purchaseId}/address`, {
+      shippingAddress,
+    });
+    return response.data;
+  } catch (error) {
+    throw normalizeApiError(error, 'No se pudo actualizar la direccion del pedido');
+  }
+}

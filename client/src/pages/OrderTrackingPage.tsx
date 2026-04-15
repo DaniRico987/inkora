@@ -1,9 +1,13 @@
+import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { OrderDeliveryInfo } from '../Components/OrderDeliveryInfo';
+import { OrderAddressModal } from '../Components/OrderAddressModal';
 import { OrderHeader } from '../Components/OrderHeader';
 import { OrderItemsSummary } from '../Components/OrderItemsSummary';
 import { OrderStatusStepper } from '../Components/OrderStatusStepper';
 import { Spinner } from '../Components/Spinner';
+import { useSnackbar } from '../Components/SnackbarProvider';
+import { updatePurchaseAddress } from '../api/purchases';
 import { usePurchaseTracking } from '../hooks/usePurchaseTracking';
 
 export function OrderTrackingPage() {
@@ -11,6 +15,44 @@ export function OrderTrackingPage() {
   const purchaseId = Number(params.id);
   const { purchase, loading, error, refresh, clearError } =
     usePurchaseTracking(purchaseId);
+  const snackbar = useSnackbar();
+  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+  const [isAddressSaving, setIsAddressSaving] = useState(false);
+
+  const canChangeAddress = purchase?.status === 'inPreparation';
+  const currentShippingAddress = useMemo(
+    () => purchase?.shippingAddress?.trim() || '',
+    [purchase?.shippingAddress],
+  );
+
+  const openAddressModal = () => {
+    clearError();
+    setIsAddressModalOpen(true);
+  };
+
+  const closeAddressModal = () => {
+    setIsAddressModalOpen(false);
+  };
+
+  const handleAddressSubmit = async (nextAddress: string) => {
+    if (!purchase) return;
+
+    setIsAddressSaving(true);
+    try {
+      await updatePurchaseAddress(purchase.purchaseId, nextAddress);
+      await refresh();
+      setIsAddressModalOpen(false);
+      snackbar.success('Dirección actualizada correctamente');
+    } catch (submitError) {
+      const message =
+        submitError instanceof Error
+          ? submitError.message
+          : 'No se pudo actualizar la dirección';
+      snackbar.error(message);
+    } finally {
+      setIsAddressSaving(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -80,6 +122,38 @@ export function OrderTrackingPage() {
               shippingAddress={purchase.shippingAddress}
               estimatedDeliveryTime={purchase.estimatedDeliveryTime}
             />
+
+            <section className="rounded-3xl border border-border bg-bg-secondary p-5 shadow-sm sm:p-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">
+                    Gestión de entrega
+                  </p>
+                  <h3 className="mt-2 text-lg font-bold text-text">
+                    Dirección de envío
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-text-muted">
+                    {canChangeAddress
+                      ? 'Puedes ajustar la dirección antes del despacho.'
+                      : 'El pedido ya fue despachado. Solo las compras futuras podrán usar una dirección distinta.'}
+                  </p>
+                </div>
+
+                {canChangeAddress ? (
+                  <button
+                    type="button"
+                    onClick={openAddressModal}
+                    className="inline-flex items-center justify-center rounded-full bg-babyblue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-babyblue-700"
+                  >
+                    Cambiar dirección
+                  </button>
+                ) : (
+                  <div className="rounded-full border border-danger-300/60 bg-danger-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-danger-700">
+                    Dirección bloqueada
+                  </div>
+                )}
+              </div>
+            </section>
           </div>
 
           <div className="space-y-6">
@@ -104,6 +178,17 @@ export function OrderTrackingPage() {
           </div>
         </div>
       </div>
+
+      {purchase && (
+        <OrderAddressModal
+          isOpen={isAddressModalOpen}
+          purchase={purchase}
+          currentAddress={currentShippingAddress}
+          onClose={closeAddressModal}
+          onSubmit={handleAddressSubmit}
+          isLoading={isAddressSaving}
+        />
+      )}
     </div>
   );
 }
