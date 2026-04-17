@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   Req,
   UseGuards,
@@ -15,6 +16,8 @@ import { Request } from 'express';
 import { AuthService } from './auth.service';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
@@ -90,6 +93,34 @@ export class AuthController {
   @ApiUnauthorizedResponse({ description: 'Token invalido o expirado' })
   async me(@Req() req: Request & { user: AuthenticatedUser }) {
     return this.authService.getProfile(req.user.userId);
+  }
+
+  @Patch('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Actualizar los datos del perfil autenticado' })
+  @ApiResponse({ status: 200, description: 'Perfil actualizado correctamente' })
+  @ApiUnauthorizedResponse({ description: 'Token invalido o expirado' })
+  async updateProfile(
+    @Req() req: Request & { user: AuthenticatedUser },
+    @Body() dto: UpdateProfileDto,
+  ) {
+    return this.authService.updateProfile(req.user.userId, dto);
+  }
+
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Cambiar contraseña autenticado' })
+  @ApiResponse({ status: 200, description: 'Contraseña actualizada correctamente' })
+  @ApiUnauthorizedResponse({ description: 'Token invalido o expirado' })
+  async changePassword(
+    @Req() req: Request & { user: AuthenticatedUser },
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.authService.changePassword(req.user.userId, dto);
   }
 
   @Post('admins')

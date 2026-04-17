@@ -106,15 +106,15 @@ export async function getAdminDetail(adminId: string) {
 }
 
 export interface CreateAdminRequest {
-  dni: string;
   firstName: string;
-  lastName: string;
-  birthDate: string;
+  lastName?: string;
+  email: string;
+  username?: string;
+  dni?: string;
+  birthDate?: string;
   birthPlace?: string;
   address?: string;
   gender?: string;
-  email: string;
-  username: string;
 }
 
 export async function createAdmin(data: CreateAdminRequest) {

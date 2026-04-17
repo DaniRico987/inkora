@@ -16,7 +16,9 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { CreateAdminDto } from './dto/create-admin.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { AuthenticatedUser } from './interfaces/authenticated-user.interface';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 import { PrismaService } from 'prisma/prisma/prisma.service';
@@ -275,6 +277,7 @@ export class AuthService {
     const payload: JwtPayload = {
       sub: user.userId,
       role: user.userType,
+      isTemporaryPassword: user.isTemporaryPassword ?? false,
     };
 
     const accessToken = await this.jwtService.signAsync(payload);
@@ -474,20 +477,30 @@ export class AuthService {
   }
 
   async createAdmin(dto: CreateAdminDto, rootUserId: number) {
-    const { email, username } = dto;
+    const email = dto.email.trim().toLowerCase();
+    const firstName = dto.firstName.trim();
+    const lastName = dto.lastName?.trim() || '';
+    const username = dto.username?.trim() ||
+      (await this.generateUniqueUsername(email, firstName, lastName));
+    const dni = dto.dni?.trim() || (await this.generateUniqueDni());
+    const birthDate = dto.birthDate ? new Date(dto.birthDate) : new Date('1900-01-01');
+
+    if (!firstName) {
+      throw new BadRequestException('El nombre es requerido');
+    }
 
     const existingEmail = await this.prisma.user.findUnique({
       where: { email },
     });
     if (existingEmail) {
-      throw new ConflictException('Email already exists');
+      throw new ConflictException('El email ya está registrado');
     }
 
     const existingUsername = await this.prisma.user.findUnique({
       where: { username },
     });
     if (existingUsername) {
-      throw new ConflictException('Username already exists');
+      throw new ConflictException('El nombre de usuario ya está en uso');
     }
 
     const temporaryPassword = this.generateTemporaryPassword();
@@ -496,10 +509,10 @@ export class AuthService {
     const adminUser = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
-          dni: dto.dni,
-          firstName: dto.firstName,
-          lastName: dto.lastName,
-          birthDate: new Date(dto.birthDate),
+          dni,
+          firstName,
+          lastName,
+          birthDate,
           birthPlace: dto.birthPlace,
           address: dto.address,
           gender: dto.gender,
@@ -530,6 +543,93 @@ export class AuthService {
 
     const { passwordHash: _passwordHash, ...safeUser } = adminUser;
     return safeUser;
+  }
+
+  async updateProfile(userId: number, dto: UpdateProfileDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { userId },
+    });
+
+    if (!user || user.status !== 'active') {
+      throw new UnauthorizedException('Usuario no autorizado');
+    }
+
+    if (dto.email && dto.email.trim().toLowerCase() !== user.email) {
+      const emailExists = await this.prisma.user.findUnique({
+        where: { email: dto.email.trim().toLowerCase() },
+      });
+      if (emailExists && emailExists.userId !== userId) {
+        throw new ConflictException('El email ya está registrado');
+      }
+    }
+
+    if (dto.username && dto.username.trim() !== user.username) {
+      const usernameExists = await this.prisma.user.findUnique({
+        where: { username: dto.username.trim() },
+      });
+      if (usernameExists && usernameExists.userId !== userId) {
+        throw new ConflictException('El nombre de usuario ya está en uso');
+      }
+    }
+
+    const updateData: any = {};
+    if (dto.firstName !== undefined) updateData.firstName = dto.firstName.trim();
+    if (dto.lastName !== undefined) updateData.lastName = dto.lastName?.trim() || '';
+    if (dto.birthDate !== undefined) updateData.birthDate = new Date(dto.birthDate);
+    if (dto.birthPlace !== undefined) updateData.birthPlace = dto.birthPlace;
+    if (dto.address !== undefined) updateData.address = dto.address;
+    if (dto.gender !== undefined) updateData.gender = dto.gender;
+    if (dto.email !== undefined) updateData.email = dto.email.trim().toLowerCase();
+    if (dto.username !== undefined) updateData.username = dto.username.trim();
+
+    const updatedUser = await this.prisma.user.update({
+      where: { userId },
+      data: updateData,
+    });
+
+    const { passwordHash: _passwordHash, ...safeUser } = updatedUser;
+    return safeUser;
+  }
+
+  async changePassword(userId: number, dto: ChangePasswordDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { userId },
+      include: { admin: true },
+    });
+
+    if (!user || user.status !== 'active') {
+      throw new UnauthorizedException('Usuario no autorizado');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, BCRYPT_SALT_ROUNDS);
+
+    await this.prisma.user.update({
+      where: { userId },
+      data: {
+        passwordHash,
+        admin: user.admin
+          ? {
+              update: {
+                isTemporaryPassword: false,
+              },
+            }
+          : undefined,
+      },
+    });
+
+    const payload: JwtPayload = {
+      sub: user.userId,
+      role: user.userType,
+      isTemporaryPassword: false,
+    };
+
+    const accessToken = await this.jwtService.signAsync(payload);
+
+    return {
+      accessToken,
+      tokenType: 'Bearer',
+      expiresIn: this.configService.get<string>('JWT_EXPIRES_IN') ?? '1h',
+    } as LoginResponseDto;
   }
 
   /**
@@ -651,6 +751,46 @@ export class AuthService {
     }
 
     return passwordChars.join('');
+  }
+
+  private async generateUniqueUsername(
+    email: string,
+    firstName: string,
+    lastName?: string,
+  ): Promise<string> {
+    const baseName = (email.split('@')[0] || `${firstName}${lastName || ''}`)
+      .replace(/[^a-zA-Z0-9_]/g, '')
+      .toLowerCase()
+      .slice(0, 25)
+      .replace(/_+$/g, '') || 'admin';
+
+    let candidate = baseName;
+    let suffix = 1;
+    while (
+      await this.prisma.user.findUnique({
+        where: { username: candidate },
+      })
+    ) {
+      candidate = `${baseName}${suffix++}`;
+    }
+
+    return candidate;
+  }
+
+  private async generateUniqueDni(): Promise<string> {
+    let dni: string;
+    let exists = true;
+
+    while (exists) {
+      dni = `TMP${Math.floor(Math.random() * 900000000) + 100000000}`;
+      exists = Boolean(
+        await this.prisma.user.findUnique({
+          where: { dni },
+        })
+      );
+    }
+
+    return dni;
   }
 
   private calculateBlockedUntil(baseDate: Date): Date {

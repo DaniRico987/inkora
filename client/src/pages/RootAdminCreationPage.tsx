@@ -8,15 +8,8 @@ import { getRoleFromToken, getAccessToken } from '../auth/session';
 import type { CreateAdminRequest } from '../api/admin';
 
 interface FormData {
-  dni: string;
   firstName: string;
-  lastName: string;
   email: string;
-  username: string;
-  birthDate: string;
-  birthPlace?: string;
-  address?: string;
-  gender?: string;
 }
 
 interface FormErrors {
@@ -24,15 +17,8 @@ interface FormErrors {
 }
 
 const initialFormData: FormData = {
-  dni: '',
   firstName: '',
-  lastName: '',
   email: '',
-  username: '',
-  birthDate: '',
-  birthPlace: '',
-  address: '',
-  gender: '',
 };
 
 export function RootAdminCreationPage() {
@@ -52,18 +38,11 @@ export function RootAdminCreationPage() {
   const validateForm = (): boolean => {
     const errors: FormErrors = {};
 
-    if (!formData.dni.trim()) errors.dni = 'DNI es requerido';
     if (!formData.firstName.trim()) errors.firstName = 'Nombre es requerido';
-    if (!formData.lastName.trim()) errors.lastName = 'Apellido es requerido';
     if (!formData.email.trim()) errors.email = 'Email es requerido';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       errors.email = 'Email no es válido';
     }
-    if (!formData.username.trim()) errors.username = 'Usuario es requerido';
-    if (formData.username.length < 3) {
-      errors.username = 'Usuario debe tener al menos 3 caracteres';
-    }
-    if (!formData.birthDate) errors.birthDate = 'Fecha de nacimiento es requerida';
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -97,15 +76,8 @@ export function RootAdminCreationPage() {
     try {
       setIsLoading(true);
       const adminData: CreateAdminRequest = {
-        dni: formData.dni,
         firstName: formData.firstName,
-        lastName: formData.lastName,
         email: formData.email,
-        username: formData.username,
-        birthDate: formData.birthDate,
-        ...(formData.birthPlace && { birthPlace: formData.birthPlace }),
-        ...(formData.address && { address: formData.address }),
-        ...(formData.gender && { gender: formData.gender }),
       };
 
       await createAdmin(adminData);
@@ -147,66 +119,7 @@ export function RootAdminCreationPage() {
         {/* Form Card */}
         <div className="rounded-2xl border border-border bg-bg-secondary p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Row 1: DNI y Email */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* DNI */}
-              <div>
-                <label
-                  htmlFor="dni"
-                  className="block text-sm font-medium text-text mb-2"
-                >
-                  DNI <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="dni"
-                  name="dni"
-                  type="text"
-                  value={formData.dni}
-                  onChange={handleInputChange}
-                  placeholder="Ej: 1098765432"
-                  className={`w-full px-4 py-3 rounded-lg border ${
-                    formErrors.dni
-                      ? 'border-red-500 bg-red-50 focus:bg-red-50'
-                      : 'border-border bg-bg focus:bg-bg-secondary'
-                  } text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all`}
-                  disabled={isLoading}
-                />
-                {formErrors.dni && (
-                  <p className="mt-2 text-sm text-red-500">{formErrors.dni}</p>
-                )}
-              </div>
-
-              {/* Email */}
-              <div>
-                <label
-                  htmlFor="email"
-                  className="block text-sm font-medium text-text mb-2"
-                >
-                  Email <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  placeholder="admin@inkora.com"
-                  className={`w-full px-4 py-3 rounded-lg border ${
-                    formErrors.email
-                      ? 'border-red-500 bg-red-50 focus:bg-red-50'
-                      : 'border-border bg-bg focus:bg-bg-secondary'
-                  } text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all`}
-                  disabled={isLoading}
-                />
-                {formErrors.email && (
-                  <p className="mt-2 text-sm text-red-500">{formErrors.email}</p>
-                )}
-              </div>
-            </div>
-
-            {/* Row 2: Nombre y Apellido */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* First Name */}
               <div>
                 <label
                   htmlFor="firstName"
@@ -235,160 +148,31 @@ export function RootAdminCreationPage() {
                 )}
               </div>
 
-              {/* Last Name */}
               <div>
                 <label
-                  htmlFor="lastName"
+                  htmlFor="email"
                   className="block text-sm font-medium text-text mb-2"
                 >
-                  Apellido <span className="text-red-500">*</span>
+                  Email <span className="text-red-500">*</span>
                 </label>
                 <input
-                  id="lastName"
-                  name="lastName"
-                  type="text"
-                  value={formData.lastName}
+                  id="email"
+                  name="email"
+                  type="email"
+                  value={formData.email}
                   onChange={handleInputChange}
-                  placeholder="Ej: Pérez"
+                  placeholder="admin@inkora.com"
                   className={`w-full px-4 py-3 rounded-lg border ${
-                    formErrors.lastName
+                    formErrors.email
                       ? 'border-red-500 bg-red-50 focus:bg-red-50'
                       : 'border-border bg-bg focus:bg-bg-secondary'
                   } text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all`}
                   disabled={isLoading}
                 />
-                {formErrors.lastName && (
-                  <p className="mt-2 text-sm text-red-500">
-                    {formErrors.lastName}
-                  </p>
+                {formErrors.email && (
+                  <p className="mt-2 text-sm text-red-500">{formErrors.email}</p>
                 )}
               </div>
-            </div>
-
-            {/* Row 3: Usuario y Fecha de Nacimiento */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Username */}
-              <div>
-                <label
-                  htmlFor="username"
-                  className="block text-sm font-medium text-text mb-2"
-                >
-                  Usuario <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="username"
-                  name="username"
-                  type="text"
-                  value={formData.username}
-                  onChange={handleInputChange}
-                  placeholder="admin.ana"
-                  className={`w-full px-4 py-3 rounded-lg border ${
-                    formErrors.username
-                      ? 'border-red-500 bg-red-50 focus:bg-red-50'
-                      : 'border-border bg-bg focus:bg-bg-secondary'
-                  } text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all`}
-                  disabled={isLoading}
-                />
-                {formErrors.username && (
-                  <p className="mt-2 text-sm text-red-500">
-                    {formErrors.username}
-                  </p>
-                )}
-              </div>
-
-              {/* Birth Date */}
-              <div>
-                <label
-                  htmlFor="birthDate"
-                  className="block text-sm font-medium text-text mb-2"
-                >
-                  Fecha de Nacimiento <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="birthDate"
-                  name="birthDate"
-                  type="date"
-                  value={formData.birthDate}
-                  onChange={handleInputChange}
-                  className={`w-full px-4 py-3 rounded-lg border ${
-                    formErrors.birthDate
-                      ? 'border-red-500 bg-red-50 focus:bg-red-50'
-                      : 'border-border bg-bg focus:bg-bg-secondary'
-                  } text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all`}
-                  disabled={isLoading}
-                />
-                {formErrors.birthDate && (
-                  <p className="mt-2 text-sm text-red-500">
-                    {formErrors.birthDate}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Row 4: Género y Lugar de Nacimiento */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Gender */}
-              <div>
-                <label
-                  htmlFor="gender"
-                  className="block text-sm font-medium text-text mb-2"
-                >
-                  Género
-                </label>
-                <select
-                  id="gender"
-                  name="gender"
-                  value={formData.gender}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 rounded-lg border border-border bg-bg focus:bg-bg-secondary text-text focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
-                  disabled={isLoading}
-                >
-                  <option value="">Seleccionar...</option>
-                  <option value="Masculino">Masculino</option>
-                  <option value="Femenino">Femenino</option>
-                  <option value="Otro">Otro</option>
-                </select>
-              </div>
-
-              {/* Birth Place */}
-              <div>
-                <label
-                  htmlFor="birthPlace"
-                  className="block text-sm font-medium text-text mb-2"
-                >
-                  Lugar de Nacimiento
-                </label>
-                <input
-                  id="birthPlace"
-                  name="birthPlace"
-                  type="text"
-                  value={formData.birthPlace}
-                  onChange={handleInputChange}
-                  placeholder="Ej: Pereira"
-                  className="w-full px-4 py-3 rounded-lg border border-border bg-bg focus:bg-bg-secondary text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
-                  disabled={isLoading}
-                />
-              </div>
-            </div>
-
-            {/* Address */}
-            <div>
-              <label
-                htmlFor="address"
-                className="block text-sm font-medium text-text mb-2"
-              >
-                Dirección
-              </label>
-              <input
-                id="address"
-                name="address"
-                type="text"
-                value={formData.address}
-                onChange={handleInputChange}
-                placeholder="Ej: Calle 1 #2-3"
-                className="w-full px-4 py-3 rounded-lg border border-border bg-bg focus:bg-bg-secondary text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
-                disabled={isLoading}
-              />
             </div>
 
             {/* Info Box */}

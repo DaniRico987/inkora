@@ -1,7 +1,19 @@
 import axios from "axios";
+import { getAccessToken } from "../auth/session";
 
 const api = axios.create({
   baseURL: "/api/v1",
+});
+
+api.interceptors.request.use((config) => {
+  const token = getAccessToken();
+  if (token) {
+    if (!config.headers) {
+      config.headers = {} as any;
+    }
+    (config.headers as any).Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 export type LoginPayload = {
@@ -28,6 +40,21 @@ export type RegisterPayload = {
   username: string;
   password: string;
   categoryIds?: number[];
+};
+
+export type UpdateProfilePayload = {
+  firstName?: string;
+  lastName?: string;
+  birthDate?: string;
+  birthPlace?: string;
+  address?: string;
+  gender?: string;
+  email?: string;
+  username?: string;
+};
+
+export type ChangePasswordPayload = {
+  newPassword: string;
 };
 
 export type AuthApiError = {
@@ -96,14 +123,31 @@ export async function register(payload: RegisterPayload) {
 }
 
 export async function forgotPassword(email: string, recaptchaToken: string) {
-  await api.post("/auth/forgot-password", { email, recaptchaToken });
+  await api.post('/auth/forgot-password', { email, recaptchaToken });
 }
 
 export async function resetPassword(
   token: string,
   newPassword: string,
-  recaptchaToken: string
+  recaptchaToken: string,
 ) {
-  await api.post("/auth/reset-password", { token, newPassword, recaptchaToken });
+  await api.post('/auth/reset-password', { token, newPassword, recaptchaToken });
+}
+
+export async function getProfile() {
+  const { data } = await api.get('/auth/me');
+  return data;
+}
+
+export async function updateProfile(payload: UpdateProfilePayload) {
+  const { data } = await api.patch('/auth/me', payload);
+  return data;
+}
+
+export async function changePassword(newPassword: string) {
+  const { data } = await api.post<LoginResponse>('/auth/change-password', {
+    newPassword,
+  });
+  return data;
 }
 

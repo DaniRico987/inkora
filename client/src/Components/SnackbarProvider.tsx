@@ -48,7 +48,7 @@ export function SnackbarProvider({
   children,
   config,
 }: PropsWithChildren<{ config?: SnackbarConfig }>) {
-  const position = config?.position ?? "bottom-center";
+  const position = config?.position ?? "top-center";
   const maxVisible = config?.maxVisible ?? 3;
   const maxQueue = config?.maxQueue ?? 20;
   const dedupeWindowMs = config?.dedupeWindowMs ?? 1500;
@@ -125,7 +125,7 @@ export function SnackbarProvider({
       {children}
       <div
         className={[
-          "fixed z-9999",
+          "fixed z-[99999]",
           "flex flex-col gap-2",
           "pointer-events-none",
           posClasses(position),

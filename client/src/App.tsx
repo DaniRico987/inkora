@@ -18,9 +18,10 @@ import { CartPage } from './pages/CartPage';
 import { OrderTrackingPage } from './pages/OrderTrackingPage';
 //import { ComponentsTestPage } from './pages/ComponentsTestPage';
 import { SnackbarProvider } from './Components/SnackbarProvider';
-import { getAccessToken, getRoleFromToken } from './auth/session';
+import { getAccessToken, getIsTemporaryPasswordFromToken, getRoleFromToken } from './auth/session';
 import { ClientHomePage } from './pages/ClientHomePage';
 import { AdminDashboard } from './pages/AdminDashboard';
+import { AdminChangePasswordPage } from './pages/AdminChangePasswordPage.tsx';
 import { BooksManagementPage } from './pages/BooksManagementPage';
 import { StoresManagementPage } from './pages/StoresManagementPage';
 import { AdminsManagementPage } from './pages/AdminsManagementPage';
@@ -80,7 +81,7 @@ function ProtectedClientRoute() {
   return <ClientHomePage />;
 }
 
-function ProtectedAdminRoute() {
+function AdminRouteGuard({ children }: { children: React.ReactNode }) {
   const role = resolveAppRole();
 
   if (role === 'visitor') {
@@ -91,7 +92,29 @@ function ProtectedAdminRoute() {
     return <Navigate to={getRoleHome(role)} replace />;
   }
 
-  return <AdminDashboard />;
+  if (getIsTemporaryPasswordFromToken()) {
+    return <Navigate to="/admin/change-password" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+function AdminChangePasswordRoute() {
+  const role = resolveAppRole();
+
+  if (role === 'visitor') {
+    return <Navigate to="/catalog" replace />;
+  }
+
+  if (role !== 'admin') {
+    return <Navigate to={getRoleHome(role)} replace />;
+  }
+
+  if (!getIsTemporaryPasswordFromToken()) {
+    return <Navigate to="/admin" replace />;
+  }
+
+  return <AdminChangePasswordPage />;
 }
 
 function PublicLoginRoute() {
@@ -188,7 +211,8 @@ function AppContent() {
           />
 
           {/* Admin */}
-          <Route path="/admin" element={<ProtectedAdminRoute />} />
+          <Route path="/admin" element={<AdminRouteGuard><AdminDashboard /></AdminRouteGuard>} />
+          <Route path="/admin/change-password" element={<AdminChangePasswordRoute />} />
 
           {/* Root */}
           <Route
@@ -222,17 +246,17 @@ function AppContent() {
           <Route
             path="/admin/books"
             element={
-              <AccessGuard allowedRoles={['admin']}>
+              <AdminRouteGuard>
                 <BooksManagementPage />
-              </AccessGuard>
+              </AdminRouteGuard>
             }
           />
           <Route
             path="/admin/stores"
             element={
-              <AccessGuard allowedRoles={['admin']}>
+              <AdminRouteGuard>
                 <StoresManagementPage />
-              </AccessGuard>
+              </AdminRouteGuard>
             }
           />
           <Route

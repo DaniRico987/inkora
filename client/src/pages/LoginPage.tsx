@@ -6,7 +6,7 @@ import { AuthHomeButton } from '../Components/AuthHomeButton';
 import { ErrorInLine } from '../Components/ErrorInline';
 import { useTheme } from '../theme/useTheme';
 import { extractAuthError, login } from '../api/auth';
-import { getRoleFromToken, saveAccessToken } from '../auth/session';
+import { getIsTemporaryPasswordFromToken, getRoleFromToken, saveAccessToken } from '../auth/session';
 
 type LoginErrorState = {
 	title: string;
@@ -76,12 +76,21 @@ export function LoginPage() {
 
 			saveAccessToken(response.accessToken);
 			const role = getRoleFromToken(response.accessToken);
-
+			const requiresPasswordChange = getIsTemporaryPasswordFromToken(response.accessToken);
 			setRequiresCaptcha(false);
 			setSuccessMessage('Inicio de sesión exitoso.');
 
-			if (role === 'admin' || role === 'root') {
+			if (role === 'admin') {
+				if (requiresPasswordChange) {
+					navigate('/admin/change-password', { replace: true });
+					return;
+				}
 				navigate('/admin', { replace: true });
+				return;
+			}
+
+			if (role === 'root') {
+				navigate('/admin/create-admin', { replace: true });
 				return;
 			}
 
@@ -91,7 +100,9 @@ export function LoginPage() {
 			setRequiresCaptcha(Boolean(authError.requiresCaptcha));
 
 			if (authError.accountBlocked) {
-				const blockedReason = authError.message || 'Cuenta bloqueada temporalmente por múltiples intentos fallidos';
+				const blockedReason =
+					authError.message ||
+					'Cuenta bloqueada temporalmente por múltiples intentos fallidos';
 				setErrorState({
 					title: blockedReason,
 					failedAttempts: {

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getRoleFromToken, getAccessToken, clearAccessToken } from '../auth/session';
+import { ProfileModal } from './ProfileModal';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -15,6 +16,7 @@ interface MenuItem {
 
 export function AdminLayout({ children }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const token = getAccessToken();
@@ -110,13 +112,24 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             <p className="text-text-muted text-xs font-medium">
               {role === 'root' ? '🔐 Root' : '👤 Administrador'}
             </p>
-            <button
-              onClick={handleLogout}
-              className="w-full px-4 py-2 rounded-lg bg-red-600/10 text-red-600 hover:bg-red-600/20 transition-colors font-medium text-sm flex items-center justify-center gap-2"
-            >
-              <span>🚪</span>
-              <span>Cerrar sesión</span>
-            </button>
+            <div className="flex gap-2">
+              {role === 'admin' && (
+                <button
+                  onClick={() => setProfileModalOpen(true)}
+                  className="flex-1 px-4 py-2 rounded-lg bg-primary-500/10 text-primary-500 hover:bg-primary-500/20 transition-colors font-medium text-sm flex items-center justify-center gap-2"
+                >
+                  <span>👤</span>
+                  <span>Perfil</span>
+                </button>
+              )}
+              <button
+                onClick={handleLogout}
+                className={`${role === 'admin' ? 'flex-1' : 'w-full'} px-4 py-2 rounded-lg bg-red-600/10 text-red-600 hover:bg-red-600/20 transition-colors font-medium text-sm flex items-center justify-center gap-2`}
+              >
+                <span>🚪</span>
+                <span>Salir</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -153,6 +166,12 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           <div className="p-4 md:p-6">{children}</div>
         </div>
       </div>
+
+      {/* Profile Modal */}
+      <ProfileModal
+        isOpen={profileModalOpen}
+        onClose={() => setProfileModalOpen(false)}
+      />
     </div>
   );
 }

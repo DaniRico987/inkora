@@ -9,7 +9,12 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
   }
 
   try {
-    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    let base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padding = base64.length % 4;
+    if (padding === 2) base64 += '==';
+    else if (padding === 3) base64 += '=';
+    else if (padding === 1) return null;
+
     const decoded = atob(base64);
     return JSON.parse(decoded) as Record<string, unknown>;
   } catch {
@@ -46,6 +51,16 @@ export function getRoleFromToken(token?: string | null): UserRole | null {
   }
 
   return null;
+}
+
+export function getIsTemporaryPasswordFromToken(token?: string | null): boolean {
+  const currentToken = token ?? getAccessToken();
+  if (!currentToken) {
+    return false;
+  }
+
+  const payload = decodeJwtPayload(currentToken);
+  return payload?.isTemporaryPassword === true;
 }
 
 export function isAuthenticated() {
