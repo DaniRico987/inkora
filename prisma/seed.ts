@@ -638,11 +638,31 @@ async function seedCategories() {
     ),
   );
 
+  const seededCategories = await prisma.category.findMany({
+    where: { name: { in: categories.map((category) => category.name) } },
+    select: { categoryId: true, name: true },
+    orderBy: { categoryId: 'asc' },
+  });
+
+  console.log('Category IDs:');
+  seededCategories.forEach((category) => {
+    console.log(`- ${category.categoryId}: ${category.name}`);
+  });
+
   console.log('Categories seeded successfully.');
 }
 
 async function seedBooks() {
   console.log(`Seeding ${books.length} books...`);
+
+  const invalidBooks = books.filter((book) => book.categoryNames.length !== 2);
+  if (invalidBooks.length > 0) {
+    throw new Error(
+      `Each book must have exactly 2 categories. Invalid books: ${invalidBooks
+        .map((book) => book.title)
+        .join(', ')}`,
+    );
+  }
 
   const uniqueCategoryNames = [...new Set(books.flatMap((book) => book.categoryNames))];
   const existingCategories = await prisma.category.findMany({
@@ -659,9 +679,10 @@ async function seedBooks() {
 
   await prisma.$transaction(
     books.map((book) => {
-      const categoryLinks = book.categoryNames.map((name) => ({
+      const categoryIds = book.categoryNames.map((name) => categoryIdByName.get(name)!);
+      const categoryLinks = categoryIds.map((categoryId) => ({
         category: {
-          connect: { categoryId: categoryIdByName.get(name)! },
+          connect: { categoryId },
         },
       }));
 
@@ -706,6 +727,30 @@ async function seedBooks() {
       });
     }),
   );
+
+  const seededBooks = await prisma.book.findMany({
+    where: { isbn: { in: books.map((book) => book.isbn) } },
+    select: {
+      bookId: true,
+      title: true,
+      isbn: true,
+      bookCategories: {
+        select: {
+          categoryId: true,
+        },
+        orderBy: {
+          categoryId: 'asc',
+        },
+      },
+    },
+    orderBy: { bookId: 'asc' },
+  });
+
+  console.log('Book IDs and linked category IDs:');
+  seededBooks.forEach((book) => {
+    const linkedCategoryIds = book.bookCategories.map((item) => item.categoryId).join(', ');
+    console.log(`- ${book.bookId}: ${book.title} (${book.isbn}) -> [${linkedCategoryIds}]`);
+  });
 
   console.log('Books seeded successfully.');
 }
