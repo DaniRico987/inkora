@@ -29,6 +29,13 @@ export interface BookImageItem {
   displayOrder: number;
 }
 
+export interface BookStoreAvailabilityItem {
+  storeId: number;
+  storeName: string;
+  city: string;
+  availableQuantity: number;
+}
+
 export interface BookListItem {
   id: number;
   coverUrl?: string | null;
@@ -58,6 +65,7 @@ export interface BookDetailItem {
   preview?: string | null;
   images: BookImageItem[];
   categories: BookCategoryItem[];
+  inventoriesByStore: BookStoreAvailabilityItem[];
 }
 
 export interface PaginatedBooksResponse {

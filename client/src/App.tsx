@@ -14,6 +14,7 @@ import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { CatalogPage } from './pages/catalog';
+import { BookDetailPage } from './pages/BookDetailPage';
 import { CartPage } from './pages/CartPage';
 import { OrderTrackingPage } from './pages/OrderTrackingPage';
 //import { ComponentsTestPage } from './pages/ComponentsTestPage';
@@ -190,6 +191,14 @@ function AppContent() {
               </AccessGuard>
             }
           />
+          <Route
+            path="/books/:id"
+            element={
+              <AccessGuard allowedRoles={['visitor', 'client']}>
+                <BookDetailPage />
+              </AccessGuard>
+            }
+          />
 
           {/* Cliente */}
           <Route path="/" element={<ProtectedClientRoute />} />
@@ -285,7 +294,7 @@ function App() {
     <BrowserRouter>
       <SnackbarProvider
         config={{
-          position: 'bottom-center',
+          position: 'top-center',
           maxVisible: 3,
           maxQueue: 20,
           dedupeWindowMs: 1500,

@@ -41,6 +41,32 @@ export class BookCategoryDto {
   description?: string | null;
 }
 
+export class BookStoreAvailabilityDto {
+  @ApiProperty({
+    description: 'ID de la tienda',
+    example: 2,
+  })
+  storeId: number;
+
+  @ApiProperty({
+    description: 'Nombre de la tienda',
+    example: 'INKORA Pereira Centro',
+  })
+  storeName: string;
+
+  @ApiProperty({
+    description: 'Ciudad de la tienda',
+    example: 'Pereira',
+  })
+  city: string;
+
+  @ApiProperty({
+    description: 'Cantidad disponible actualmente en la tienda',
+    example: 4,
+  })
+  availableQuantity: number;
+}
+
 export class BookDetailDto {
   @ApiProperty({
     description: 'ID único del libro',
@@ -153,4 +179,10 @@ export class BookDetailDto {
     type: [BookCategoryDto],
   })
   categories: BookCategoryDto[];
+
+  @ApiProperty({
+    description: 'Disponibilidad actual por tienda',
+    type: [BookStoreAvailabilityDto],
+  })
+  inventoriesByStore: BookStoreAvailabilityDto[];
 }
