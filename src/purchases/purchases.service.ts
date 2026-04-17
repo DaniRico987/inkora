@@ -5,12 +5,62 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { DeliveryMode, PurchaseStatus } from '@prisma/client';
+import { DeliveryMode, Prisma, PurchaseStatus } from '@prisma/client';
 import { PrismaService } from 'prisma/prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
 import { PurchaseResponseDto } from './dto/purchase-response.dto';
+
+type PurchaseCartItem = {
+  bookId: number;
+  quantity: number;
+  unitPrice: unknown;
+  book: {
+    bookId: number;
+    title: string;
+    author: string;
+  };
+};
+
+type PurchaseBookInventory = {
+  inventoryId: number;
+  bookId: number;
+  storeId: number;
+  availableQuantity: number;
+};
+
+type PurchaseBookAvailability = {
+  bookId: number;
+  title: string;
+  isAvailable: boolean;
+};
+
+type PurchaseDetails = {
+  purchaseId: number;
+  clientId: number;
+  purchaseDate: Date;
+  totalAmount: unknown;
+  paymentMethod: string | null;
+  shippingAddress: string | null;
+  deliveryMode: DeliveryMode | null;
+  pickupStoreId: number | null;
+  estimatedDeliveryTime: string | null;
+  dispatchDate: Date | null;
+  status: PurchaseStatus;
+  client: { user: { email: string; firstName: string } };
+  pickupStore: { name: string } | null;
+  purchaseItems: Array<{
+    purchaseItemId: number;
+    bookId: number;
+    quantity: number;
+    unitPrice: unknown;
+    book: {
+      title: string;
+      author: string;
+    };
+  }>;
+};
 
 const toNumber = (value: unknown): number => {
   if (typeof value === 'number') {
@@ -70,6 +120,10 @@ export class PurchasesService {
       throw new BadRequestException('El carrito no tiene items para confirmar compra');
     }
 
+    if (cart.status !== 'active') {
+      throw new BadRequestException('El carrito ya fue procesado');
+    }
+
     let pickupStoreName: string | undefined;
     if (dto.deliveryMode === DeliveryMode.storePickup) {
       const store = await this.prisma.store.findUnique({
@@ -88,7 +142,8 @@ export class PurchasesService {
       pickupStoreName = store.name;
     }
 
-    const totalAmount = cart.cartItems.reduce((sum, item) => {
+    const cartItems = cart.cartItems as PurchaseCartItem[];
+    const totalAmount = cartItems.reduce((sum, item) => {
       return sum + item.quantity * toNumber(item.unitPrice);
     }, 0);
 
@@ -97,7 +152,10 @@ export class PurchasesService {
       pickupStoreName,
     );
 
-    const purchase = await this.prisma.$transaction(async (tx) => {
+    const purchase = await this.prisma.$transaction(
+      async (tx): Promise<PurchaseDetails> => {
+      await this.validatePurchaseInventory(tx, cartItems);
+
       const createdPurchase = await tx.purchase.create({
         data: {
           clientId,
@@ -112,10 +170,14 @@ export class PurchasesService {
           estimatedDeliveryTime,
           status: PurchaseStatus.inPreparation,
           purchaseItems: {
-            create: cart.cartItems.map((item) => ({
-              bookId: item.bookId,
+            create: cartItems.map((item) => ({
+              book: {
+                connect: {
+                  bookId: item.bookId,
+                },
+              },
               quantity: item.quantity,
-              unitPrice: item.unitPrice,
+              unitPrice: toNumber(item.unitPrice),
             })),
           },
         },
@@ -148,10 +210,16 @@ export class PurchasesService {
         },
       });
 
+      await tx.cart.update({
+        where: { cartId: cart.cartId },
+        data: { status: 'processed' },
+      });
+
       await tx.cartItem.deleteMany({ where: { cartId: cart.cartId } });
 
       return createdPurchase;
-    });
+      },
+    );
 
     this.sendInvoiceEmail(purchase).catch((error) => {
       this.logger.error(
@@ -432,6 +500,131 @@ export class PurchasesService {
         };
       }),
     };
+  }
+
+  private async validatePurchaseInventory(
+    tx: Prisma.TransactionClient,
+    cartItems: PurchaseCartItem[],
+  ): Promise<void> {
+    const requestedItems = this.groupCartItemsByBook(cartItems);
+    const requestedBookIds = [...requestedItems.keys()];
+
+    const books = await tx.book.findMany({
+      where: { bookId: { in: requestedBookIds } },
+      select: {
+        bookId: true,
+        title: true,
+        isAvailable: true,
+      },
+    });
+
+    if (books.length !== requestedBookIds.length) {
+      const foundIds = new Set(books.map((book) => book.bookId));
+      const missingBookId = requestedBookIds.find((bookId) => !foundIds.has(bookId));
+      throw new NotFoundException(
+        `Libro con ID ${missingBookId ?? 'desconocido'} no encontrado`,
+      );
+    }
+
+    const unavailableBook = books.find((book) => !book.isAvailable);
+    if (unavailableBook) {
+      throw new BadRequestException(
+        `El libro "${unavailableBook.title}" no esta disponible para compra`,
+      );
+    }
+
+    const inventories = await tx.inventory.findMany({
+      where: {
+        bookId: { in: requestedBookIds },
+        availableQuantity: { gt: 0 },
+      },
+      select: {
+        inventoryId: true,
+        bookId: true,
+        storeId: true,
+        availableQuantity: true,
+      },
+      orderBy: [{ bookId: 'asc' }, { storeId: 'asc' }],
+    });
+
+    this.assertInventoryAvailability(requestedItems, inventories, books);
+
+    for (const [bookId, quantity] of requestedItems.entries()) {
+      const bookInventories = inventories.filter((inventory) => inventory.bookId === bookId);
+      await this.decrementInventoryForPurchase(tx, bookInventories, quantity);
+    }
+  }
+
+  private groupCartItemsByBook(
+    cartItems: PurchaseCartItem[],
+  ): Map<number, number> {
+    const requestedItems = new Map<number, number>();
+
+    for (const item of cartItems) {
+      requestedItems.set(
+        item.bookId,
+        (requestedItems.get(item.bookId) ?? 0) + item.quantity,
+      );
+    }
+
+    return requestedItems;
+  }
+
+  private assertInventoryAvailability(
+    requestedItems: Map<number, number>,
+    inventories: PurchaseBookInventory[],
+    books: PurchaseBookAvailability[],
+  ): void {
+    const availableByBook = new Map<number, number>();
+
+    for (const inventory of inventories) {
+      availableByBook.set(
+        inventory.bookId,
+        (availableByBook.get(inventory.bookId) ?? 0) + inventory.availableQuantity,
+      );
+    }
+
+    for (const [bookId, quantity] of requestedItems.entries()) {
+      const available = availableByBook.get(bookId) ?? 0;
+      if (available < quantity) {
+        const bookTitle = books.find((book) => book.bookId === bookId)?.title;
+        throw new BadRequestException(
+          `Stock insuficiente para "${bookTitle ?? `bookId ${bookId}`}": solicitado ${quantity}, disponible ${available}`,
+        );
+      }
+    }
+  }
+
+  private async decrementInventoryForPurchase(
+    tx: Prisma.TransactionClient,
+    inventories: PurchaseBookInventory[],
+    quantity: number,
+  ): Promise<void> {
+    let remaining = quantity;
+
+    for (const inventory of inventories) {
+      if (remaining === 0) {
+        break;
+      }
+
+      const take = Math.min(remaining, inventory.availableQuantity);
+      if (take <= 0) {
+        continue;
+      }
+
+      await tx.inventory.update({
+        where: { inventoryId: inventory.inventoryId },
+        data: {
+          availableQuantity: { decrement: take },
+        },
+      });
+
+      remaining -= take;
+    }
+
+    if (remaining > 0) {
+      throw new BadRequestException('No hay inventario suficiente para completar la compra');
+    }
   }
 
   private async sendInvoiceEmail(purchase: {

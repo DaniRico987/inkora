@@ -28,17 +28,17 @@ export const CartSummary: React.FC<CartSummaryProps> = ({ cart }) => {
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-babyblue-700">
           Checkout summary
         </p>
-        <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div className="space-y-1">
+        <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+          <div className="min-w-0 space-y-1">
             <h2 className="text-2xl font-bold tracking-tight text-text sm:text-3xl">
               Resumen
             </h2>
-            <p className="max-w-104 text-sm text-text-muted">
+            <p className="max-w-104 text-sm leading-6 text-text-muted">
               {cart.itemCount} artículo{cart.itemCount !== 1 ? 's' : ''} listo
               {cart.itemCount !== 1 ? 's' : ''} para continuar.
             </p>
           </div>
-          <div className="w-full rounded-2xl border border-border bg-bg-secondary px-4 py-3 text-left sm:w-auto sm:text-right">
+          <div className="w-full shrink-0 rounded-2xl border border-border bg-bg-secondary px-4 py-3 text-left sm:w-44 sm:text-right">
             <p className="text-[11px] uppercase tracking-[0.2em] text-text-muted">
               Total
             </p>

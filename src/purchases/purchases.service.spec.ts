@@ -1,6 +1,10 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { PurchaseStatus } from '@prisma/client';
+import { DeliveryMode, PurchaseStatus } from '@prisma/client';
 import { PrismaService } from 'prisma/prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { PurchasesService } from './purchases.service';
@@ -98,6 +102,196 @@ describe('PurchasesService', () => {
 
   afterEach(() => {
     jest.useRealTimers();
+  });
+
+  describe('createPurchase', () => {
+    it('debe crear la compra, descontar inventario y marcar el carrito como procesado', async () => {
+      const cart = {
+        cartId: 1,
+        clientId: 10,
+        status: 'active',
+        cartItems: [
+          {
+            bookId: 5,
+            quantity: 1,
+            unitPrice: '21490',
+            book: {
+              bookId: 5,
+              title: 'El Quijote',
+              author: 'Miguel de Cervantes',
+            },
+          },
+        ],
+      };
+
+      const createdPurchase = {
+        purchaseId: 15,
+        clientId: 10,
+        purchaseDate: new Date('2026-04-14T12:00:00.000Z'),
+        totalAmount: '21490',
+        paymentMethod: 'Tarjeta de credito',
+        shippingAddress: 'Av. Corrientes 1234, Buenos Aires',
+        deliveryMode: DeliveryMode.homeDelivery,
+        pickupStoreId: null,
+        estimatedDeliveryTime:
+          'Entrega estimada entre 16/4/2026 y 18/4/2026 para Av. Corrientes 1234, Buenos Aires',
+        dispatchDate: null,
+        status: PurchaseStatus.inPreparation,
+        client: {
+          user: {
+            email: 'client@inkora.com',
+            firstName: 'Ana',
+          },
+        },
+        pickupStore: null,
+        purchaseItems: [
+          {
+            purchaseItemId: 1,
+            bookId: 5,
+            quantity: 1,
+            unitPrice: '21490',
+            book: {
+              title: 'El Quijote',
+              author: 'Miguel de Cervantes',
+            },
+          },
+        ],
+      };
+
+      const tx = {
+        book: {
+          findMany: jest.fn().mockResolvedValue([
+            {
+              bookId: 5,
+              title: 'El Quijote',
+              isAvailable: true,
+            },
+          ]),
+        },
+        inventory: {
+          findMany: jest.fn().mockResolvedValue([
+            {
+              inventoryId: 11,
+              bookId: 5,
+              storeId: 1,
+              availableQuantity: 2,
+            },
+          ]),
+          update: jest.fn().mockResolvedValue({}),
+        },
+        purchase: {
+          create: jest.fn().mockResolvedValue(createdPurchase),
+        },
+        cart: {
+          update: jest.fn().mockResolvedValue({}),
+        },
+        cartItem: {
+          deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+      };
+
+      prisma.cart.findUnique.mockResolvedValueOnce(cart);
+      prisma.$transaction.mockImplementation(async (callback: any) => callback(tx));
+
+      const result = await service.createPurchase(10, {
+        deliveryMode: DeliveryMode.homeDelivery,
+        shippingAddress: 'Av. Corrientes 1234, Buenos Aires',
+        paymentMethod: 'Tarjeta de credito',
+      });
+
+      expect(tx.book.findMany).toHaveBeenCalledWith({
+        where: { bookId: { in: [5] } },
+        select: {
+          bookId: true,
+          title: true,
+          isAvailable: true,
+        },
+      });
+      expect(tx.inventory.update).toHaveBeenCalledWith({
+        where: { inventoryId: 11 },
+        data: {
+          availableQuantity: { decrement: 1 },
+        },
+      });
+      expect(tx.cart.update).toHaveBeenCalledWith({
+        where: { cartId: 1 },
+        data: { status: 'processed' },
+      });
+      expect(tx.cartItem.deleteMany).toHaveBeenCalledWith({
+        where: { cartId: 1 },
+      });
+      expect(mailService.sendPurchaseInvoice).toHaveBeenCalledTimes(1);
+      expect(result.status).toBe(PurchaseStatus.inPreparation);
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].bookId).toBe(5);
+    });
+
+    it('debe rechazar la compra si el stock es insuficiente', async () => {
+      const cart = {
+        cartId: 1,
+        clientId: 10,
+        status: 'active',
+        cartItems: [
+          {
+            bookId: 5,
+            quantity: 2,
+            unitPrice: '21490',
+            book: {
+              bookId: 5,
+              title: 'El Quijote',
+              author: 'Miguel de Cervantes',
+            },
+          },
+        ],
+      };
+
+      const tx = {
+        book: {
+          findMany: jest.fn().mockResolvedValue([
+            {
+              bookId: 5,
+              title: 'El Quijote',
+              isAvailable: true,
+            },
+          ]),
+        },
+        inventory: {
+          findMany: jest.fn().mockResolvedValue([
+            {
+              inventoryId: 11,
+              bookId: 5,
+              storeId: 1,
+              availableQuantity: 1,
+            },
+          ]),
+          update: jest.fn(),
+        },
+        purchase: {
+          create: jest.fn(),
+        },
+        cart: {
+          update: jest.fn(),
+        },
+        cartItem: {
+          deleteMany: jest.fn(),
+        },
+      };
+
+      prisma.cart.findUnique.mockResolvedValueOnce(cart);
+      prisma.$transaction.mockImplementation(async (callback: any) => callback(tx));
+
+      await expect(
+        service.createPurchase(10, {
+          deliveryMode: DeliveryMode.homeDelivery,
+          shippingAddress: 'Av. Corrientes 1234, Buenos Aires',
+          paymentMethod: 'Tarjeta de credito',
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(tx.purchase.create).not.toHaveBeenCalled();
+      expect(tx.cart.update).not.toHaveBeenCalled();
+      expect(tx.cartItem.deleteMany).not.toHaveBeenCalled();
+    });
   });
 
   it('debe actualizar la direccion y recalcular el ETA si el pedido esta en preparacion', async () => {

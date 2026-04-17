@@ -122,14 +122,15 @@ describe('CartService', () => {
       expect(result.items.length).toBe(0);
     });
 
-    it('debe lanzar error si carrito no se encuentra', async () => {
+    it('debe crear carrito vacio si no existe', async () => {
       prismaService.cart.findUnique.mockResolvedValueOnce(null);
       prismaService.cart.create.mockResolvedValueOnce(mockCart);
-      prismaService.cart.findUnique.mockResolvedValueOnce(null);
 
-      await expect(service.getActiveCart(10)).rejects.toThrow(
-        NotFoundException,
-      );
+      const result = await service.getActiveCart(10);
+
+      expect(result.cartId).toBe(1);
+      expect(result.items).toHaveLength(0);
+      expect(result.total).toBeDefined();
     });
   });
 

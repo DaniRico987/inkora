@@ -2,6 +2,13 @@ import axios from 'axios';
 import { getAccessToken } from '../auth/session';
 import type { Purchase } from '../interfaces/PurchaseInterface';
 
+export type CreatePurchasePayload = {
+  deliveryMode: 'homeDelivery' | 'storePickup';
+  pickupStoreId?: number;
+  paymentMethod?: string;
+  shippingAddress?: string;
+};
+
 const apiClient = axios.create({
   baseURL: '/api/v1',
 });
@@ -39,6 +46,17 @@ export async function getPurchaseById(purchaseId: number): Promise<Purchase> {
     return response.data;
   } catch (error) {
     throw normalizeApiError(error, 'No se pudo cargar el pedido');
+  }
+}
+
+export async function createPurchase(
+  payload: CreatePurchasePayload,
+): Promise<Purchase> {
+  try {
+    const response = await apiClient.post<Purchase>('/purchases', payload);
+    return response.data;
+  } catch (error) {
+    throw normalizeApiError(error, 'No se pudo confirmar la compra');
   }
 }
 

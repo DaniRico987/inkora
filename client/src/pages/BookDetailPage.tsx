@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ConfirmationModal } from '../Components/ConfirmationModal';
+import { AddToCartButton } from '../Components/AddToCartButton';
 import { Spinner } from '../Components/Spinner';
 import { useSnackbar } from '../Components/SnackbarProvider';
 import { createReservation } from '../api/reservations';
@@ -144,7 +145,7 @@ export function BookDetailPage() {
                 onError={() => setImageFailed(true)}
               />
             ) : (
-              <div className="flex h-full min-h-[360px] items-center justify-center">
+              <div className="flex h-full min-h-90 items-center justify-center">
                 <img src="/inkoraICO.svg" alt="inkora" className="w-24" />
               </div>
             )}
@@ -189,6 +190,14 @@ export function BookDetailPage() {
                     Este libro no se encuentra disponible para reserva en este momento.
                   </p>
                 )}
+
+                <div className="pt-3">
+                  <AddToCartButton
+                    bookId={book.id}
+                    quantity={1}
+                    className="inline-flex w-full items-center justify-center rounded-full border border-border bg-bg px-5 py-3 font-semibold text-text transition hover:border-babyblue-300 hover:text-babyblue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </div>
               </div>
             )}
           </div>

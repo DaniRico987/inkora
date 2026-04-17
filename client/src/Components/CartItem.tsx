@@ -61,7 +61,7 @@ export const CartItem: React.FC<CartItemProps> = ({
 
   return (
     <div className="group overflow-hidden rounded-[1.75rem] border border-border bg-bg-secondary shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-lg">
-      <div className="grid gap-5 p-4 sm:p-6 md:grid-cols-[96px_minmax(0,1fr)_auto] md:items-start md:gap-6">
+      <div className="grid gap-5 p-4 sm:p-6 xl:grid-cols-[96px_minmax(0,1fr)_minmax(220px,auto)] xl:items-start xl:gap-6">
         <div className="relative mx-auto w-full max-w-30 md:max-w-none">
           <div className="aspect-3/4 overflow-hidden rounded-2xl border border-border bg-bg shadow-inner">
             <div className="flex h-full w-full flex-col items-center justify-between p-3 text-center">
@@ -84,7 +84,7 @@ export const CartItem: React.FC<CartItemProps> = ({
         </div>
 
         <div className="min-w-0 space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-3">
             <div className="min-w-0 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-full bg-babyblue-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-babyblue-700">
@@ -103,7 +103,7 @@ export const CartItem: React.FC<CartItemProps> = ({
               </div>
             </div>
 
-            <div className="rounded-2xl border border-border bg-bg px-4 py-3 text-left sm:text-right">
+            <div className="w-full max-w-xl rounded-2xl border border-border bg-bg px-4 py-3 text-left xl:max-w-none xl:self-start xl:text-right">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted">
                 Precio unitario
               </p>
@@ -120,7 +120,7 @@ export const CartItem: React.FC<CartItemProps> = ({
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 md:min-w-65 md:items-end">
+        <div className="flex flex-col gap-3 xl:min-w-65 xl:items-end">
           <div className="flex w-full items-center gap-2 rounded-2xl border border-border bg-bg-secondary px-3 py-2 shadow-sm sm:w-auto">
             <button
               onClick={() => handleQuantityChange(quantity - 1)}

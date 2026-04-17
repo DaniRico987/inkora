@@ -16,6 +16,7 @@ import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { CatalogPage } from './pages/catalog';
 import { BookDetailPage } from './pages/BookDetailPage';
 import { CartPage } from './pages/CartPage';
+import { CheckoutPage } from './pages/CheckoutPage';
 import { OrderTrackingPage } from './pages/OrderTrackingPage';
 import { MyReservationsPage } from './pages/MyReservationsPage';
 //import { ComponentsTestPage } from './pages/ComponentsTestPage';
@@ -169,7 +170,7 @@ function AppContent() {
         </div>
       </header>
       <main
-        className={`flex-1 ${location.pathname.startsWith('/admin') ? '' : 'flex items-center justify-center'}`}
+        className={`flex-1 ${location.pathname.startsWith('/admin') || location.pathname === '/checkout' ? '' : 'flex items-center justify-center'}`}
       >
         <Routes>
           {/* Login */}
@@ -208,6 +209,14 @@ function AppContent() {
             element={
               <AccessGuard allowedRoles={['client']}>
                 <CartPage />
+              </AccessGuard>
+            }
+          />
+          <Route
+            path="/checkout"
+            element={
+              <AccessGuard allowedRoles={['client']}>
+                <CheckoutPage />
               </AccessGuard>
             }
           />

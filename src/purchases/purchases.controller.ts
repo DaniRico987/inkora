@@ -43,13 +43,17 @@ export class PurchasesController {
   @ApiOperation({
     summary: 'Confirmar compra desde carrito',
     description:
-      'Crea una compra con los items del carrito activo, persiste ETA y envia factura HTML al cliente.',
+      'Crea una compra con los items del carrito activo, valida stock, actualiza inventario, marca el carrito como procesado y envia factura HTML al cliente.',
   })
   @ApiBody({ type: CreatePurchaseDto })
   @ApiResponse({
     status: 201,
     description: 'Compra creada exitosamente',
     type: PurchaseResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description:
+      'El carrito no tiene items, faltan datos obligatorios, no hay stock suficiente o la tienda de retiro es invalida',
   })
   @ApiUnauthorizedResponse({ description: 'Token JWT invalido o expirado' })
   @ApiForbiddenResponse({ description: 'Solo clientes pueden confirmar compras' })

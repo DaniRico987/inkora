@@ -332,6 +332,17 @@ export class CartService {
         this.rethrowIfMissingClientProfile(error);
         throw error;
       }
+    } else if (cart.status !== 'active') {
+      await this.prisma.cartItem.deleteMany({
+        where: { cartId: cart.cartId },
+      });
+
+      cart = await this.prisma.cart.update({
+        where: { cartId: cart.cartId },
+        data: {
+          status: 'active',
+        },
+      });
     }
 
     return cart.cartId;
