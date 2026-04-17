@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { InputText, InputPassword, InputSelect } from '../Components/Inputs';
+import { InputText, InputPassword, InputSelect, InputDate, InputNumber } from '../Components/Inputs';
 import { Button } from '../Components/Button';
 import { AuthHomeButton } from '../Components/AuthHomeButton';
 import { useTheme } from '../theme/useTheme';
@@ -313,14 +313,13 @@ export function RegisterPage() {
 							{/* Row 1: DNI, First Name, Last Name */}
 							<div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-3">
 								<div>
-									<InputText
+									<InputNumber
 										label="DNI"
 										name="dni"
-										type="text"
 										autoComplete="off"
 										value={formData.dni}
 										onChange={handleInputChange}
-										maxLength={20}
+										length={20}
 									/>
 									{formErrors.dni && <p className="text-xs text-red-300">{formErrors.dni}</p>}
 								</div>
@@ -333,6 +332,7 @@ export function RegisterPage() {
 										value={formData.firstName}
 										onChange={handleInputChange}
 										maxLength={100}
+										validationType="name"
 									/>
 									{formErrors.firstName && <p className="text-xs text-red-300">{formErrors.firstName}</p>}
 								</div>
@@ -345,6 +345,7 @@ export function RegisterPage() {
 										value={formData.lastName}
 										onChange={handleInputChange}
 										maxLength={100}
+										validationType="name"
 									/>
 									{formErrors.lastName && <p className="text-xs text-red-300">{formErrors.lastName}</p>}
 								</div>
@@ -353,10 +354,9 @@ export function RegisterPage() {
 							{/* Row 2: Birth Date, Gender */}
 							<div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
 								<div>
-									<InputText
+									<InputDate
 										label="Fecha de nacimiento"
 										name="birthDate"
-										type="date"
 										value={formData.birthDate}
 										onChange={handleInputChange}
 									/>
@@ -395,6 +395,7 @@ export function RegisterPage() {
 										value={formData.address}
 										onChange={handleInputChange}
 										maxLength={255}
+										validationType="address"
 									/>
 								</div>
 							</div>
