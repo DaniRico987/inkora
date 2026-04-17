@@ -25,6 +25,13 @@ type PurchaseInvoiceParams = {
   items: PurchaseInvoiceItem[];
 };
 
+type NewBookNotificationParams = {
+  firstName: string;
+  bookTitle: string;
+  bookAuthor: string;
+  categories: string[];
+};
+
 export type MailBrandingOptions = {
   logoUrl?: string;
   logoCid?: string;
@@ -357,5 +364,59 @@ export function buildPurchaseInvoiceTemplate(
       `Entrega: ${params.deliveryMode || 'N/D'}\n` +
       `ETA: ${params.estimatedDeliveryTime || 'N/D'}\n` +
       `Total: $${params.totalAmount.toFixed(2)}\n`,
+  };
+}
+
+export function buildNewBookNotificationTemplate(
+  params: NewBookNotificationParams,
+  branding?: MailBrandingOptions,
+): MailTemplate {
+  const categoriesText = params.categories.join(', ');
+
+  const bodyHtml = `
+    <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#334155;">
+      ¡Buenas noticias! Hemos añadido un nuevo libro que podría interesarte.
+    </p>
+    <div style="margin:0 0 18px 0;padding:16px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;">
+      <h3 style="margin:0 0 8px 0;font-size:18px;font-weight:700;color:#1e293b;">
+        ${escapeHtml(params.bookTitle)}
+      </h3>
+      <p style="margin:0 0 8px 0;font-size:14px;color:#64748b;">
+        Autor: ${escapeHtml(params.bookAuthor)}
+      </p>
+      <p style="margin:0;font-size:14px;color:#64748b;">
+        Categorías: ${escapeHtml(categoriesText)}
+      </p>
+    </div>
+    <p style="margin:0 0 18px 0;">
+      <a
+        href="#"
+        style="display:inline-block;padding:12px 18px;background:${BRAND_ACCENT};color:#ffffff;text-decoration:none;border-radius:8px;font-weight:700;font-size:14px;"
+      >
+        Ver libro
+      </a>
+    </p>
+    <p style="margin:0;font-size:14px;line-height:1.6;color:#475569;">
+      Recibes esta notificación porque estás suscrito a las categorías mencionadas.
+    </p>
+  `;
+
+  return {
+    subject: `Nuevo libro disponible: ${params.bookTitle}`,
+    html: buildLayout({
+      preheader: `Descubre "${params.bookTitle}" de ${params.bookAuthor} en INKORA.`,
+      title: 'Nuevo libro disponible',
+      intro: `Hola ${escapeHtml(params.firstName)},`,
+      bodyHtml,
+      footer:
+        'Puedes gestionar tus suscripciones en tu perfil. Si no deseas recibir estas notificaciones, ajusta tus preferencias.',
+      branding,
+    }),
+    text:
+      `¡Nuevo libro disponible!\n\n` +
+      `Título: ${params.bookTitle}\n` +
+      `Autor: ${params.bookAuthor}\n` +
+      `Categorías: ${categoriesText}\n\n` +
+      'Recibes esta notificación porque estás suscrito a las categorías mencionadas.',
   };
 }

@@ -7,6 +7,7 @@ import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import {
   buildAccountBlockedTemplate,
   buildAdminTemporaryPasswordTemplate,
+  buildNewBookNotificationTemplate,
   buildPasswordResetTemplate,
   buildPurchaseInvoiceTemplate,
 } from './mail.templates';
@@ -133,6 +134,35 @@ export class MailService {
       logoUrl: this.logoUrl,
       logoCid: this.logoCid,
     });
+
+    await this.sendEmail({
+      to: email,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
+    });
+  }
+
+  async sendNewBookNotification(
+    email: string,
+    firstName: string,
+    bookTitle: string,
+    bookAuthor: string,
+    categories: string[],
+    notificationId: number,
+  ) {
+    const template = buildNewBookNotificationTemplate(
+      {
+        firstName,
+        bookTitle,
+        bookAuthor,
+        categories,
+      },
+      {
+        logoUrl: this.logoUrl,
+        logoCid: this.logoCid,
+      },
+    );
 
     await this.sendEmail({
       to: email,

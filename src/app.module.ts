@@ -13,6 +13,8 @@ import { AdminModule } from './admin/admin.module';
 import { StoresModule } from './stores/stores.module';
 import { PurchasesModule } from './purchases/purchases.module';
 import { ReservationsModule } from './reservations/reservations.module';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
@@ -31,6 +33,8 @@ import { ScheduleModule } from '@nestjs/schedule';
     StoresModule,
     PurchasesModule,
     ReservationsModule,
+    SubscriptionsModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

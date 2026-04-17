@@ -15,12 +15,14 @@ import { UpdateBookDto } from './dto/update-book.dto';
 import { UploadBookCoverResponseDto } from './dto/upload-book-cover-response.dto';
 import { S3Service } from '../storage/s3.service';
 import { UploadedFile } from '../storage/interfaces/uploaded-file.interface';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class BooksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly s3Service: S3Service,
+    private readonly notificationsService: NotificationsService,
   ) { }
 
   async findAll(query: GetBooksQueryDto): Promise<PaginatedBooksResponseDto> {
@@ -292,7 +294,49 @@ export class BooksService {
       throw error;
     }
 
+    // Trigger notifications for subscribed users
+    this.triggerNewBookNotifications(created.bookId).catch((error) => {
+      // Log error but don't fail book creation
+      console.error('Error sending new book notifications:', error);
+    });
+
     return { id: created.bookId };
+  }
+
+  private async triggerNewBookNotifications(bookId: number): Promise<void> {
+    // Get book with categories
+    const book = await this.prisma.book.findUnique({
+      where: { bookId },
+      include: { bookCategories: { include: { category: true } } },
+    });
+    if (!book || book.bookCategories.length === 0) {
+      return; // No categories, no notifications
+    }
+
+    // Get unique category IDs
+    const categoryIds = [...new Set(book.bookCategories.map(bc => bc.categoryId))];
+
+    // Find all subscriptions to these categories
+    const subscriptions = await this.prisma.subscription.findMany({
+      where: {
+        categoryId: { in: categoryIds },
+      },
+      include: {
+        client: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+
+    // Get unique user IDs
+    const userIds = [...new Set(subscriptions.map(sub => sub.client.userId))];
+
+    // Send notifications
+    for (const userId of userIds) {
+      await this.notificationsService.sendNewBookNotification(userId, bookId);
+    }
   }
 
   async adminUpdate(id: number, dto: UpdateBookDto) {
