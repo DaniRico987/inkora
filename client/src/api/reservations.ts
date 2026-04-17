@@ -70,3 +70,25 @@ export async function createReservation(
     throw normalizeApiError(error, 'No se pudo crear la reserva');
   }
 }
+
+export async function getReservations(): Promise<ReservationResponse[]> {
+  try {
+    const response = await apiClient.get<ReservationResponse[]>('/reservations');
+    return response.data;
+  } catch (error) {
+    throw normalizeApiError(error, 'No se pudo cargar el historial de reservas');
+  }
+}
+
+export async function cancelReservation(
+  reservationId: number,
+): Promise<ReservationResponse> {
+  try {
+    const response = await apiClient.patch<ReservationResponse>(
+      `/reservations/${reservationId}/cancel`,
+    );
+    return response.data;
+  } catch (error) {
+    throw normalizeApiError(error, 'No se pudo cancelar la reserva');
+  }
+}

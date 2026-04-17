@@ -17,6 +17,7 @@ import { CatalogPage } from './pages/catalog';
 import { BookDetailPage } from './pages/BookDetailPage';
 import { CartPage } from './pages/CartPage';
 import { OrderTrackingPage } from './pages/OrderTrackingPage';
+import { MyReservationsPage } from './pages/MyReservationsPage';
 //import { ComponentsTestPage } from './pages/ComponentsTestPage';
 import { SnackbarProvider } from './Components/SnackbarProvider';
 import { getAccessToken, getIsTemporaryPasswordFromToken, getRoleFromToken } from './auth/session';
@@ -215,6 +216,14 @@ function AppContent() {
             element={
               <AccessGuard allowedRoles={['client']}>
                 <OrderTrackingPage />
+              </AccessGuard>
+            }
+          />
+          <Route
+            path="/my-reservations"
+            element={
+              <AccessGuard allowedRoles={['client']}>
+                <MyReservationsPage />
               </AccessGuard>
             }
           />

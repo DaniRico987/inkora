@@ -1,11 +1,12 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { Prisma, ReservationStatus } from '@prisma/client';
+import { Prisma, ReservationStatus, TransactionType } from '@prisma/client';
 import { PrismaService } from 'prisma/prisma/prisma.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { ReservationResponseDto } from './dto/reservation-response.dto';
@@ -139,19 +140,7 @@ export class ReservationsService {
         });
       });
 
-      return {
-        reservationId: created.reservationId,
-        clientId: created.clientId,
-        status: created.status,
-        reservationDate: created.reservationDate,
-        expirationDate: created.expirationDate,
-        items: created.reservationItems.map((item) => ({
-          reservationItemId: item.reservationItemId,
-          bookId: item.bookId,
-          title: item.book.title,
-          quantity: item.quantity,
-        })),
-      };
+      return this.mapReservationResponse(created);
     } catch (error) {
       if (error instanceof BadRequestException || error instanceof NotFoundException) {
         throw error;
@@ -180,6 +169,100 @@ export class ReservationsService {
         'No se pudo crear la reserva por un error interno de datos',
       );
     }
+  }
+
+  async listClientReservations(clientId: number): Promise<ReservationResponseDto[]> {
+    const reservations = await this.prisma.reservation.findMany({
+      where: { clientId },
+      include: {
+        reservationItems: {
+          include: {
+            book: {
+              select: {
+                title: true,
+              },
+            },
+          },
+          orderBy: { reservationItemId: 'asc' },
+        },
+      },
+      orderBy: [{ reservationDate: 'desc' }, { reservationId: 'desc' }],
+    });
+
+    return reservations.map((reservation) => this.mapReservationResponse(reservation));
+  }
+
+  async cancelReservation(
+    clientId: number,
+    reservationId: number,
+  ): Promise<ReservationResponseDto> {
+    return this.prisma.$transaction(async (tx) => {
+      const reservation = await tx.reservation.findUnique({
+        where: { reservationId },
+        include: {
+          reservationItems: {
+            include: {
+              book: {
+                select: {
+                  title: true,
+                },
+              },
+            },
+            orderBy: { reservationItemId: 'asc' },
+          },
+        },
+      });
+
+      if (!reservation) {
+        throw new NotFoundException(`Reserva con ID ${reservationId} no encontrada`);
+      }
+
+      if (reservation.clientId !== clientId) {
+        throw new ForbiddenException('No tienes permiso para cancelar esta reserva');
+      }
+
+      if (reservation.status !== ReservationStatus.active) {
+        throw new BadRequestException(
+          'Solo se pueden cancelar reservas con estado active',
+        );
+      }
+
+      if (reservation.expirationDate.getTime() <= Date.now()) {
+        throw new BadRequestException(
+          'No se puede cancelar una reserva vencida. Espera su expiracion automatica.',
+        );
+      }
+
+      await this.assertNoAssociatedPayment(tx, reservation);
+
+      for (const item of reservation.reservationItems) {
+        await this.releaseReservedInventory(
+          tx,
+          item.bookId,
+          item.quantity,
+          item.storeId,
+        );
+      }
+
+      const updated = await tx.reservation.update({
+        where: { reservationId },
+        data: { status: ReservationStatus.cancelled },
+        include: {
+          reservationItems: {
+            include: {
+              book: {
+                select: {
+                  title: true,
+                },
+              },
+            },
+            orderBy: { reservationItemId: 'asc' },
+          },
+        },
+      });
+
+      return this.mapReservationResponse(updated);
+    });
   }
 
   @Cron(CronExpression.EVERY_MINUTE)
@@ -457,5 +540,80 @@ export class ReservationsService {
         `No hay stock reservado suficiente para liberar ${quantity} unidades del libro ${bookId}`,
       );
     }
+  }
+
+  private async assertNoAssociatedPayment(
+    tx: Prisma.TransactionClient,
+    reservation: {
+      reservationId: number;
+      clientId: number;
+      reservationDate: Date;
+      expirationDate: Date;
+      reservationItems: Array<{ bookId: number }>;
+    },
+  ): Promise<void> {
+    const reservedBookIds = [
+      ...new Set(reservation.reservationItems.map((item) => item.bookId)),
+    ];
+
+    if (reservedBookIds.length === 0) {
+      return;
+    }
+
+    const relatedPayment = await tx.transaction.findFirst({
+      where: {
+        clientId: reservation.clientId,
+        transactionType: TransactionType.payment,
+        purchaseId: { not: null },
+        transactionDate: {
+          gte: reservation.reservationDate,
+          lte: reservation.expirationDate,
+        },
+        purchase: {
+          purchaseItems: {
+            some: {
+              bookId: { in: reservedBookIds },
+            },
+          },
+        },
+      },
+      select: { transactionId: true },
+    });
+
+    if (relatedPayment) {
+      throw new BadRequestException(
+        'No se puede cancelar la reserva porque tiene un pago asociado',
+      );
+    }
+  }
+
+  private mapReservationResponse(reservation: {
+    reservationId: number;
+    clientId: number;
+    status: ReservationStatus;
+    reservationDate: Date;
+    expirationDate: Date;
+    reservationItems: Array<{
+      reservationItemId: number;
+      bookId: number;
+      quantity: number;
+      book: {
+        title: string;
+      };
+    }>;
+  }): ReservationResponseDto {
+    return {
+      reservationId: reservation.reservationId,
+      clientId: reservation.clientId,
+      status: reservation.status,
+      reservationDate: reservation.reservationDate,
+      expirationDate: reservation.expirationDate,
+      items: reservation.reservationItems.map((item) => ({
+        reservationItemId: item.reservationItemId,
+        bookId: item.bookId,
+        title: item.book.title,
+        quantity: item.quantity,
+      })),
+    };
   }
 }

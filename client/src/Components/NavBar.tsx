@@ -27,6 +27,7 @@ function getNavItems(variant: NavBarVariant): NavBarItem[] {
             ? [
                   { label: 'Inicio', to: '/' },
                   { label: 'Catalogo', to: '/catalog' },
+                { label: 'Mis reservas', to: '/my-reservations' },
                   { label: 'Novedades', to: '/catalog' },
                   { label: 'Tiendas', to: '/catalog' },
               ]

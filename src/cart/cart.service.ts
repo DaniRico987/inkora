@@ -46,12 +46,18 @@ export class CartService {
     });
 
     if (!cart) {
-      const createdCart = await this.prisma.cart.create({
-        data: {
-          clientId,
-          status: 'active',
-        },
-      });
+      let createdCart;
+      try {
+        createdCart = await this.prisma.cart.create({
+          data: {
+            clientId,
+            status: 'active',
+          },
+        });
+      } catch (error) {
+        this.rethrowIfMissingClientProfile(error);
+        throw error;
+      }
 
       cart = {
         ...createdCart,
@@ -315,14 +321,32 @@ export class CartService {
     });
 
     if (!cart) {
-      cart = await this.prisma.cart.create({
-        data: {
-          clientId,
-          status: 'active',
-        },
-      });
+      try {
+        cart = await this.prisma.cart.create({
+          data: {
+            clientId,
+            status: 'active',
+          },
+        });
+      } catch (error) {
+        this.rethrowIfMissingClientProfile(error);
+        throw error;
+      }
     }
 
     return cart.cartId;
+  }
+
+  private rethrowIfMissingClientProfile(error: unknown): never | void {
+    const prismaErrorCode =
+      typeof error === 'object' && error !== null && 'code' in error
+        ? String((error as { code: unknown }).code)
+        : null;
+
+    if (prismaErrorCode === 'P2003') {
+      throw new ForbiddenException(
+        'El usuario autenticado no tiene un perfil de cliente valido para usar el carrito',
+      );
+    }
   }
 }
