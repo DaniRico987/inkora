@@ -12,6 +12,8 @@ import {
   Length,
   Max,
   Min,
+  ArrayNotEmpty,
+  IsArray,
 } from 'class-validator';
 import { BookCondition } from '@prisma/client';
 
@@ -137,5 +139,25 @@ export class CreateBookDto {
   @IsOptional()
   @IsUrl()
   previewUrl?: string | null;
+
+  @ApiProperty({
+    description: 'IDs de las categorías a las que pertenece el libro',
+    example: [1, 2, 3],
+    type: [Number],
+  })
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsInt({ each: true })
+  @IsPositive({ each: true })
+  categoryIds: number[];
+
+  @ApiProperty({
+    description: 'Cantidad inicial de inventario',
+    example: 10,
+    minimum: 1,
+  })
+  @IsInt()
+  @Min(1)
+  initialInventoryQuantity: number;
 }
 

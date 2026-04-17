@@ -22,6 +22,7 @@ export function AdminDashboard() {
   const [dashboardError, setDashboardError] = useState<string | null>(null);
   const [isFormOpenBooks, setIsFormOpenBooks] = useState(false);
   const [isFormOpenStores, setIsFormOpenStores] = useState(false);
+  const [inventoryQuantity, setInventoryQuantity] = useState<number>(1);
 
   // Redirect root users
   useEffect(() => {
@@ -72,11 +73,17 @@ export function AdminDashboard() {
         description: (formData.get('description') as string) || undefined,
         coverUrl: (formData.get('coverUrl') as string) || undefined,
         previewUrl: (formData.get('previewUrl') as string) || undefined,
+        categoryIds: [],
+        initialInventoryQuantity: inventoryQuantity,
       };
 
+      if (inventoryQuantity < 1) {
+        throw new Error('La cantidad de inventario inicial debe ser mayor a 0');
+      }
       await createBook(data);
       success('Libro creado exitosamente');
       setIsFormOpenBooks(false);
+      setInventoryQuantity(1);
     } catch (err) {
       error('Error al guardar libro');
       console.error(err);
@@ -238,7 +245,10 @@ export function AdminDashboard() {
       <FormModal
         isOpen={isFormOpenBooks}
         title="Crear Libro"
-        onClose={() => setIsFormOpenBooks(false)}
+        onClose={() => {
+          setIsFormOpenBooks(false);
+          setInventoryQuantity(1);
+        }}
         onSubmit={handleFormSubmitBook}
         isLoading={isLoading}
         submitText="Crear"
@@ -391,6 +401,29 @@ export function AdminDashboard() {
               rows={4}
               className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-text mb-2">Cantidad de inventario inicial</label>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setInventoryQuantity(prev => Math.max(1, prev - 1))}
+                className="px-3 py-2 rounded-lg border border-border bg-bg text-text hover:bg-border-hover transition-colors"
+              >
+                −
+              </button>
+              <span className="w-12 text-center text-text font-medium">
+                {inventoryQuantity}
+              </span>
+              <button
+                type="button"
+                onClick={() => setInventoryQuantity(prev => prev + 1)}
+                className="px-3 py-2 rounded-lg border border-border bg-bg text-text hover:bg-border-hover transition-colors"
+              >
+                +
+              </button>
+            </div>
           </div>
         </div>
       </FormModal>

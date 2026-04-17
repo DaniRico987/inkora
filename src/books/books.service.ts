@@ -294,6 +294,46 @@ export class BooksService {
       throw error;
     }
 
+    // Create book-category relations
+    if (dto.categoryIds && dto.categoryIds.length > 0) {
+      // Verify all categories exist
+      const categories = await this.prisma.category.findMany({
+        where: { categoryId: { in: dto.categoryIds } },
+        select: { categoryId: true },
+      });
+      if (categories.length !== dto.categoryIds.length) {
+        throw new NotFoundException('Una o más categorías no existen');
+      }
+
+      // Create relations
+      await this.prisma.bookCategory.createMany({
+        data: dto.categoryIds.map(categoryId => ({
+          bookId: created.bookId,
+          categoryId,
+        })),
+      });
+    }
+
+    // Create initial inventory if quantity provided
+    if (dto.initialInventoryQuantity && dto.initialInventoryQuantity > 0) {
+      // Get first active store
+      const firstStore = await this.prisma.store.findFirst({
+        where: { status: 'active' },
+        select: { storeId: true },
+      });
+
+      if (firstStore) {
+        await this.prisma.inventory.create({
+          data: {
+            bookId: created.bookId,
+            storeId: firstStore.storeId,
+            availableQuantity: dto.initialInventoryQuantity,
+            reservedQuantity: 0,
+          },
+        });
+      }
+    }
+
     // Trigger notifications for subscribed users
     this.triggerNewBookNotifications(created.bookId).catch((error) => {
       // Log error but don't fail book creation
@@ -372,6 +412,34 @@ export class BooksService {
         throw new ConflictException('El ISBN ya está registrado');
       }
       throw error;
+    }
+
+    // Update book-category relations if categoryIds provided
+    if (dto.categoryIds !== undefined) {
+      // Delete existing relations
+      await this.prisma.bookCategory.deleteMany({
+        where: { bookId: id },
+      });
+
+      // Create new relations if any
+      if (dto.categoryIds.length > 0) {
+        // Verify all categories exist
+        const categories = await this.prisma.category.findMany({
+          where: { categoryId: { in: dto.categoryIds } },
+          select: { categoryId: true },
+        });
+        if (categories.length !== dto.categoryIds.length) {
+          throw new NotFoundException('Una o más categorías no existen');
+        }
+
+        // Create relations
+        await this.prisma.bookCategory.createMany({
+          data: dto.categoryIds.map(categoryId => ({
+            bookId: id,
+            categoryId,
+          })),
+        });
+      }
     }
 
     return { id: updated.bookId };

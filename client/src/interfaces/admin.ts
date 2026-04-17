@@ -68,7 +68,8 @@ export interface CreateBookRequest {
   isAvailable?: boolean;
   description?: string;
   coverUrl?: string;
-  previewUrl?: string;
+  categoryIds: number[];
+  initialInventoryQuantity?: number;
 }
 
 export interface UpdateBookRequest extends Partial<CreateBookRequest> {

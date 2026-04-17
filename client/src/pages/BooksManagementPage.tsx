@@ -14,6 +14,7 @@ import {
   createBook,
   updateBook,
 } from '../api/books';
+import { getCategories } from '../api/categories';
 import type { Book } from '../interfaces/admin';
 
 export function BooksManagementPage() {
@@ -23,11 +24,14 @@ export function BooksManagementPage() {
   
   const { success, error } = useSnackbar();
   const [books, setBooks] = useState<Book[]>([]);
+  const [categories, setCategories] = useState<Array<{ categoryId: number; name: string }>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingBook, setEditingBook] = useState<Book | null>(null);
+  const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
+  const [inventoryQuantity, setInventoryQuantity] = useState<number>(1);
   const [deleteConfirm, setDeleteConfirm] = useState<{
     isOpen: boolean;
     bookId?: string;
@@ -39,6 +43,20 @@ export function BooksManagementPage() {
       navigate('/admin/create-admin', { replace: true });
     }
   }, [role, navigate]);
+
+  // Fetch categories
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const data = await getCategories();
+        setCategories(data);
+      } catch (err) {
+        console.error('Error fetching categories:', err);
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   // Fetch books
   useEffect(() => {
@@ -114,6 +132,8 @@ export function BooksManagementPage() {
 
   const handleAddBook = () => {
     setEditingBook(null);
+    setSelectedCategories([]);
+    setInventoryQuantity(1);
     setIsFormOpen(true);
   };
 
@@ -138,6 +158,7 @@ export function BooksManagementPage() {
         previewUrl: bookDetail.preview,
       };
       setEditingBook(normalized);
+      setSelectedCategories(bookDetail.categories.map(c => c.id));
       setIsFormOpen(true);
     } catch (err) {
       error('Error al cargar datos del libro');
@@ -191,7 +212,13 @@ export function BooksManagementPage() {
         description: (formData.get('description') as string) || undefined,
         coverUrl: (formData.get('coverUrl') as string) || undefined,
         previewUrl: (formData.get('previewUrl') as string) || undefined,
+        categoryIds: selectedCategories,
+        initialInventoryQuantity: inventoryQuantity,
       };
+
+      if (inventoryQuantity < 1) {
+        throw new Error('La cantidad de inventario inicial debe ser mayor a 0');
+      }
 
       if (editingBook) {
         await updateBook(editingBook.bookId, data);
@@ -202,6 +229,8 @@ export function BooksManagementPage() {
       }
 
       setIsFormOpen(false);
+      setSelectedCategories([]);
+      setInventoryQuantity(1);
       setCurrentPage(1);
     } catch (err) {
       error('Error al guardar libro');
@@ -302,6 +331,8 @@ export function BooksManagementPage() {
         onClose={() => {
           setIsFormOpen(false);
           setEditingBook(null);
+          setSelectedCategories([]);
+          setInventoryQuantity(1);
         }}
         onSubmit={handleFormSubmit}
         isLoading={isLoading}
@@ -469,6 +500,52 @@ export function BooksManagementPage() {
               placeholder="https://..."
               className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-text mb-2">Categorías</label>
+            <div className="max-h-40 overflow-y-auto border border-border rounded-lg p-2 bg-bg">
+              {categories.map((category) => (
+                <label key={category.categoryId} className="flex items-center gap-2 py-1">
+                  <input
+                    type="checkbox"
+                    checked={selectedCategories.includes(category.categoryId)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedCategories(prev => [...prev, category.categoryId]);
+                      } else {
+                        setSelectedCategories(prev => prev.filter(id => id !== category.categoryId));
+                      }
+                    }}
+                    className="h-4 w-4 text-primary-600 border-border focus:ring-primary-500"
+                  />
+                  <span className="text-sm text-text">{category.name}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-text mb-2">Cantidad de inventario inicial</label>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setInventoryQuantity(prev => Math.max(1, prev - 1))}
+                className="px-3 py-2 rounded-lg border border-border bg-bg text-text hover:bg-border-hover transition-colors"
+              >
+                −
+              </button>
+              <span className="w-12 text-center text-text font-medium">
+                {inventoryQuantity}
+              </span>
+              <button
+                type="button"
+                onClick={() => setInventoryQuantity(prev => prev + 1)}
+                className="px-3 py-2 rounded-lg border border-border bg-bg text-text hover:bg-border-hover transition-colors"
+              >
+                +
+              </button>
+            </div>
           </div>
         </div>
       </FormModal>
