@@ -21,6 +21,7 @@ import { OrderTrackingPage } from './pages/OrderTrackingPage';
 import { MyReservationsPage } from './pages/MyReservationsPage';
 //import { ComponentsTestPage } from './pages/ComponentsTestPage';
 import { SnackbarProvider } from './Components/SnackbarProvider';
+import { NotificationsProvider } from './hooks/useNotifications';
 import { getAccessToken, getIsTemporaryPasswordFromToken, getRoleFromToken } from './auth/session';
 import { ClientHomePage } from './pages/ClientHomePage';
 import { AdminDashboard } from './pages/AdminDashboard';
@@ -29,6 +30,7 @@ import { BooksManagementPage } from './pages/BooksManagementPage';
 import { StoresManagementPage } from './pages/StoresManagementPage';
 import { AdminsManagementPage } from './pages/AdminsManagementPage';
 import { RootAdminCreationPage } from './pages/RootAdminCreationPage';
+import { NewsPage } from './pages/NewsPage';
 
 type AppRole = 'visitor' | 'client' | 'admin' | 'root';
 
@@ -236,6 +238,14 @@ function AppContent() {
               </AccessGuard>
             }
           />
+          <Route
+            path="/news"
+            element={
+              <AccessGuard allowedRoles={['client']}>
+                <NewsPage />
+              </AccessGuard>
+            }
+          />
 
           {/* Admin */}
           <Route path="/admin" element={<AdminRouteGuard><AdminDashboard /></AdminRouteGuard>} />
@@ -310,16 +320,18 @@ function App() {
   useTheme();
   return (
     <BrowserRouter>
-      <SnackbarProvider
-        config={{
-          position: 'top-center',
-          maxVisible: 3,
-          maxQueue: 20,
-          dedupeWindowMs: 1500,
-        }}
-      >
-        <AppContent />
-      </SnackbarProvider>
+      <NotificationsProvider>
+        <SnackbarProvider
+          config={{
+            position: 'top-center',
+            maxVisible: 3,
+            maxQueue: 20,
+            dedupeWindowMs: 1500,
+          }}
+        >
+          <AppContent />
+        </SnackbarProvider>
+      </NotificationsProvider>
     </BrowserRouter>
   );
 }

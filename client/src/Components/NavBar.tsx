@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { clearAccessToken } from '../auth/session';
 import { CartIcon } from './CartIcon';
 import { UserProfileModal } from './UserProfileModal';
+import { useNotifications } from '../hooks/useNotifications';
 
 type NavBarItem = {
     label: string;
@@ -28,8 +29,8 @@ function getNavItems(variant: NavBarVariant): NavBarItem[] {
             ? [
                   { label: 'Inicio', to: '/' },
                   { label: 'Catalogo', to: '/catalog' },
-                { label: 'Mis reservas', to: '/my-reservations' },
-                  { label: 'Novedades', to: '/catalog' },
+                  { label: 'Mis reservas', to: '/my-reservations' },
+                  { label: 'Novedades', to: '/news' },
                   { label: 'Tiendas', to: '/catalog' },
               ]
             : []),
@@ -39,8 +40,12 @@ function getNavItems(variant: NavBarVariant): NavBarItem[] {
 export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [userProfileModalOpen, setUserProfileModalOpen] = useState(false);
+    const [notificationsDropdownOpen, setNotificationsDropdownOpen] = useState(false);
+    const notificationsRef = useRef<HTMLDivElement>(null);
     const navigate = useNavigate();
     const location = useLocation();
+
+    const { notifications, unreadCount, markAsRead, loading: notificationsLoading } = useNotifications();
 
     const navItems = useMemo(() => getNavItems(variant), [variant]);
 
@@ -63,6 +68,38 @@ export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
     const handleMobileLinkClick = () => {
         setIsOpen(false);
     };
+
+    const handleNotificationClick = async (notificationId: number, bookId?: number) => {
+        await markAsRead(notificationId);
+        setNotificationsDropdownOpen(false);
+        if (bookId) {
+            navigate(`/books/${bookId}`);
+        } else {
+            navigate('/news');
+        }
+    };
+
+    const handleViewAllNotifications = () => {
+        setNotificationsDropdownOpen(false);
+        navigate('/news');
+    };
+
+    // Cerrar dropdown de notificaciones al hacer clic fuera
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
+                setNotificationsDropdownOpen(false);
+            }
+        };
+
+        if (notificationsDropdownOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [notificationsDropdownOpen]);
 
     return (
         <div className="w-full h-24 sm:h-28 z-100">
@@ -110,6 +147,95 @@ export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
                                     <Link to="/cart" aria-label="Carrito" className={iconButtonClass}>
                                         <CartIcon />
                                     </Link>
+                                    <div className="relative" ref={notificationsRef}>
+                                        <button
+                                            type="button"
+                                            onClick={() => setNotificationsDropdownOpen(!notificationsDropdownOpen)}
+                                            aria-label="Notificaciones"
+                                            className={`${iconButtonClass} relative`}
+                                            title="Notificaciones"
+                                        >
+                                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                                                <path d="M15 17h5l-5 5v-5z" />
+                                                <path d="M13.5 6.5a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0z" />
+                                                <path d="M9 12l2 2 4-4" />
+                                            </svg>
+                                            {unreadCount > 0 && (
+                                                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+                                                    {unreadCount > 99 ? '99+' : unreadCount}
+                                                </span>
+                                            )}
+                                        </button>
+
+                                        {notificationsDropdownOpen && (
+                                            <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                                                <div className="p-4 border-b border-gray-200">
+                                                    <h3 className="text-sm font-medium text-gray-900">Notificaciones</h3>
+                                                </div>
+                                                <div className="max-h-96 overflow-y-auto">
+                                                    {notificationsLoading ? (
+                                                        <div className="p-4 text-center text-gray-500">Cargando...</div>
+                                                    ) : notifications.length === 0 ? (
+                                                        <div className="p-4 text-center text-gray-500">No hay notificaciones</div>
+                                                    ) : (
+                                                        notifications.slice(0, 5).map((notification) => (
+                                                            <div
+                                                                key={notification.notificationId}
+                                                                className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 ${
+                                                                    !notification.isRead ? 'bg-blue-50' : ''
+                                                                }`}
+                                                                onClick={() => handleNotificationClick(notification.notificationId, notification.bookId)}
+                                                            >
+                                                                <div className="flex items-start space-x-3">
+                                                                    <div className="flex-shrink-0">
+                                                                        {notification.book?.coverUrl ? (
+                                                                            <img
+                                                                                src={notification.book.coverUrl}
+                                                                                alt={notification.book.title}
+                                                                                className="w-10 h-14 object-cover rounded"
+                                                                            />
+                                                                        ) : (
+                                                                            <div className="w-10 h-14 bg-gray-200 rounded flex items-center justify-center">
+                                                                                <svg className="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                                                                                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                                                                                </svg>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <p className="text-sm font-medium text-gray-900 truncate">
+                                                                            {notification.news?.title || 'Nueva notificación'}
+                                                                        </p>
+                                                                        <p className="text-sm text-gray-600 line-clamp-2">
+                                                                            {notification.content}
+                                                                        </p>
+                                                                        <p className="text-xs text-gray-500 mt-1">
+                                                                            {new Date(notification.createdAt).toLocaleDateString()}
+                                                                        </p>
+                                                                    </div>
+                                                                    {!notification.isRead && (
+                                                                        <div className="flex-shrink-0">
+                                                                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        ))
+                                                    )}
+                                                </div>
+                                                {notifications.length > 5 && (
+                                                    <div className="p-4 border-t border-gray-200">
+                                                        <button
+                                                            onClick={handleViewAllNotifications}
+                                                            className="w-full text-sm text-blue-600 hover:text-blue-800 font-medium"
+                                                        >
+                                                            Ver todas las notificaciones
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
                                     <button
                                         type="button"
                                         onClick={() => setUserProfileModalOpen(true)}
