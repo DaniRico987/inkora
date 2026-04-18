@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 
@@ -9,13 +9,15 @@ export class NotificationsService {
     private readonly mailService: MailService,
   ) {}
 
-  async sendNewBookNotification(userId: number, bookId: number): Promise<void> {
-    // Get book details
-    const book = await this.prisma.book.findUnique({
-      where: { bookId },
-      include: { bookCategories: { include: { category: true } } },
+  async sendNewBookNotification(userId: number, newsId: number): Promise<void> {
+    // Get news details with book
+    const news = await this.prisma.news.findUnique({
+      where: { newsId },
+      include: { book: { include: { bookCategories: { include: { category: true } } } } },
     });
-    if (!book) return;
+    if (!news || !news.book) return;
+
+    const book = news.book;
 
     // Get user email
     const user = await this.prisma.user.findUnique({
@@ -28,7 +30,8 @@ export class NotificationsService {
     const notification = await this.prisma.notification.create({
       data: {
         userId,
-        bookId,
+        newsId,
+        bookId: book.bookId,
         notificationType: 'newBook',
         content: `Nuevo libro disponible: "${book.title}" de ${book.author}. Categorías: ${book.bookCategories.map(bc => bc.category.name).join(', ')}`,
         isRead: false,
@@ -66,5 +69,74 @@ export class NotificationsService {
         },
       });
     }
+  }
+
+  async getUserNotifications(userId: number) {
+    // Get notifications for the user, filtered by subscribed categories via news
+    const notifications = await this.prisma.notification.findMany({
+      where: {
+        userId,
+        news: {
+          isActive: true,
+          newsCategories: {
+            some: {
+              category: {
+                subscriptions: {
+                  some: {
+                    client: {
+                      userId,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      include: {
+        news: {
+          select: {
+            title: true,
+            content: true,
+            publishedAt: true,
+          },
+        },
+        book: {
+          select: {
+            title: true,
+            author: true,
+            coverUrl: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return notifications;
+  }
+
+  async markAsRead(notificationId: number, userId: number) {
+    // Verify the notification belongs to the user
+    const notification = await this.prisma.notification.findFirst({
+      where: {
+        notificationId,
+        userId,
+      },
+    });
+
+    if (!notification) {
+      throw new NotFoundException('Notification not found or does not belong to user');
+    }
+
+    return await this.prisma.notification.update({
+      where: { notificationId },
+      data: { isRead: true },
+      select: {
+        notificationId: true,
+        isRead: true,
+      },
+    });
   }
 }

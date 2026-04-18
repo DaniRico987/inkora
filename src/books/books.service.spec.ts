@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from 'prisma/prisma/prisma.service';
 import { S3Service } from '../storage/s3.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { BooksService } from './books.service';
 
 describe('BooksService', () => {
@@ -16,6 +17,9 @@ describe('BooksService', () => {
   };
   let s3Service: {
     uploadCover: jest.Mock;
+  };
+  let notificationsService: {
+    sendNewBookNotification: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -32,6 +36,10 @@ describe('BooksService', () => {
       uploadCover: jest.fn(),
     };
 
+    notificationsService = {
+      sendNewBookNotification: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BooksService,
@@ -42,6 +50,10 @@ describe('BooksService', () => {
         {
           provide: S3Service,
           useValue: s3Service,
+        },
+        {
+          provide: NotificationsService,
+          useValue: notificationsService,
         },
       ],
     }).compile();
@@ -75,7 +87,16 @@ describe('BooksService', () => {
     const result = await service.findAll({ page: 2, limit: 2 });
 
     expect(prismaService.book.findMany).toHaveBeenCalledWith({
-      where: { isAvailable: true },
+      where: { 
+        isAvailable: true,
+        inventories: {
+          some: {
+            availableQuantity: {
+              gt: 0,
+            },
+          },
+        },
+      },
       skip: 2,
       take: 2,
       orderBy: [{ publicationYear: 'desc' }, { bookId: 'asc' }],
@@ -87,10 +108,24 @@ describe('BooksService', () => {
         price: true,
         condition: true,
         isAvailable: true,
+        inventories: {
+          select: {
+            availableQuantity: true,
+          },
+        },
       },
     });
     expect(prismaService.book.count).toHaveBeenCalledWith({
-      where: { isAvailable: true },
+      where: { 
+        isAvailable: true,
+        inventories: {
+          some: {
+            availableQuantity: {
+              gt: 0,
+            },
+          },
+        },
+      },
     });
     expect(result).toEqual({
       items: [
@@ -142,6 +177,13 @@ describe('BooksService', () => {
     expect(prismaService.book.findMany).toHaveBeenCalledWith({
       where: {
         isAvailable: true,
+        inventories: {
+          some: {
+            availableQuantity: {
+              gt: 0,
+            },
+          },
+        },
         title: {
           contains: 'Macondo',
           mode: 'insensitive',
@@ -177,11 +219,23 @@ describe('BooksService', () => {
         price: true,
         condition: true,
         isAvailable: true,
+        inventories: {
+          select: {
+            availableQuantity: true,
+          },
+        },
       },
     });
     expect(prismaService.book.count).toHaveBeenCalledWith({
       where: {
         isAvailable: true,
+        inventories: {
+          some: {
+            availableQuantity: {
+              gt: 0,
+            },
+          },
+        },
         title: {
           contains: 'Macondo',
           mode: 'insensitive',
@@ -253,6 +307,16 @@ describe('BooksService', () => {
           },
         },
       ],
+      inventories: [
+        {
+          store: {
+            storeId: 1,
+            name: 'Tienda Central',
+            city: 'Bogota',
+          },
+          availableQuantity: 5,
+        },
+      ],
     });
 
     const result = await service.findOne(12);
@@ -269,6 +333,20 @@ describe('BooksService', () => {
           },
           orderBy: {
             categoryId: 'asc',
+          },
+        },
+        inventories: {
+          include: {
+            store: {
+              select: {
+                storeId: true,
+                name: true,
+                city: true,
+              },
+            },
+          },
+          orderBy: {
+            storeId: 'asc',
           },
         },
       },
@@ -300,6 +378,15 @@ describe('BooksService', () => {
           id: 5,
           name: 'Novela',
           description: 'Obras narrativas de ficcion de extension amplia.',
+        },
+      ],
+      quantity: 5,
+      inventoriesByStore: [
+        {
+          storeId: 1,
+          storeName: 'Tienda Central',
+          city: 'Bogota',
+          availableQuantity: 5,
         },
       ],
     });
