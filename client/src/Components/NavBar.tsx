@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { clearAccessToken } from '../auth/session';
 import { CartIcon } from './CartIcon';
+import { UserProfileModal } from './UserProfileModal';
 
 type NavBarItem = {
     label: string;
@@ -37,6 +38,7 @@ function getNavItems(variant: NavBarVariant): NavBarItem[] {
 
 export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
     const [isOpen, setIsOpen] = useState(false);
+    const [userProfileModalOpen, setUserProfileModalOpen] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -108,6 +110,17 @@ export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
                                     <Link to="/cart" aria-label="Carrito" className={iconButtonClass}>
                                         <CartIcon />
                                     </Link>
+                                    <button
+                                        type="button"
+                                        onClick={() => setUserProfileModalOpen(true)}
+                                        aria-label="Abrir perfil"
+                                        className={iconButtonClass}
+                                        title="Mi Perfil"
+                                    >
+                                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                                        </svg>
+                                    </button>
                                     <button type="button" onClick={handleLogout} className={authLinkClass}>
                                         Cerrar sesion
                                     </button>
@@ -160,7 +173,20 @@ export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
                                     </>
                                 )}
 
-                                    {variant !== 'visitor' && (
+                                {variant === 'client' && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setUserProfileModalOpen(true);
+                                            handleMobileLinkClick();
+                                        }}
+                                        className="rounded-md px-2 py-2 text-left hover:bg-white/12"
+                                    >
+                                        Mi Perfil
+                                    </button>
+                                )}
+
+                                {variant !== 'visitor' && (
                                     <button
                                         type="button"
                                         onClick={handleLogout}
@@ -174,6 +200,12 @@ export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
                     )}
                 </div>
             </nav>
+            
+            {/* User Profile Modal */}
+            <UserProfileModal
+                isOpen={userProfileModalOpen}
+                onClose={() => setUserProfileModalOpen(false)}
+            />
         </div>
     );
 };
