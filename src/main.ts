@@ -60,6 +60,10 @@ async function bootstrap() {
       'Reservas de libros con expiración automática de 24 horas',
     )
     .addTag(
+      'Clients',
+      'Operaciones del cliente autenticado, incluyendo historial consolidado de transacciones',
+    )
+    .addTag(
       'Administradores',
       'Gestión de administradores (solo accesible para usuarios root)',
     )

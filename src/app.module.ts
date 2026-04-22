@@ -16,6 +16,7 @@ import { ReservationsModule } from './reservations/reservations.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ClientsModule } from './clients/clients.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     StoresModule,
     PurchasesModule,
     ReservationsModule,
+    ClientsModule,
     SubscriptionsModule,
     NotificationsModule,
   ],
