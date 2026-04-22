@@ -31,7 +31,7 @@ async function bootstrap() {
     .setTitle('INKORA API')
     .setDescription(
       'Documentación oficial de la API REST para la plataforma de librería INKORA. ' +
-        'Esta API permite gestionar el catálogo de libros, usuarios, categorías y tiendas físicas.',
+      'Esta API permite gestionar el catálogo de libros, usuarios, categorías y tiendas físicas.',
     )
     .setVersion('1.0')
     .setContact(

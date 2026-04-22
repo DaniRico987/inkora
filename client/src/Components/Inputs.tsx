@@ -1,12 +1,15 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type {
   InputTextProps,
+  InputNumberProps,
+  InputDateProps,
   InputPasswordProps,
   InputTextAreaProps,
   InputSelectProps,
   CheckboxProps,
   InputSearchProps,
   FloatingLabelProps,
+  InputValidationType,
 } from "../interfaces/InputsInterface";
 
 const wrapper = "relative mb-5 mt-2";
@@ -15,6 +18,46 @@ const inputBase =
   "w-full border border-border rounded-lg px-3 py-3 text-md text-text outline-none transition duration-200 focus:border-border-focus bg-bg-input peer";
 
 const PlaceholderBase = "placeholder:text-transparent";
+
+// -------- Validación de inputs --------
+
+const validators: Record<InputValidationType, (value: string) => string> = {
+  // Para nombres, apellidos: solo letras inglesas (a-z, A-Z) y espacios simples
+  name: (value) => {
+    // Solo permitir letras inglesas (a-z, A-Z) y espacios
+    let cleaned = value.replace(/[^a-zA-Z\s]/g, "");
+
+    // Remover espacios dobles
+    cleaned = cleaned.replace(/\s+/g, " ");
+
+    return cleaned;
+  },
+
+  // Para direcciones: letras, números, guiones, puntos, numerales, espacios
+  address: (value) => {
+    // Solo permitir: letras, números, guiones, puntos, numerales (#), comas, espacios
+    let cleaned = value.replace(/[^a-zA-Z0-9\-\.#,\s]/g, "");
+
+    // Remover espacios dobles
+    cleaned = cleaned.replace(/\s+/g, " ");
+
+    return cleaned;
+  },
+
+  // Correo: solo quitamos espacios
+  email: (value) => value.replace(/\s+/g, ""),
+
+  // Username: letras, números y guion bajo
+  username: (value) => value.replace(/[^a-zA-Z0-9_]/g, ""),
+
+  // DNI y otros campos numéricos: solo dígitos
+  dni: (value) => value.replace(/\D/g, ""),
+  numeric: (value) => value.replace(/\D/g, ""),
+
+  // Sin validación especial
+  none: (value) => value,
+};
+
 // -------- Floating Label helper --------
 
 // DESPUÉS — sale por encima del borde
@@ -38,13 +81,35 @@ function FloatingLabel({ label, lifted }: FloatingLabelProps) {
 
 // -------- Input Text --------
 
-export function InputText({ label, value, onChange, ...props }: InputTextProps) {
+export function InputText({ label, value, onChange, validationType = "none", ...props }: InputTextProps) {
   const [focused, setFocused] = useState(false);
   const [internalVal, setInternalVal] = useState("");
 
   const currentVal = value !== undefined ? String(value) : internalVal;
   const isDateInput = props.type === "date";
   const lifted = isDateInput ? true : focused || currentVal.length > 0;
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let newValue = e.target.value;
+
+    // Aplicar validación si está configurada y no es "none"
+    if (validationType !== "none") {
+      const validator = validators[validationType];
+      if (validator) {
+        newValue = validator(newValue);
+        // Actualizar el target del evento con el valor validado
+        e.target.value = newValue;
+      }
+    }
+
+    // Actualizar estado interno si no es controlado
+    if (value === undefined) {
+      setInternalVal(newValue);
+    }
+
+    // Notificar al padre
+    onChange?.(e);
+  };
 
   return (
     <div className={wrapper}>
@@ -54,12 +119,137 @@ export function InputText({ label, value, onChange, ...props }: InputTextProps) 
         value={currentVal}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        onChange={(e) => {
-          if (value === undefined) setInternalVal(e.target.value);
-          onChange?.(e);
-        }}
+        onChange={handleChange}
         {...props}
       />
+    </div>
+  );
+}
+
+// -------- Input Number --------
+
+export function InputNumber({ label, value, onChange, length = 20, ...props }: InputNumberProps) {
+  const [focused, setFocused] = useState(false);
+  const [internalVal, setInternalVal] = useState("");
+
+  const currentVal = value !== undefined ? String(value) : internalVal;
+  const lifted = focused || currentVal.length > 0;
+  const maxLength = length || 20;
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digitsOnly = e.target.value.replace(/\D/g, "");
+    const limitedValue = digitsOnly.slice(0, maxLength);
+
+    e.target.value = limitedValue;
+
+    if (value === undefined) setInternalVal(limitedValue);
+    onChange?.(e);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Permitimos teclas de navegación/edición y bloqueamos cualquier caracter no numérico.
+    const allowedControlKeys = [
+      "Backspace",
+      "Delete",
+      "Tab",
+      "ArrowLeft",
+      "ArrowRight",
+      "Home",
+      "End",
+    ];
+
+    if (allowedControlKeys.includes(e.key)) return;
+    if (e.ctrlKey || e.metaKey) return;
+    if (!/^[0-9]$/.test(e.key)) {
+      e.preventDefault();
+    }
+  };
+
+  return (
+    <div className={wrapper}>
+      <FloatingLabel label={label ?? ""} lifted={lifted} />
+      <input
+        type="text"
+        className={`${inputBase} ${PlaceholderBase}`}
+        value={currentVal}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        onChange={handleChange}
+        onKeyDown={handleKeyDown}
+        maxLength={maxLength}
+        inputMode="numeric"
+        pattern="[0-9]*"
+        {...props}
+      />
+    </div>
+  );
+}
+
+// -------- Input Date --------
+
+export function InputDate({
+  label,
+  value,
+  onChange,
+  calendarIconClassName = "text-text-muted",
+  ...props
+}: InputDateProps) {
+  const [internalVal, setInternalVal] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const currentVal = value !== undefined ? String(value) : internalVal;
+  const lifted = true;
+
+  const openDatePicker = () => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    input.focus();
+    try {
+      (input as HTMLInputElement & { showPicker?: () => void }).showPicker?.();
+    } catch {
+      // Algunos navegadores restringen showPicker; al menos dejamos el input enfocado.
+    }
+  };
+
+  return (
+    <div className={wrapper}>
+      <FloatingLabel label={label ?? ""} lifted={lifted} />
+      <div className="relative">
+        <input
+          ref={inputRef}
+          type="date"
+          className={`${inputBase} pr-10 appearance-none ${PlaceholderBase} [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer`}
+          value={currentVal}
+          onChange={(e) => {
+            if (value === undefined) setInternalVal(e.target.value);
+            onChange?.(e);
+          }}
+          {...props}
+        />
+        <button
+          type="button"
+          onClick={openDatePicker}
+          className={`absolute right-3 top-1/2 -translate-y-1/2 ${calendarIconClassName}`}
+          aria-label="Abrir calendario"
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+          </svg>
+        </button>
+      </div>
     </div>
   );
 }

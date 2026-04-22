@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AdminLayout } from '../Components/AdminLayout';
 import { Button } from '../Components/Button';
 import { useSnackbar } from '../Components/SnackbarProvider';
+import { LocationPicker } from '../Components/LocationPicker';
 import { createAdmin } from '../api/admin';
 import { getRoleFromToken, getAccessToken } from '../auth/session';
 import type { CreateAdminRequest } from '../api/admin';
@@ -119,6 +120,62 @@ export function RootAdminCreationPage() {
         {/* Form Card */}
         <div className="rounded-2xl border border-border bg-bg-secondary p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Row 1: DNI y Email */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* DNI */}
+              <div>
+                <label
+                  htmlFor="dni"
+                  className="block text-sm font-medium text-text mb-2"
+                >
+                  DNI <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="dni"
+                  name="dni"
+                  type="text"
+                  value={formData.dni}
+                  onChange={handleInputChange}
+                  placeholder="Ej: 1098765432"
+                  className={`w-full px-4 py-3 rounded-lg border ${formErrors.dni
+                      ? 'border-red-500 bg-red-50 focus:bg-red-50'
+                      : 'border-border bg-bg focus:bg-bg-secondary'
+                    } text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all`}
+                  disabled={isLoading}
+                />
+                {formErrors.dni && (
+                  <p className="mt-2 text-sm text-red-500">{formErrors.dni}</p>
+                )}
+              </div>
+
+              {/* Email */}
+              <div>
+                <label
+                  htmlFor="email"
+                  className="block text-sm font-medium text-text mb-2"
+                >
+                  Email <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  placeholder="admin@inkora.com"
+                  className={`w-full px-4 py-3 rounded-lg border ${formErrors.email
+                      ? 'border-red-500 bg-red-50 focus:bg-red-50'
+                      : 'border-border bg-bg focus:bg-bg-secondary'
+                    } text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all`}
+                  disabled={isLoading}
+                />
+                {formErrors.email && (
+                  <p className="mt-2 text-sm text-red-500">{formErrors.email}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Row 2: Nombre y Apellido */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label
@@ -134,11 +191,10 @@ export function RootAdminCreationPage() {
                   value={formData.firstName}
                   onChange={handleInputChange}
                   placeholder="Ej: Ana"
-                  className={`w-full px-4 py-3 rounded-lg border ${
-                    formErrors.firstName
+                  className={`w-full px-4 py-3 rounded-lg border ${formErrors.firstName
                       ? 'border-red-500 bg-red-50 focus:bg-red-50'
                       : 'border-border bg-bg focus:bg-bg-secondary'
-                  } text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all`}
+                    } text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all`}
                   disabled={isLoading}
                 />
                 {formErrors.firstName && (
@@ -166,13 +222,75 @@ export function RootAdminCreationPage() {
                     formErrors.email
                       ? 'border-red-500 bg-red-50 focus:bg-red-50'
                       : 'border-border bg-bg focus:bg-bg-secondary'
-                  } text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all`}
+                    } text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all`}
                   disabled={isLoading}
                 />
                 {formErrors.email && (
                   <p className="mt-2 text-sm text-red-500">{formErrors.email}</p>
                 )}
               </div>
+            </div>
+
+            {/* Row 4: Género y Lugar de Nacimiento */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Gender */}
+              <div>
+                <label
+                  htmlFor="gender"
+                  className="block text-sm font-medium text-text mb-2"
+                >
+                  Género
+                </label>
+                <select
+                  id="gender"
+                  name="gender"
+                  value={formData.gender}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 rounded-lg border border-border bg-bg focus:bg-bg-secondary text-text focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
+                  disabled={isLoading}
+                >
+                  <option value="">Seleccionar...</option>
+                  <option value="Masculino">Masculino</option>
+                  <option value="Femenino">Femenino</option>
+                  <option value="Otro">Otro</option>
+                </select>
+              </div>
+
+              {/* Birth Place */}
+              <div className="md:col-span-2">
+                <LocationPicker
+                  label="Lugar de Nacimiento"
+                  value={formData.birthPlace || ''}
+                  onChange={(birthPlace) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      birthPlace,
+                    }))
+                  }
+                  disabled={isLoading}
+                  error={formErrors.birthPlace}
+                />
+              </div>
+            </div>
+
+            {/* Address */}
+            <div>
+              <label
+                htmlFor="address"
+                className="block text-sm font-medium text-text mb-2"
+              >
+                Dirección
+              </label>
+              <input
+                id="address"
+                name="address"
+                type="text"
+                value={formData.address}
+                onChange={handleInputChange}
+                placeholder="Ej: Calle 1 #2-3"
+                className="w-full px-4 py-3 rounded-lg border border-border bg-bg focus:bg-bg-secondary text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
+                disabled={isLoading}
+              />
             </div>
 
             {/* Info Box */}

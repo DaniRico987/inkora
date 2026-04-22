@@ -14,17 +14,33 @@ export interface BaseInputProps {
   label: ReactNode;
 }
 
+export type InputValidationType = "name" | "address" | "email" | "username" | "dni" | "numeric" | "none";
+
 export interface InputTextProps
   extends BaseInputProps,
-    InputHTMLAttributes<HTMLInputElement> {}
+  InputHTMLAttributes<HTMLInputElement> {
+  validationType?: InputValidationType;
+}
+
+export interface InputNumberProps
+  extends BaseInputProps,
+  InputHTMLAttributes<HTMLInputElement> {
+  length?: number;
+}
+
+export interface InputDateProps
+  extends BaseInputProps,
+  InputHTMLAttributes<HTMLInputElement> {
+  calendarIconClassName?: string;
+}
 
 export interface InputPasswordProps
   extends BaseInputProps,
-    InputHTMLAttributes<HTMLInputElement> {}
+  InputHTMLAttributes<HTMLInputElement> { }
 
 export interface InputTextAreaProps
   extends BaseInputProps,
-    TextareaHTMLAttributes<HTMLTextAreaElement> {}
+  TextareaHTMLAttributes<HTMLTextAreaElement> { }
 
 export interface SelectOption {
   label: string;
@@ -33,7 +49,7 @@ export interface SelectOption {
 
 export interface InputSelectProps
   extends BaseInputProps,
-    SelectHTMLAttributes<HTMLSelectElement> {
+  SelectHTMLAttributes<HTMLSelectElement> {
   options: (SelectOption | string)[];
 }
 
