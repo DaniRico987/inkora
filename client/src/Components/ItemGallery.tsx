@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from 'react-router-dom';
 import ViewToggle from "./ViewToggle";
 import ItemCard from "./ItemCard";
 import ItemRow from "./ItemRow";
@@ -20,6 +21,7 @@ function normalizeText(value: string): string {
 
 export default function ItemGallery({ items, title }: ItemGalleryProps) {
   const PAGE_SIZE = 16;
+  const [searchParams] = useSearchParams();
   const [isGrid, setIsGrid] = useState(true);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [searchValue, setSearchValue] = useState("");
@@ -40,6 +42,16 @@ export default function ItemGallery({ items, title }: ItemGalleryProps) {
     media.addEventListener("change", updateMedia);
     return () => media.removeEventListener("change", updateMedia);
   }, []);
+
+  useEffect(() => {
+    const tagParam = searchParams.get('tag');
+    const genreParam = searchParams.get('genre');
+    const queryParam = searchParams.get('q');
+
+    setSelectedTag(tagParam || null);
+    setSelectedGenre(genreParam || '');
+    setSearchValue(queryParam || '');
+  }, [searchParams]);
 
   const availableTags = useMemo(
     () => Array.from(new Set(items.map((item) => item.tag).filter(Boolean))),
@@ -188,6 +200,27 @@ export default function ItemGallery({ items, title }: ItemGalleryProps) {
               <h1 className="text-3xl font-bold text-text tracking-tight">{title}</h1>
               <ViewToggle isGrid={isGrid} onToggle={() => setIsGrid((v) => !v)} />
             </div>
+
+            {(selectedTag || selectedGenre || searchValue) && (
+              <div className="flex flex-wrap items-center gap-2 text-sm text-text-muted">
+                <span className="font-semibold text-text">Filtro activo:</span>
+                {selectedTag && (
+                  <span className="rounded-full border border-babyblue-300/30 bg-primary-900/40 px-3 py-1 text-babyblue-100">
+                    Tag: {selectedTag}
+                  </span>
+                )}
+                {selectedGenre && (
+                  <span className="rounded-full border border-babyblue-300/30 bg-primary-900/40 px-3 py-1 text-babyblue-100">
+                    Género: {selectedGenre}
+                  </span>
+                )}
+                {searchValue && (
+                  <span className="rounded-full border border-babyblue-300/30 bg-primary-900/40 px-3 py-1 text-babyblue-100">
+                    Búsqueda: {searchValue}
+                  </span>
+                )}
+              </div>
+            )}
 
             <div className="flex flex-col lg:flex-row lg:items-center gap-3">
               <div className="w-full lg:max-w-xl lg:-mb-6">
