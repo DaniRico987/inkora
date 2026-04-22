@@ -1,10 +1,13 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { PurchaseStatus, ReservationStatus } from '@prisma/client';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma, PurchaseStatus, ReservationStatus } from '@prisma/client';
 import { PrismaService } from 'prisma/prisma/prisma.service';
 import {
     ClientHistoryEntryDto,
     GetClientHistoryQueryDto,
 } from './dto/client-history.dto';
+import { UpdateClientProfileDto } from './dto/update-client-profile.dto';
+import { CreateClientCardDto } from './dto/create-client-card.dto';
+import { ClientMeResponseDto } from './dto/client-me-response.dto';
 
 const PURCHASE_STATUS_VALUES = new Set<string>(Object.values(PurchaseStatus));
 const RESERVATION_STATUS_VALUES = new Set<string>(Object.values(ReservationStatus));
@@ -18,6 +21,148 @@ const toNumber = (value: unknown): number => {
 @Injectable()
 export class ClientsService {
     constructor(private readonly prisma: PrismaService) { }
+
+    async getMyProfile(userId: number): Promise<ClientMeResponseDto> {
+        const client = await this.prisma.client.findUnique({
+            where: { userId },
+            include: {
+                user: true,
+                subscriptions: {
+                    include: { category: true },
+                    orderBy: { subscribedAt: 'desc' },
+                },
+                paymentCards: {
+                    where: { isActive: true },
+                    orderBy: { cardId: 'desc' },
+                },
+            },
+        });
+
+        if (!client) {
+            throw new NotFoundException('Cliente no encontrado');
+        }
+
+        return {
+            clientId: client.clientId,
+            userId: client.userId,
+            dni: client.user.dni,
+            firstName: client.user.firstName,
+            lastName: client.user.lastName,
+            email: client.user.email,
+            username: client.user.username,
+            birthDate: client.user.birthDate,
+            birthPlace: client.user.birthPlace,
+            address: client.user.address,
+            gender: client.user.gender,
+            subscriptions: client.subscriptions.map((sub) => ({
+                subscriptionId: sub.subscriptionId,
+                categoryId: sub.categoryId,
+                categoryName: sub.category.name,
+                subscribedAt: sub.subscribedAt,
+            })),
+            cards: client.paymentCards.map((card) => ({
+                cardId: card.cardId,
+                maskedNumber: card.maskedNumber,
+                cardType: card.cardType,
+                expirationDate: card.expirationDate,
+                cardHolder: card.cardHolder,
+            })),
+        };
+    }
+
+    async updateMyProfile(
+        userId: number,
+        payload: UpdateClientProfileDto,
+    ): Promise<ClientMeResponseDto> {
+        const client = await this.prisma.client.findUnique({
+            where: { userId },
+            select: { clientId: true, userId: true },
+        });
+
+        if (!client) {
+            throw new NotFoundException('Cliente no encontrado');
+        }
+
+        const data: Prisma.UserUpdateInput = {};
+        if (payload.firstName !== undefined) data.firstName = payload.firstName;
+        if (payload.lastName !== undefined) data.lastName = payload.lastName;
+        if (payload.email !== undefined) data.email = payload.email;
+        if (payload.username !== undefined) data.username = payload.username;
+        if (payload.birthPlace !== undefined) data.birthPlace = payload.birthPlace;
+        if (payload.address !== undefined) data.address = payload.address;
+        if (payload.gender !== undefined) data.gender = payload.gender;
+        if (payload.birthDate !== undefined) data.birthDate = new Date(payload.birthDate);
+
+        try {
+            await this.prisma.user.update({
+                where: { userId: client.userId },
+                data,
+            });
+        } catch (error) {
+            if (
+                error instanceof Prisma.PrismaClientKnownRequestError &&
+                error.code === 'P2002'
+            ) {
+                throw new BadRequestException('El email o username ya está en uso');
+            }
+            throw error;
+        }
+
+        return this.getMyProfile(userId);
+    }
+
+    async createMyCard(
+        userId: number,
+        payload: CreateClientCardDto,
+    ): Promise<ClientMeResponseDto> {
+        const client = await this.prisma.client.findUnique({
+            where: { userId },
+            select: { clientId: true },
+        });
+
+        if (!client) {
+            throw new NotFoundException('Cliente no encontrado');
+        }
+
+        await this.prisma.paymentCard.create({
+            data: {
+                clientId: client.clientId,
+                maskedNumber: payload.maskedNumber,
+                cardType: payload.cardType,
+                expirationDate: new Date(payload.expirationDate),
+                cardHolder: payload.cardHolder,
+                isActive: true,
+            },
+        });
+
+        return this.getMyProfile(userId);
+    }
+
+    async deleteMyCard(userId: number, cardId: number): Promise<void> {
+        const client = await this.prisma.client.findUnique({
+            where: { userId },
+            select: { clientId: true },
+        });
+
+        if (!client) {
+            throw new NotFoundException('Cliente no encontrado');
+        }
+
+        const result = await this.prisma.paymentCard.updateMany({
+            where: {
+                cardId,
+                clientId: client.clientId,
+                isActive: true,
+            },
+            data: {
+                isActive: false,
+            },
+        });
+
+        if (result.count === 0) {
+            throw new NotFoundException('Tarjeta no encontrada');
+        }
+    }
 
     async getClientHistory(
         clientId: number,
