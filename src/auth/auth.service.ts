@@ -464,7 +464,7 @@ export class AuthService {
     });
 
     if (categoryIds && categoryIds.length > 0) {
-      await this.prisma.userPreference.createMany({
+      await this.prisma.subscription.createMany({
         data: categoryIds.map((categoryId) => ({
           clientId: client.clientId,
           categoryId,
