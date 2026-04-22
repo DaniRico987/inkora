@@ -80,7 +80,7 @@ export function InputPassword({ label, value, onChange, ...props }: InputPasswor
       <div className="relative">
         <input
           type={show ? "text" : "password"}
-          className={`${inputBase} pr-10 ${PlaceholderBase}`}
+          className={`${inputBase} pr-10 ${PlaceholderBase} [&::-ms-reveal]:hidden [&::-ms-clear]:hidden`}
           value={currentVal}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
