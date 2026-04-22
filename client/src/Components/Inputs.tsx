@@ -44,6 +44,16 @@ const validators: Record<InputValidationType, (value: string) => string> = {
     return cleaned;
   },
 
+  // Correo: solo quitamos espacios
+  email: (value) => value.replace(/\s+/g, ""),
+
+  // Username: letras, números y guion bajo
+  username: (value) => value.replace(/[^a-zA-Z0-9_]/g, ""),
+
+  // DNI y otros campos numéricos: solo dígitos
+  dni: (value) => value.replace(/\D/g, ""),
+  numeric: (value) => value.replace(/\D/g, ""),
+
   // Sin validación especial
   none: (value) => value,
 };
@@ -127,11 +137,31 @@ export function InputNumber({ label, value, onChange, length = 20, ...props }: I
   const maxLength = length || 20;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
-    // Solo actualizar si no excede el máximo de caracteres
-    if (newValue.length <= maxLength) {
-      if (value === undefined) setInternalVal(newValue);
-      onChange?.(e);
+    const digitsOnly = e.target.value.replace(/\D/g, "");
+    const limitedValue = digitsOnly.slice(0, maxLength);
+
+    e.target.value = limitedValue;
+
+    if (value === undefined) setInternalVal(limitedValue);
+    onChange?.(e);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Permitimos teclas de navegación/edición y bloqueamos cualquier caracter no numérico.
+    const allowedControlKeys = [
+      "Backspace",
+      "Delete",
+      "Tab",
+      "ArrowLeft",
+      "ArrowRight",
+      "Home",
+      "End",
+    ];
+
+    if (allowedControlKeys.includes(e.key)) return;
+    if (e.ctrlKey || e.metaKey) return;
+    if (!/^[0-9]$/.test(e.key)) {
+      e.preventDefault();
     }
   };
 
@@ -139,13 +169,16 @@ export function InputNumber({ label, value, onChange, length = 20, ...props }: I
     <div className={wrapper}>
       <FloatingLabel label={label ?? ""} lifted={lifted} />
       <input
-        type="number"
-        className={`${inputBase} ${PlaceholderBase} [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+        type="text"
+        className={`${inputBase} ${PlaceholderBase}`}
         value={currentVal}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         onChange={handleChange}
+        onKeyDown={handleKeyDown}
         maxLength={maxLength}
+        inputMode="numeric"
+        pattern="[0-9]*"
         {...props}
       />
     </div>

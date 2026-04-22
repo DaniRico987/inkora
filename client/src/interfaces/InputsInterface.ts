@@ -14,7 +14,7 @@ export interface BaseInputProps {
   label: ReactNode;
 }
 
-export type InputValidationType = "name" | "address" | "none";
+export type InputValidationType = "name" | "address" | "email" | "username" | "dni" | "numeric" | "none";
 
 export interface InputTextProps
   extends BaseInputProps,

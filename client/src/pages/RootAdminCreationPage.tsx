@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AdminLayout } from '../Components/AdminLayout';
 import { Button } from '../Components/Button';
 import { useSnackbar } from '../Components/SnackbarProvider';
+import { LocationPicker } from '../Components/LocationPicker';
 import { createAdmin } from '../api/admin';
 import { getRoleFromToken, getAccessToken } from '../auth/session';
 import type { CreateAdminRequest } from '../api/admin';
@@ -164,11 +165,10 @@ export function RootAdminCreationPage() {
                   value={formData.dni}
                   onChange={handleInputChange}
                   placeholder="Ej: 1098765432"
-                  className={`w-full px-4 py-3 rounded-lg border ${
-                    formErrors.dni
+                  className={`w-full px-4 py-3 rounded-lg border ${formErrors.dni
                       ? 'border-red-500 bg-red-50 focus:bg-red-50'
                       : 'border-border bg-bg focus:bg-bg-secondary'
-                  } text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all`}
+                    } text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all`}
                   disabled={isLoading}
                 />
                 {formErrors.dni && (
@@ -191,11 +191,10 @@ export function RootAdminCreationPage() {
                   value={formData.email}
                   onChange={handleInputChange}
                   placeholder="admin@inkora.com"
-                  className={`w-full px-4 py-3 rounded-lg border ${
-                    formErrors.email
+                  className={`w-full px-4 py-3 rounded-lg border ${formErrors.email
                       ? 'border-red-500 bg-red-50 focus:bg-red-50'
                       : 'border-border bg-bg focus:bg-bg-secondary'
-                  } text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all`}
+                    } text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all`}
                   disabled={isLoading}
                 />
                 {formErrors.email && (
@@ -221,11 +220,10 @@ export function RootAdminCreationPage() {
                   value={formData.firstName}
                   onChange={handleInputChange}
                   placeholder="Ej: Ana"
-                  className={`w-full px-4 py-3 rounded-lg border ${
-                    formErrors.firstName
+                  className={`w-full px-4 py-3 rounded-lg border ${formErrors.firstName
                       ? 'border-red-500 bg-red-50 focus:bg-red-50'
                       : 'border-border bg-bg focus:bg-bg-secondary'
-                  } text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all`}
+                    } text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all`}
                   disabled={isLoading}
                 />
                 {formErrors.firstName && (
@@ -250,11 +248,10 @@ export function RootAdminCreationPage() {
                   value={formData.lastName}
                   onChange={handleInputChange}
                   placeholder="Ej: Pérez"
-                  className={`w-full px-4 py-3 rounded-lg border ${
-                    formErrors.lastName
+                  className={`w-full px-4 py-3 rounded-lg border ${formErrors.lastName
                       ? 'border-red-500 bg-red-50 focus:bg-red-50'
                       : 'border-border bg-bg focus:bg-bg-secondary'
-                  } text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all`}
+                    } text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all`}
                   disabled={isLoading}
                 />
                 {formErrors.lastName && (
@@ -282,11 +279,10 @@ export function RootAdminCreationPage() {
                   value={formData.username}
                   onChange={handleInputChange}
                   placeholder="admin.ana"
-                  className={`w-full px-4 py-3 rounded-lg border ${
-                    formErrors.username
+                  className={`w-full px-4 py-3 rounded-lg border ${formErrors.username
                       ? 'border-red-500 bg-red-50 focus:bg-red-50'
                       : 'border-border bg-bg focus:bg-bg-secondary'
-                  } text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all`}
+                    } text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all`}
                   disabled={isLoading}
                 />
                 {formErrors.username && (
@@ -310,11 +306,10 @@ export function RootAdminCreationPage() {
                   type="date"
                   value={formData.birthDate}
                   onChange={handleInputChange}
-                  className={`w-full px-4 py-3 rounded-lg border ${
-                    formErrors.birthDate
+                  className={`w-full px-4 py-3 rounded-lg border ${formErrors.birthDate
                       ? 'border-red-500 bg-red-50 focus:bg-red-50'
                       : 'border-border bg-bg focus:bg-bg-secondary'
-                  } text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all`}
+                    } text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all`}
                   disabled={isLoading}
                 />
                 {formErrors.birthDate && (
@@ -351,22 +346,18 @@ export function RootAdminCreationPage() {
               </div>
 
               {/* Birth Place */}
-              <div>
-                <label
-                  htmlFor="birthPlace"
-                  className="block text-sm font-medium text-text mb-2"
-                >
-                  Lugar de Nacimiento
-                </label>
-                <input
-                  id="birthPlace"
-                  name="birthPlace"
-                  type="text"
-                  value={formData.birthPlace}
-                  onChange={handleInputChange}
-                  placeholder="Ej: Pereira"
-                  className="w-full px-4 py-3 rounded-lg border border-border bg-bg focus:bg-bg-secondary text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
+              <div className="md:col-span-2">
+                <LocationPicker
+                  label="Lugar de Nacimiento"
+                  value={formData.birthPlace || ''}
+                  onChange={(birthPlace) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      birthPlace,
+                    }))
+                  }
                   disabled={isLoading}
+                  error={formErrors.birthPlace}
                 />
               </div>
             </div>

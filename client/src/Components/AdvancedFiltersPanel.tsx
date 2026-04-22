@@ -1,5 +1,5 @@
 import { Button } from "./Button";
-import { InputSelect, InputText } from "./Inputs";
+import { InputNumber, InputSelect } from "./Inputs";
 
 interface AdvancedFiltersPanelProps {
   open: boolean;
@@ -104,16 +104,16 @@ export default function AdvancedFiltersPanel({
         <div className="flex flex-col gap-1">
           <SelectField label="Autor" value={selectedAuthor} options={authors} onChange={onAuthorChange} />
           <div className="grid grid-cols-2 gap-2">
-            <InputText
+            <InputNumber
               label="Publicación desde"
-              type="number"
+              length={4}
               value={publicationYearFrom}
               placeholder="Ej: 1990"
               onChange={(event) => onPublicationYearFromChange(event.target.value)}
             />
-            <InputText
+            <InputNumber
               label="Publicación hasta"
-              type="number"
+              length={4}
               value={publicationYearTo}
               placeholder="Ej: 2020"
               onChange={(event) => onPublicationYearToChange(event.target.value)}
