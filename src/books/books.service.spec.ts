@@ -87,7 +87,7 @@ describe('BooksService', () => {
     const result = await service.findAll({ page: 2, limit: 2 });
 
     expect(prismaService.book.findMany).toHaveBeenCalledWith({
-      where: { 
+      where: {
         isAvailable: true,
         inventories: {
           some: {
@@ -116,7 +116,7 @@ describe('BooksService', () => {
       },
     });
     expect(prismaService.book.count).toHaveBeenCalledWith({
-      where: { 
+      where: {
         isAvailable: true,
         inventories: {
           some: {
@@ -405,7 +405,8 @@ describe('BooksService', () => {
     });
     prismaService.book.update.mockResolvedValue({
       bookId: 15,
-      coverUrl: 'https://bucket.s3.us-east-1.amazonaws.com/books/15/covers/test.webp',
+      coverUrl:
+        'https://bucket.s3.us-east-1.amazonaws.com/books/15/covers/test.webp',
     });
 
     const result = await service.uploadCover(15, {
@@ -422,7 +423,8 @@ describe('BooksService', () => {
     expect(prismaService.book.update).toHaveBeenCalledWith({
       where: { bookId: 15 },
       data: {
-        coverUrl: 'https://bucket.s3.us-east-1.amazonaws.com/books/15/covers/test.webp',
+        coverUrl:
+          'https://bucket.s3.us-east-1.amazonaws.com/books/15/covers/test.webp',
       },
       select: {
         bookId: true,
@@ -431,7 +433,8 @@ describe('BooksService', () => {
     });
     expect(result).toEqual({
       id: 15,
-      coverUrl: 'https://bucket.s3.us-east-1.amazonaws.com/books/15/covers/test.webp',
+      coverUrl:
+        'https://bucket.s3.us-east-1.amazonaws.com/books/15/covers/test.webp',
     });
   });
 

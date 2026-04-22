@@ -68,7 +68,9 @@ export class ReservationsService {
 
       if (books.length !== requestedBookIds.length) {
         const foundIds = new Set(books.map((book) => book.bookId));
-        const missingBookId = requestedBookIds.find((bookId) => !foundIds.has(bookId));
+        const missingBookId = requestedBookIds.find(
+          (bookId) => !foundIds.has(bookId),
+        );
         throw new NotFoundException(
           `Libro con ID ${missingBookId ?? 'desconocido'} no encontrado`,
         );
@@ -96,7 +98,11 @@ export class ReservationsService {
         orderBy: [{ bookId: 'asc' }, { storeId: 'asc' }],
       });
 
-      this.assertInventoryAvailability(requestedItems, availableInventory, books);
+      this.assertInventoryAvailability(
+        requestedItems,
+        availableInventory,
+        books,
+      );
 
       const expirationDate = new Date(Date.now() + RESERVATION_DURATION_MS);
 
@@ -142,7 +148,10 @@ export class ReservationsService {
 
       return this.mapReservationResponse(created);
     } catch (error) {
-      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
         throw error;
       }
 
@@ -171,7 +180,9 @@ export class ReservationsService {
     }
   }
 
-  async listClientReservations(clientId: number): Promise<ReservationResponseDto[]> {
+  async listClientReservations(
+    clientId: number,
+  ): Promise<ReservationResponseDto[]> {
     const reservations = await this.prisma.reservation.findMany({
       where: { clientId },
       include: {
@@ -189,7 +200,9 @@ export class ReservationsService {
       orderBy: [{ reservationDate: 'desc' }, { reservationId: 'desc' }],
     });
 
-    return reservations.map((reservation) => this.mapReservationResponse(reservation));
+    return reservations.map((reservation) =>
+      this.mapReservationResponse(reservation),
+    );
   }
 
   async cancelReservation(
@@ -214,11 +227,15 @@ export class ReservationsService {
       });
 
       if (!reservation) {
-        throw new NotFoundException(`Reserva con ID ${reservationId} no encontrada`);
+        throw new NotFoundException(
+          `Reserva con ID ${reservationId} no encontrada`,
+        );
       }
 
       if (reservation.clientId !== clientId) {
-        throw new ForbiddenException('No tienes permiso para cancelar esta reserva');
+        throw new ForbiddenException(
+          'No tienes permiso para cancelar esta reserva',
+        );
       }
 
       if (reservation.status !== ReservationStatus.active) {
@@ -323,7 +340,9 @@ export class ReservationsService {
     }
   }
 
-  private aggregateRequestedItems(dto: CreateReservationDto): Map<number, number> {
+  private aggregateRequestedItems(
+    dto: CreateReservationDto,
+  ): Map<number, number> {
     const aggregated = new Map<number, number>();
 
     for (const item of dto.items) {
@@ -376,7 +395,10 @@ export class ReservationsService {
 
     for (const reservation of activeReservations) {
       for (const item of reservation.reservationItems) {
-        currentMap.set(item.bookId, (currentMap.get(item.bookId) ?? 0) + item.quantity);
+        currentMap.set(
+          item.bookId,
+          (currentMap.get(item.bookId) ?? 0) + item.quantity,
+        );
       }
     }
 
@@ -409,7 +431,8 @@ export class ReservationsService {
     for (const inventory of inventories) {
       availableByBook.set(
         inventory.bookId,
-        (availableByBook.get(inventory.bookId) ?? 0) + inventory.availableQuantity,
+        (availableByBook.get(inventory.bookId) ?? 0) +
+          inventory.availableQuantity,
       );
     }
 

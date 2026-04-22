@@ -164,4 +164,3 @@ export class AdminController {
     return this.authService.activateAdmin(id, req.user.userId);
   }
 }
-

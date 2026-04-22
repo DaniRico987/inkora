@@ -41,7 +41,8 @@ describe('PurchasesService', () => {
     shippingAddress: 'Av. Corrientes 1234, Buenos Aires',
     deliveryMode: 'homeDelivery' as const,
     pickupStoreId: null,
-    estimatedDeliveryTime: 'Entrega estimada entre 16/4/2026 y 18/4/2026 para Av. Corrientes 1234, Buenos Aires',
+    estimatedDeliveryTime:
+      'Entrega estimada entre 16/4/2026 y 18/4/2026 para Av. Corrientes 1234, Buenos Aires',
     dispatchDate: null,
     status: PurchaseStatus.inPreparation,
     client: {
@@ -203,7 +204,9 @@ describe('PurchasesService', () => {
       };
 
       prisma.cart.findUnique.mockResolvedValueOnce(cart);
-      prisma.$transaction.mockImplementation(async (callback: any) => callback(tx));
+      prisma.$transaction.mockImplementation(async (callback: any) =>
+        callback(tx),
+      );
 
       const result = await service.createPurchase(10, {
         deliveryMode: DeliveryMode.homeDelivery,
@@ -305,7 +308,9 @@ describe('PurchasesService', () => {
       };
 
       prisma.cart.findUnique.mockResolvedValueOnce(cart);
-      prisma.$transaction.mockImplementation(async (callback: any) => callback(tx));
+      prisma.$transaction.mockImplementation(async (callback: any) =>
+        callback(tx),
+      );
 
       const result = await service.createPurchase(10, {
         deliveryMode: DeliveryMode.storePickup,
@@ -376,7 +381,9 @@ describe('PurchasesService', () => {
       };
 
       prisma.cart.findUnique.mockResolvedValueOnce(cart);
-      prisma.$transaction.mockImplementation(async (callback: any) => callback(tx));
+      prisma.$transaction.mockImplementation(async (callback: any) =>
+        callback(tx),
+      );
 
       await expect(
         service.createPurchase(10, {
@@ -428,7 +435,9 @@ describe('PurchasesService', () => {
       },
     });
     expect(result.shippingAddress).toBe('Av. Santa Fe 4321, Buenos Aires');
-    expect(result.estimatedDeliveryTime).toContain('Av. Santa Fe 4321, Buenos Aires');
+    expect(result.estimatedDeliveryTime).toContain(
+      'Av. Santa Fe 4321, Buenos Aires',
+    );
   });
 
   it('debe lanzar forbidden si el pedido no pertenece al cliente', async () => {

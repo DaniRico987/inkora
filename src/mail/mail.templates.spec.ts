@@ -56,7 +56,9 @@ describe('Mail templates', () => {
       );
 
       expect(template.html).toContain('src="cid:inkora-logo"');
-      expect(template.html).not.toContain('https://example.com/inkora-logo.png');
+      expect(template.html).not.toContain(
+        'https://example.com/inkora-logo.png',
+      );
     });
   });
 

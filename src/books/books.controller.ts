@@ -56,7 +56,10 @@ export class BooksController {
   @ApiBody({ type: CreateBookDto })
   @ApiResponse({ status: 201, description: 'Libro creado' })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
-  @ApiResponse({ status: 409, description: 'Conflicto - ISBN ya está registrado' })
+  @ApiResponse({
+    status: 409,
+    description: 'Conflicto - ISBN ya está registrado',
+  })
   @ApiUnauthorizedResponse({ description: 'Token inválido o ausente' })
   @ApiForbiddenResponse({ description: 'No tienes permisos para crear libros' })
   async adminCreate(@Body() dto: CreateBookDto) {
@@ -74,9 +77,14 @@ export class BooksController {
   @ApiResponse({ status: 200, description: 'Libro actualizado' })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
   @ApiResponse({ status: 404, description: 'Libro no encontrado' })
-  @ApiResponse({ status: 409, description: 'Conflicto - ISBN ya está registrado' })
+  @ApiResponse({
+    status: 409,
+    description: 'Conflicto - ISBN ya está registrado',
+  })
   @ApiUnauthorizedResponse({ description: 'Token inválido o ausente' })
-  @ApiForbiddenResponse({ description: 'No tienes permisos para editar libros' })
+  @ApiForbiddenResponse({
+    description: 'No tienes permisos para editar libros',
+  })
   async adminUpdate(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateBookDto,
@@ -95,7 +103,9 @@ export class BooksController {
   @ApiResponse({ status: 200, description: 'Libro eliminado' })
   @ApiResponse({ status: 404, description: 'Libro no encontrado' })
   @ApiUnauthorizedResponse({ description: 'Token inválido o ausente' })
-  @ApiForbiddenResponse({ description: 'No tienes permisos para eliminar libros' })
+  @ApiForbiddenResponse({
+    description: 'No tienes permisos para eliminar libros',
+  })
   async adminDelete(@Param('id', ParseIntPipe) id: number) {
     return this.booksService.adminDelete(id);
   }
@@ -136,10 +146,25 @@ export class BooksController {
       '/api/v1/books/search?categoryId=1&minPrice=10000&maxPrice=50000&page=1&limit=12, ' +
       '/api/v1/books/search?author=Rulfo&language=Espanol&condition=used&sortBy=price&sortOrder=asc',
   })
-  @ApiQuery({ name: 'title', required: false, type: String, example: 'Cien anos' })
-  @ApiQuery({ name: 'author', required: false, type: String, example: 'Garcia Marquez' })
+  @ApiQuery({
+    name: 'title',
+    required: false,
+    type: String,
+    example: 'Cien anos',
+  })
+  @ApiQuery({
+    name: 'author',
+    required: false,
+    type: String,
+    example: 'Garcia Marquez',
+  })
   @ApiQuery({ name: 'categoryId', required: false, type: Number, example: 1 })
-  @ApiQuery({ name: 'language', required: false, type: String, example: 'Espanol' })
+  @ApiQuery({
+    name: 'language',
+    required: false,
+    type: String,
+    example: 'Espanol',
+  })
   @ApiQuery({
     name: 'condition',
     required: false,
@@ -262,7 +287,12 @@ export class BooksController {
       mimeType,
     );
 
-    if (!(hasAllowedMime || (mimeType === 'application/octet-stream' && hasAllowedExtension))) {
+    if (
+      !(
+        hasAllowedMime ||
+        (mimeType === 'application/octet-stream' && hasAllowedExtension)
+      )
+    ) {
       throw new BadRequestException(
         'Solo se permiten imágenes JPG, PNG o WEBP',
       );

@@ -3,6 +3,7 @@ import { StoreStatus } from '@prisma/client';
 import { PrismaService } from 'prisma/prisma/prisma.service';
 import { CreateStoreDto } from './dto/create-store.dto';
 import { UpdateStoreDto } from './dto/update-store.dto';
+import { StorePublicDto } from './dto/store-public.dto';
 
 export type StoreAvailabilityDto = {
   storeId: number;
@@ -35,7 +36,7 @@ const toNullableNumber = (value: unknown): number | null => {
 
 @Injectable()
 export class StoresService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async findAvailableByBook(bookId: number): Promise<StoreAvailabilityDto[]> {
     const inventories = await this.prisma.inventory.findMany({
@@ -93,6 +94,34 @@ export class StoresService {
     });
   }
 
+  async findPublicStores(): Promise<StorePublicDto[]> {
+    const stores = await this.prisma.store.findMany({
+      where: {
+        status: 'active',
+        latitude: { not: null },
+        longitude: { not: null },
+      },
+      select: {
+        storeId: true,
+        name: true,
+        address: true,
+        city: true,
+        latitude: true,
+        longitude: true,
+      },
+      orderBy: { storeId: 'asc' },
+    });
+
+    return stores.map((store) => ({
+      storeId: store.storeId,
+      name: store.name,
+      address: store.address,
+      city: store.city,
+      latitude: toNullableNumber(store.latitude),
+      longitude: toNullableNumber(store.longitude),
+    }));
+  }
+
   async create(dto: CreateStoreDto) {
     return this.prisma.store.create({
       data: {
@@ -125,29 +154,31 @@ export class StoresService {
   }
 
   async findActiveById(storeId: number): Promise<StoreReferenceDto | null> {
-    return this.prisma.store.findFirst({
-      where: {
-        storeId,
-        status: 'active',
-      },
-      select: {
-        storeId: true,
-        name: true,
-        city: true,
-        latitude: true,
-        longitude: true,
-      },
-    }).then((store) =>
-      store
-        ? {
-          storeId: store.storeId,
-          name: store.name,
-          city: store.city,
-          latitude: toNullableNumber(store.latitude),
-          longitude: toNullableNumber(store.longitude),
-        }
-        : null,
-    );
+    return this.prisma.store
+      .findFirst({
+        where: {
+          storeId,
+          status: 'active',
+        },
+        select: {
+          storeId: true,
+          name: true,
+          city: true,
+          latitude: true,
+          longitude: true,
+        },
+      })
+      .then((store) =>
+        store
+          ? {
+              storeId: store.storeId,
+              name: store.name,
+              city: store.city,
+              latitude: toNullableNumber(store.latitude),
+              longitude: toNullableNumber(store.longitude),
+            }
+          : null,
+      );
   }
 
   private async assertExists(storeId: number) {
@@ -160,4 +191,3 @@ export class StoresService {
     }
   }
 }
-

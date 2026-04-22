@@ -32,7 +32,11 @@ export class CreateAdminDto {
   @IsString()
   dni?: string;
 
-  @ApiProperty({ example: '1990-05-12', description: 'Formato YYYY-MM-DD', required: false })
+  @ApiProperty({
+    example: '1990-05-12',
+    description: 'Formato YYYY-MM-DD',
+    required: false,
+  })
   @IsOptional()
   @IsDateString()
   birthDate?: string;

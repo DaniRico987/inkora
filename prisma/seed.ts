@@ -761,19 +761,71 @@ async function seedInventory() {
   const defaultStore = await prisma.store.upsert({
     where: { storeId: 1 },
     update: {
-      name: 'Inkora Centro',
-      address: 'Av. Principal 123',
-      city: 'Quito',
+      name: 'Inkora Centro Pereira',
+      address: 'Carrera 7 #15-23, Centro',
+      city: 'Pereira',
+      latitude: 4.8133,
+      longitude: -75.6961,
       status: StoreStatus.active,
       capacity: 5000,
     },
     create: {
       storeId: 1,
-      name: 'Inkora Centro',
-      address: 'Av. Principal 123',
-      city: 'Quito',
+      name: 'Inkora Centro Pereira',
+      address: 'Carrera 7 #15-23, Centro',
+      city: 'Pereira',
+      latitude: 4.8133,
+      longitude: -75.6961,
       status: StoreStatus.active,
       capacity: 5000,
+    },
+  });
+
+  // Agregar tienda 2: Inkora Mall del Café
+  await prisma.store.upsert({
+    where: { storeId: 2 },
+    update: {
+      name: 'Inkora Mall del Café',
+      address: 'Av. Circunvalar #1-23, Mall del Café',
+      city: 'Pereira',
+      latitude: 4.8047,
+      longitude: -75.6885,
+      status: StoreStatus.active,
+      capacity: 3000,
+    },
+    create: {
+      storeId: 2,
+      name: 'Inkora Mall del Café',
+      address: 'Av. Circunvalar #1-23, Mall del Café',
+      city: 'Pereira',
+      latitude: 4.8047,
+      longitude: -75.6885,
+      status: StoreStatus.active,
+      capacity: 3000,
+    },
+  });
+
+  // Agregar tienda 3: Inkora Villa Country
+  await prisma.store.upsert({
+    where: { storeId: 3 },
+    update: {
+      name: 'Inkora Villa Country',
+      address: 'Calle 23 #5-45, Villa Country',
+      city: 'Pereira',
+      latitude: 4.7956,
+      longitude: -75.6812,
+      status: StoreStatus.active,
+      capacity: 2000,
+    },
+    create: {
+      storeId: 3,
+      name: 'Inkora Villa Country',
+      address: 'Calle 23 #5-45, Villa Country',
+      city: 'Pereira',
+      latitude: 4.7956,
+      longitude: -75.6812,
+      status: StoreStatus.active,
+      capacity: 2000,
     },
   });
 

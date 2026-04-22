@@ -189,9 +189,7 @@ describe('CartService', () => {
 
       prismaService.book.findUnique.mockResolvedValueOnce(null);
 
-      await expect(service.addItem(10, dto)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.addItem(10, dto)).rejects.toThrow(NotFoundException);
     });
 
     it('debe lanzar error si libro no está disponible', async () => {
@@ -317,7 +315,7 @@ describe('CartService', () => {
     it('debe calcular subtotal, impuestos (21%) y total correctamente', () => {
       const items = [
         { quantity: 2, unitPrice: 19.99 }, // 39.98
-        { quantity: 1, unitPrice: 25.50 }, // 25.50
+        { quantity: 1, unitPrice: 25.5 }, // 25.50
       ]; // Subtotal: 65.48
 
       // Vamos a llamar a la función privada para probar el cálculo

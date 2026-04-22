@@ -14,7 +14,8 @@ export class RecaptchaService {
     const nodeEnv = this.configService.get<string>('NODE_ENV') ?? 'development';
     this.isProduction = nodeEnv === 'production';
     // Default: enabled unless explicitly set to "false"
-    this.enabled = enabledRaw == null ? true : enabledRaw.toLowerCase() !== 'false';
+    this.enabled =
+      enabledRaw == null ? true : enabledRaw.toLowerCase() !== 'false';
   }
 
   async verify(token: string): Promise<boolean> {

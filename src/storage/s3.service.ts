@@ -1,7 +1,4 @@
-import {
-  Injectable,
-  InternalServerErrorException,
-} from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { extname } from 'path';
 import { randomUUID } from 'crypto';
@@ -68,13 +65,18 @@ export class S3Service {
   }
 
   private sanitizeBaseName(originalname: string) {
-    const fileNameWithoutExtension = originalname.replace(extname(originalname), '');
+    const fileNameWithoutExtension = originalname.replace(
+      extname(originalname),
+      '',
+    );
 
-    return fileNameWithoutExtension
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '') || 'cover';
+    return (
+      fileNameWithoutExtension
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'cover'
+    );
   }
 
   private resolveExtension(file: UploadedFile) {

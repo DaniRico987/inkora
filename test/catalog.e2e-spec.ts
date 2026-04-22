@@ -323,7 +323,17 @@ describe('Catalog (e2e)', () => {
 
     rolesGuardSpy = jest
       .spyOn(RolesGuard.prototype, 'canActivate')
-      .mockImplementation(() => true);
+      .mockImplementation((context) => {
+        const request = context.switchToHttp().getRequest();
+        const user = request.user;
+        const requiredRoles = Reflect.getMetadata('roles', context.getHandler()) || [];
+
+        if (!user || !requiredRoles.length) {
+          return true; // No roles required
+        }
+
+        return requiredRoles.includes(user.userType);
+      });
 
     prismaMock = {
       book: {

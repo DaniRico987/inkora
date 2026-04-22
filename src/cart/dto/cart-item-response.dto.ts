@@ -10,7 +10,10 @@ export class CartItemResponseDto {
   @ApiProperty({ example: 'El Quijote', description: 'Título del libro' })
   title: string;
 
-  @ApiProperty({ example: 'Miguel de Cervantes', description: 'Autor del libro' })
+  @ApiProperty({
+    example: 'Miguel de Cervantes',
+    description: 'Autor del libro',
+  })
   author: string;
 
   @ApiProperty({ example: 2, description: 'Cantidad en el carrito' })

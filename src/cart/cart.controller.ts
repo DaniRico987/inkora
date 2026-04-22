@@ -88,7 +88,10 @@ export class CartController {
     description: 'Item agregado al carrito exitosamente',
     type: CartItemResponseDto,
   })
-  @ApiResponse({ status: 400, description: 'Datos inválidos o libro no disponible' })
+  @ApiResponse({
+    status: 400,
+    description: 'Datos inválidos o libro no disponible',
+  })
   @ApiResponse({ status: 404, description: 'Libro no encontrado' })
   @ApiUnauthorizedResponse({ description: 'Token JWT inválido o expirado' })
   async addItem(
@@ -123,7 +126,9 @@ export class CartController {
   @ApiResponse({ status: 400, description: 'Cantidad inválida' })
   @ApiResponse({ status: 404, description: 'Item no encontrado' })
   @ApiUnauthorizedResponse({ description: 'Token JWT inválido o expirado' })
-  @ApiForbiddenResponse({ description: 'No tienes permiso para actualizar este item' })
+  @ApiForbiddenResponse({
+    description: 'No tienes permiso para actualizar este item',
+  })
   async updateItem(
     @Request() req,
     @Param('id', ParseIntPipe) cartItemId: number,
@@ -152,7 +157,9 @@ export class CartController {
   @ApiResponse({ status: 204, description: 'Item eliminado exitosamente' })
   @ApiResponse({ status: 404, description: 'Item no encontrado' })
   @ApiUnauthorizedResponse({ description: 'Token JWT inválido o expirado' })
-  @ApiForbiddenResponse({ description: 'No tienes permiso para eliminar este item' })
+  @ApiForbiddenResponse({
+    description: 'No tienes permiso para eliminar este item',
+  })
   async removeItem(
     @Request() req,
     @Param('id', ParseIntPipe) cartItemId: number,

@@ -31,7 +31,7 @@ async function bootstrap() {
     .setTitle('INKORA API')
     .setDescription(
       'Documentación oficial de la API REST para la plataforma de librería INKORA. ' +
-      'Esta API permite gestionar el catálogo de libros, usuarios, categorías y tiendas físicas.',
+        'Esta API permite gestionar el catálogo de libros, usuarios, categorías y tiendas físicas.',
     )
     .setVersion('1.0')
     .setContact(
@@ -49,12 +49,18 @@ async function bootstrap() {
       },
       'JWT',
     )
-    .addTag('Auth', 'Operaciones de autenticación, registro y recuperación de cuenta')
+    .addTag(
+      'Auth',
+      'Operaciones de autenticación, registro y recuperación de cuenta',
+    )
     .addTag('Users', 'Gestión de perfiles de usuario y preferencias')
     .addTag('Books', 'Catálogo completo de libros, búsqueda y filtrado')
     .addTag('Categories', 'Organización de libros por géneros y categorías')
     .addTag('Stores', 'Información sobre sucursales y puntos de venta físicos')
-    .addTag('Purchases', 'Flujo de compras, seguimiento y actualización de estados')
+    .addTag(
+      'Purchases',
+      'Flujo de compras, seguimiento y actualización de estados',
+    )
     .addTag(
       'Reservations',
       'Reservas de libros con expiración automática de 24 horas',
@@ -76,7 +82,9 @@ async function bootstrap() {
   await app.listen(port);
 
   console.log(`\n��� INKORA API corriendo en: http://localhost:${port}`);
-  console.log(`��� Swagger docs en:         http://localhost:${port}/api/docs\n`);
+  console.log(
+    `��� Swagger docs en:         http://localhost:${port}/api/docs\n`,
+  );
 }
 
 bootstrap();

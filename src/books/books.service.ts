@@ -23,7 +23,7 @@ export class BooksService {
     private readonly prisma: PrismaService,
     private readonly s3Service: S3Service,
     private readonly notificationsService: NotificationsService,
-  ) { }
+  ) {}
 
   async findAll(query: GetBooksQueryDto): Promise<PaginatedBooksResponseDto> {
     const page = query.page ?? 1;
@@ -205,7 +205,8 @@ export class BooksService {
       pageCount: book.pageCount,
       price: Number(book.price),
       quantity: (book.inventories ?? []).reduce(
-        (totalQuantity, inventory) => totalQuantity + inventory.availableQuantity,
+        (totalQuantity, inventory) =>
+          totalQuantity + inventory.availableQuantity,
         0,
       ),
       status: book.condition,
@@ -307,7 +308,7 @@ export class BooksService {
 
       // Create relations
       await this.prisma.bookCategory.createMany({
-        data: dto.categoryIds.map(categoryId => ({
+        data: dto.categoryIds.map((categoryId) => ({
           bookId: created.bookId,
           categoryId,
         })),
@@ -354,7 +355,9 @@ export class BooksService {
     }
 
     // Get unique category IDs
-    const categoryIds = [...new Set(book.bookCategories.map(bc => bc.categoryId))];
+    const categoryIds = [
+      ...new Set(book.bookCategories.map((bc) => bc.categoryId)),
+    ];
 
     // Create news for the new book
     const news = await this.prisma.news.create({
@@ -369,7 +372,7 @@ export class BooksService {
 
     // Create news categories
     await this.prisma.newsCategory.createMany({
-      data: categoryIds.map(categoryId => ({
+      data: categoryIds.map((categoryId) => ({
         newsId: news.newsId,
         categoryId,
       })),
@@ -390,11 +393,14 @@ export class BooksService {
     });
 
     // Get unique user IDs
-    const userIds = [...new Set(subscriptions.map(sub => sub.client.userId))];
+    const userIds = [...new Set(subscriptions.map((sub) => sub.client.userId))];
 
     // Send notifications
     for (const userId of userIds) {
-      await this.notificationsService.sendNewBookNotification(userId, news.newsId);
+      await this.notificationsService.sendNewBookNotification(
+        userId,
+        news.newsId,
+      );
     }
   }
 
@@ -417,10 +423,16 @@ export class BooksService {
           ...(dto.pageCount !== undefined ? { pageCount: dto.pageCount } : {}),
           ...(dto.price !== undefined ? { price: dto.price } : {}),
           ...(dto.condition !== undefined ? { condition: dto.condition } : {}),
-          ...(dto.isAvailable !== undefined ? { isAvailable: dto.isAvailable } : {}),
-          ...(dto.description !== undefined ? { description: dto.description } : {}),
+          ...(dto.isAvailable !== undefined
+            ? { isAvailable: dto.isAvailable }
+            : {}),
+          ...(dto.description !== undefined
+            ? { description: dto.description }
+            : {}),
           ...(dto.coverUrl !== undefined ? { coverUrl: dto.coverUrl } : {}),
-          ...(dto.previewUrl !== undefined ? { previewUrl: dto.previewUrl } : {}),
+          ...(dto.previewUrl !== undefined
+            ? { previewUrl: dto.previewUrl }
+            : {}),
         },
         select: {
           bookId: true,
@@ -453,7 +465,7 @@ export class BooksService {
 
         // Create relations
         await this.prisma.bookCategory.createMany({
-          data: dto.categoryIds.map(categoryId => ({
+          data: dto.categoryIds.map((categoryId) => ({
             bookId: id,
             categoryId,
           })),

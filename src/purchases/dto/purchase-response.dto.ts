@@ -21,7 +21,10 @@ export class PurchaseResponseDto {
   @ApiPropertyOptional({ example: 'Av. Siempre Viva 742, Springfield' })
   shippingAddress?: string | null;
 
-  @ApiPropertyOptional({ enum: DeliveryMode, example: DeliveryMode.homeDelivery })
+  @ApiPropertyOptional({
+    enum: DeliveryMode,
+    example: DeliveryMode.homeDelivery,
+  })
   deliveryMode?: DeliveryMode | null;
 
   @ApiPropertyOptional({ example: 2 })
