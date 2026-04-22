@@ -74,7 +74,6 @@ async function loadColombiaCitiesByDepartmentName(departmentName: string): Promi
     if (!departmentId) {
         await loadColombiaDepartments();
         departmentId = colombiaDepartmentIdsByName.get(normalizedName);
-        console.log `Department ID for "${departmentName}" is ${departmentId}`; // Debug log
     }
 
     if (!departmentId) {
