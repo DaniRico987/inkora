@@ -10,4 +10,4 @@ import { PurchasesService } from './purchases.service';
   controllers: [PurchasesController],
   providers: [PurchasesService],
 })
-export class PurchasesModule { }
+export class PurchasesModule {}

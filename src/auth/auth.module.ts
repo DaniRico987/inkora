@@ -23,8 +23,8 @@ import { RolesGuard } from './guards/roles.guard';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        const expiresIn =
-          (configService.get<string>('JWT_EXPIRES_IN') ?? '1h') as StringValue;
+        const expiresIn = (configService.get<string>('JWT_EXPIRES_IN') ??
+          '1h') as StringValue;
 
         return {
           secret: configService.get<string>('JWT_SECRET') ?? 'dev-jwt-secret',

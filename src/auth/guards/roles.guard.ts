@@ -22,7 +22,9 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest<{ user?: AuthenticatedUser }>();
+    const request = context
+      .switchToHttp()
+      .getRequest<{ user?: AuthenticatedUser }>();
     const user = request.user;
 
     if (!user) {
@@ -30,7 +32,8 @@ export class RolesGuard implements CanActivate {
     }
 
     if (user.userType === 'admin') {
-      const isRootOnly = requiredRoles.length === 1 && requiredRoles[0] === 'root';
+      const isRootOnly =
+        requiredRoles.length === 1 && requiredRoles[0] === 'root';
       if (isRootOnly) {
         throw new ForbiddenException('Solo root puede ejecutar esta acción');
       }

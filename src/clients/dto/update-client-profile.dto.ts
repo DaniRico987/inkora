@@ -20,7 +20,10 @@ export class UpdateClientProfileDto {
   @MaxLength(100)
   lastName?: string;
 
-  @ApiPropertyOptional({ example: '1990-05-12', description: 'Formato YYYY-MM-DD' })
+  @ApiPropertyOptional({
+    example: '1990-05-12',
+    description: 'Formato YYYY-MM-DD',
+  })
   @IsOptional()
   @IsDateString()
   birthDate?: string;

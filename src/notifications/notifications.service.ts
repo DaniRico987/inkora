@@ -13,7 +13,9 @@ export class NotificationsService {
     // Get news details with book
     const news = await this.prisma.news.findUnique({
       where: { newsId },
-      include: { book: { include: { bookCategories: { include: { category: true } } } } },
+      include: {
+        book: { include: { bookCategories: { include: { category: true } } } },
+      },
     });
     if (!news || !news.book) return;
 
@@ -33,7 +35,7 @@ export class NotificationsService {
         newsId,
         bookId: book.bookId,
         notificationType: 'newBook',
-        content: `Nuevo libro disponible: "${book.title}" de ${book.author}. Categorías: ${book.bookCategories.map(bc => bc.category.name).join(', ')}`,
+        content: `Nuevo libro disponible: "${book.title}" de ${book.author}. Categorías: ${book.bookCategories.map((bc) => bc.category.name).join(', ')}`,
         isRead: false,
       },
     });
@@ -45,7 +47,7 @@ export class NotificationsService {
         user.firstName || 'Cliente',
         book.title,
         book.author,
-        book.bookCategories.map(bc => bc.category.name),
+        book.bookCategories.map((bc) => bc.category.name),
         notification.notificationId,
       );
 
@@ -127,7 +129,9 @@ export class NotificationsService {
     });
 
     if (!notification) {
-      throw new NotFoundException('Notification not found or does not belong to user');
+      throw new NotFoundException(
+        'Notification not found or does not belong to user',
+      );
     }
 
     return await this.prisma.notification.update({

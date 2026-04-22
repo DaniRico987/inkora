@@ -7,7 +7,11 @@ export class CreateCartItemDto {
   @IsPositive({ message: 'bookId debe ser mayor a 0' })
   bookId: number;
 
-  @ApiProperty({ example: 1, description: 'Cantidad a agregar', required: false })
+  @ApiProperty({
+    example: 1,
+    description: 'Cantidad a agregar',
+    required: false,
+  })
   @IsInt({ message: 'quantity debe ser un entero' })
   @Min(1, { message: 'quantity debe ser al menos 1' })
   quantity: number = 1;

@@ -56,13 +56,17 @@ export class PurchasesController {
       'El carrito no tiene items, faltan datos obligatorios, no hay stock suficiente o la tienda de retiro es invalida',
   })
   @ApiUnauthorizedResponse({ description: 'Token JWT invalido o expirado' })
-  @ApiForbiddenResponse({ description: 'Solo clientes pueden confirmar compras' })
+  @ApiForbiddenResponse({
+    description: 'Solo clientes pueden confirmar compras',
+  })
   async createPurchase(
     @Req() req: { user: AuthenticatedUser },
     @Body() dto: CreatePurchaseDto,
   ): Promise<PurchaseResponseDto> {
     if (!req.user.clientId) {
-      throw new ForbiddenException('Solo los clientes pueden confirmar compras');
+      throw new ForbiddenException(
+        'Solo los clientes pueden confirmar compras',
+      );
     }
 
     return this.purchasesService.createPurchase(req.user.clientId, dto);
@@ -82,7 +86,9 @@ export class PurchasesController {
   })
   @ApiNotFoundResponse({ description: 'Compra no encontrada' })
   @ApiUnauthorizedResponse({ description: 'Token JWT invalido o expirado' })
-  @ApiForbiddenResponse({ description: 'No tienes permiso para ver esta compra' })
+  @ApiForbiddenResponse({
+    description: 'No tienes permiso para ver esta compra',
+  })
   async getPurchaseById(
     @Req() req: { user: AuthenticatedUser },
     @Param('id', ParseIntPipe) purchaseId: number,
@@ -118,7 +124,9 @@ export class PurchasesController {
     @Body() dto: UpdatePurchaseAddressDto,
   ): Promise<PurchaseResponseDto> {
     if (!req.user.clientId) {
-      throw new ForbiddenException('Solo los clientes pueden modificar pedidos');
+      throw new ForbiddenException(
+        'Solo los clientes pueden modificar pedidos',
+      );
     }
 
     return this.purchasesService.updatePurchaseAddress(
@@ -133,7 +141,8 @@ export class PurchasesController {
   @Roles('admin')
   @ApiOperation({
     summary: 'Actualizar estado de compra',
-    description: 'Solo administradores pueden actualizar el estado de una compra.',
+    description:
+      'Solo administradores pueden actualizar el estado de una compra.',
   })
   @ApiParam({ name: 'id', type: 'integer', example: 15 })
   @ApiBody({ type: UpdatePurchaseStatusDto })
@@ -144,7 +153,9 @@ export class PurchasesController {
   })
   @ApiNotFoundResponse({ description: 'Compra no encontrada' })
   @ApiUnauthorizedResponse({ description: 'Token JWT invalido o expirado' })
-  @ApiForbiddenResponse({ description: 'Solo administradores pueden actualizar estados' })
+  @ApiForbiddenResponse({
+    description: 'Solo administradores pueden actualizar estados',
+  })
   async updatePurchaseStatus(
     @Param('id', ParseIntPipe) purchaseId: number,
     @Body() dto: UpdatePurchaseStatusDto,

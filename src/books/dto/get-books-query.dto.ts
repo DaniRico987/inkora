@@ -17,7 +17,8 @@ export const BOOK_SORT_ORDER = ['asc', 'desc'] as const;
 
 export class GetBooksQueryDto {
   @ApiPropertyOptional({
-    description: 'Filtra por titulo (busqueda parcial, no sensible a mayusculas)',
+    description:
+      'Filtra por titulo (busqueda parcial, no sensible a mayusculas)',
     example: 'Cien anos',
     maxLength: 255,
   })
@@ -27,7 +28,8 @@ export class GetBooksQueryDto {
   title?: string;
 
   @ApiPropertyOptional({
-    description: 'Filtra por autor (busqueda parcial, no sensible a mayusculas)',
+    description:
+      'Filtra por autor (busqueda parcial, no sensible a mayusculas)',
     example: 'Garcia Marquez',
     maxLength: 150,
   })
@@ -73,7 +75,10 @@ export class GetBooksQueryDto {
   })
   @IsOptional()
   @Type(() => Number)
-  @IsNumber({ allowInfinity: false, allowNaN: false }, { message: 'minPrice must be a number' })
+  @IsNumber(
+    { allowInfinity: false, allowNaN: false },
+    { message: 'minPrice must be a number' },
+  )
   @Min(0)
   minPrice?: number;
 
@@ -84,7 +89,10 @@ export class GetBooksQueryDto {
   })
   @IsOptional()
   @Type(() => Number)
-  @IsNumber({ allowInfinity: false, allowNaN: false }, { message: 'maxPrice must be a number' })
+  @IsNumber(
+    { allowInfinity: false, allowNaN: false },
+    { message: 'maxPrice must be a number' },
+  )
   @Min(0)
   maxPrice?: number;
 

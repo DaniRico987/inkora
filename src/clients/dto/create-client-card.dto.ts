@@ -1,6 +1,12 @@
 import { CardType } from '@prisma/client';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsDateString, IsEnum, IsString, Matches, MaxLength } from 'class-validator';
+import {
+  IsDateString,
+  IsEnum,
+  IsString,
+  Matches,
+  MaxLength,
+} from 'class-validator';
 
 export class CreateClientCardDto {
   @ApiProperty({
@@ -9,7 +15,8 @@ export class CreateClientCardDto {
   })
   @IsString()
   @Matches(/^[*\d\s-]{8,25}$/, {
-    message: 'maskedNumber debe contener solo asteriscos, dígitos, espacios o guiones',
+    message:
+      'maskedNumber debe contener solo asteriscos, dígitos, espacios o guiones',
   })
   maskedNumber: string;
 

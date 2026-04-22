@@ -149,7 +149,8 @@ export class BookDetailDto {
 
   @ApiPropertyOptional({
     description: 'Descripción del libro',
-    example: 'La historia de la familia Buendía a lo largo de varias generaciones.',
+    example:
+      'La historia de la familia Buendía a lo largo de varias generaciones.',
     nullable: true,
   })
   description?: string | null;

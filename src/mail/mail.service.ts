@@ -65,14 +65,16 @@ export class MailService {
     username: string,
     temporaryPassword: string,
   ) {
-    const template = buildAdminTemporaryPasswordTemplate({
-      username,
-      temporaryPassword,
-    },
-    {
-      logoUrl: this.logoUrl,
-      logoCid: this.logoCid,
-    });
+    const template = buildAdminTemporaryPasswordTemplate(
+      {
+        username,
+        temporaryPassword,
+      },
+      {
+        logoUrl: this.logoUrl,
+        logoCid: this.logoCid,
+      },
+    );
 
     await this.sendEmail({
       to: email,
@@ -88,14 +90,16 @@ export class MailService {
     blockedUntil: Date,
   ) {
     const blockedUntilIso = blockedUntil.toISOString();
-    const template = buildAccountBlockedTemplate({
-      firstName,
-      blockedUntilIso,
-    },
-    {
-      logoUrl: this.logoUrl,
-      logoCid: this.logoCid,
-    });
+    const template = buildAccountBlockedTemplate(
+      {
+        firstName,
+        blockedUntilIso,
+      },
+      {
+        logoUrl: this.logoUrl,
+        logoCid: this.logoCid,
+      },
+    );
 
     await this.sendEmail({
       to: email,
@@ -185,7 +189,9 @@ export class MailService {
     logoPath?: string;
     logoCid?: string;
   } {
-    const explicitLogoPath = this.configService.get<string>('MAIL_LOGO_PATH')?.trim();
+    const explicitLogoPath = this.configService
+      .get<string>('MAIL_LOGO_PATH')
+      ?.trim();
     const cid = 'inkora-logo';
 
     if (explicitLogoPath) {
@@ -201,7 +207,12 @@ export class MailService {
       );
     }
 
-    const defaultLogoPath = join(process.cwd(), 'public', 'branding', 'inkora-logo.png');
+    const defaultLogoPath = join(
+      process.cwd(),
+      'public',
+      'branding',
+      'inkora-logo.png',
+    );
     if (existsSync(defaultLogoPath)) {
       return {
         logoPath: defaultLogoPath,
@@ -209,7 +220,9 @@ export class MailService {
       };
     }
 
-    const explicitLogoUrl = this.configService.get<string>('MAIL_LOGO_URL')?.trim();
+    const explicitLogoUrl = this.configService
+      .get<string>('MAIL_LOGO_URL')
+      ?.trim();
     if (explicitLogoUrl) {
       return { logoUrl: explicitLogoUrl };
     }
@@ -221,8 +234,9 @@ export class MailService {
       };
     }
 
-    const apiUrl = this.configService.get<string>('API_URL')?.trim() || 
-                   `http://localhost:${this.configService.get<string>('PORT') || '3000'}`;
+    const apiUrl =
+      this.configService.get<string>('API_URL')?.trim() ||
+      `http://localhost:${this.configService.get<string>('PORT') || '3000'}`;
 
     return {
       logoUrl: `${apiUrl.replace(/\/$/, '')}/branding/inkora-logo.png`,
@@ -257,6 +271,8 @@ export class MailService {
       ...(attachments ? { attachments } : {}),
     });
 
-    this.logger.log(`Correo enviado a ${params.to} con asunto "${params.subject}"`);
+    this.logger.log(
+      `Correo enviado a ${params.to} con asunto "${params.subject}"`,
+    );
   }
 }

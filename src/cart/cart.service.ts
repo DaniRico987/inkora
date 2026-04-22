@@ -214,7 +214,9 @@ export class CartService {
     }
 
     if (cartItem.cart.clientId !== clientId) {
-      throw new ForbiddenException('No tienes permiso para actualizar este item');
+      throw new ForbiddenException(
+        'No tienes permiso para actualizar este item',
+      );
     }
 
     // Si cantidad es 0, eliminar el item

@@ -98,7 +98,8 @@ export class RegisterDto {
   username: string;
 
   @ApiProperty({
-    description: 'Contraseña (mínimo 8 caracteres, debe incluir mayúsculas, minúsculas y números)',
+    description:
+      'Contraseña (mínimo 8 caracteres, debe incluir mayúsculas, minúsculas y números)',
     minLength: 8,
     example: 'Password123!',
   })
@@ -107,7 +108,8 @@ export class RegisterDto {
   password: string;
 
   @ApiProperty({
-    description: 'IDs de las categorías literarias favoritas del usuario (opcional)',
+    description:
+      'IDs de las categorías literarias favoritas del usuario (opcional)',
     type: [Number],
     example: [1, 2, 5],
     required: false,

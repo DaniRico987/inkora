@@ -83,4 +83,3 @@ export class CreateStoreDto {
   @IsEnum(StoreStatus)
   status?: StoreStatus;
 }
-

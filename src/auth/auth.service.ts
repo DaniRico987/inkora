@@ -121,7 +121,8 @@ export class AuthService {
           now,
         );
         throw new UnauthorizedException({
-          message: 'Cuenta bloqueada temporalmente por múltiples intentos fallidos',
+          message:
+            'Cuenta bloqueada temporalmente por múltiples intentos fallidos',
           accountBlocked: true,
           blockedUntil: user.blockedUntil,
           remainingBlockSeconds,
@@ -172,7 +173,8 @@ export class AuthService {
           }
 
           throw new UnauthorizedException({
-            message: 'Cuenta bloqueada temporalmente por múltiples intentos fallidos',
+            message:
+              'Cuenta bloqueada temporalmente por múltiples intentos fallidos',
             accountBlocked: true,
             blockedUntil,
             remainingBlockSeconds: this.calculateRemainingBlockSeconds(
@@ -201,9 +203,7 @@ export class AuthService {
     if (!isPasswordValid) {
       const nextFailedAttempts = user.failedAttempts + 1;
       const shouldBlock = nextFailedAttempts >= MAX_LOGIN_FAILED_ATTEMPTS;
-      const blockedUntil = shouldBlock
-        ? this.calculateBlockedUntil(now)
-        : null;
+      const blockedUntil = shouldBlock ? this.calculateBlockedUntil(now) : null;
 
       await this.safeUpdateUser({
         where: { userId: user.userId },
@@ -230,7 +230,8 @@ export class AuthService {
         }
 
         throw new UnauthorizedException({
-          message: 'Cuenta bloqueada temporalmente por múltiples intentos fallidos',
+          message:
+            'Cuenta bloqueada temporalmente por múltiples intentos fallidos',
           accountBlocked: true,
           blockedUntil,
           remainingBlockSeconds: this.calculateRemainingBlockSeconds(
@@ -245,8 +246,7 @@ export class AuthService {
 
       throw new UnauthorizedException({
         message: 'Credenciales inválidas',
-        requiresCaptcha:
-          nextFailedAttempts >= CAPTCHA_AFTER_FAILED_ATTEMPTS,
+        requiresCaptcha: nextFailedAttempts >= CAPTCHA_AFTER_FAILED_ATTEMPTS,
         failedAttempts: nextFailedAttempts,
         attemptsRemaining: Math.max(
           0,
@@ -480,10 +480,13 @@ export class AuthService {
     const email = dto.email.trim().toLowerCase();
     const firstName = dto.firstName.trim();
     const lastName = dto.lastName?.trim() || '';
-    const username = dto.username?.trim() ||
+    const username =
+      dto.username?.trim() ||
       (await this.generateUniqueUsername(email, firstName, lastName));
     const dni = dto.dni?.trim() || (await this.generateUniqueDni());
-    const birthDate = dto.birthDate ? new Date(dto.birthDate) : new Date('1900-01-01');
+    const birthDate = dto.birthDate
+      ? new Date(dto.birthDate)
+      : new Date('1900-01-01');
 
     if (!firstName) {
       throw new BadRequestException('El nombre es requerido');
@@ -504,7 +507,10 @@ export class AuthService {
     }
 
     const temporaryPassword = this.generateTemporaryPassword();
-    const passwordHash = await bcrypt.hash(temporaryPassword, BCRYPT_SALT_ROUNDS);
+    const passwordHash = await bcrypt.hash(
+      temporaryPassword,
+      BCRYPT_SALT_ROUNDS,
+    );
 
     const adminUser = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
@@ -573,13 +579,17 @@ export class AuthService {
     }
 
     const updateData: any = {};
-    if (dto.firstName !== undefined) updateData.firstName = dto.firstName.trim();
-    if (dto.lastName !== undefined) updateData.lastName = dto.lastName?.trim() || '';
-    if (dto.birthDate !== undefined) updateData.birthDate = new Date(dto.birthDate);
+    if (dto.firstName !== undefined)
+      updateData.firstName = dto.firstName.trim();
+    if (dto.lastName !== undefined)
+      updateData.lastName = dto.lastName?.trim() || '';
+    if (dto.birthDate !== undefined)
+      updateData.birthDate = new Date(dto.birthDate);
     if (dto.birthPlace !== undefined) updateData.birthPlace = dto.birthPlace;
     if (dto.address !== undefined) updateData.address = dto.address;
     if (dto.gender !== undefined) updateData.gender = dto.gender;
-    if (dto.email !== undefined) updateData.email = dto.email.trim().toLowerCase();
+    if (dto.email !== undefined)
+      updateData.email = dto.email.trim().toLowerCase();
     if (dto.username !== undefined) updateData.username = dto.username.trim();
 
     const updatedUser = await this.prisma.user.update({
@@ -747,7 +757,10 @@ export class AuthService {
 
     for (let i = passwordChars.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [passwordChars[i], passwordChars[j]] = [passwordChars[j], passwordChars[i]];
+      [passwordChars[i], passwordChars[j]] = [
+        passwordChars[j],
+        passwordChars[i],
+      ];
     }
 
     return passwordChars.join('');
@@ -758,11 +771,12 @@ export class AuthService {
     firstName: string,
     lastName?: string,
   ): Promise<string> {
-    const baseName = (email.split('@')[0] || `${firstName}${lastName || ''}`)
-      .replace(/[^a-zA-Z0-9_]/g, '')
-      .toLowerCase()
-      .slice(0, 25)
-      .replace(/_+$/g, '') || 'admin';
+    const baseName =
+      (email.split('@')[0] || `${firstName}${lastName || ''}`)
+        .replace(/[^a-zA-Z0-9_]/g, '')
+        .toLowerCase()
+        .slice(0, 25)
+        .replace(/_+$/g, '') || 'admin';
 
     let candidate = baseName;
     let suffix = 1;
@@ -786,7 +800,7 @@ export class AuthService {
       exists = Boolean(
         await this.prisma.user.findUnique({
           where: { dni },
-        })
+        }),
       );
     }
 
@@ -797,7 +811,10 @@ export class AuthService {
     const lockDurationMinutesRaw = this.configService.get<string>(
       'AUTH_LOCK_DURATION_MINUTES',
     );
-    const lockDurationMinutes = Number.parseInt(lockDurationMinutesRaw ?? '', 10);
+    const lockDurationMinutes = Number.parseInt(
+      lockDurationMinutesRaw ?? '',
+      10,
+    );
     const durationMinutes = Number.isFinite(lockDurationMinutes)
       ? lockDurationMinutes
       : DEFAULT_LOCK_DURATION_MINUTES;

@@ -230,7 +230,9 @@ describe('AuthService', () => {
 
       await expect(
         service.validateUser('captchauser', 'IncorrectPass', ''),
-      ).rejects.toThrow('Cuenta bloqueada temporalmente por múltiples intentos fallidos');
+      ).rejects.toThrow(
+        'Cuenta bloqueada temporalmente por múltiples intentos fallidos',
+      );
 
       expect(prisma.user.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -263,7 +265,9 @@ describe('AuthService', () => {
 
       await expect(
         service.validateUser('blockeduser', 'IncorrectPass', 'captcha-token'),
-      ).rejects.toThrow('Cuenta bloqueada temporalmente por múltiples intentos fallidos');
+      ).rejects.toThrow(
+        'Cuenta bloqueada temporalmente por múltiples intentos fallidos',
+      );
 
       expect(prisma.user.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -295,7 +299,9 @@ describe('AuthService', () => {
 
       await expect(
         service.validateUser('missinglock', 'CorrectPass123', 'captcha-token'),
-      ).rejects.toThrow('Cuenta bloqueada temporalmente por múltiples intentos fallidos');
+      ).rejects.toThrow(
+        'Cuenta bloqueada temporalmente por múltiples intentos fallidos',
+      );
 
       expect(prisma.user.update).toHaveBeenCalledWith(
         expect.objectContaining({

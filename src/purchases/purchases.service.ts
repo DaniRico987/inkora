@@ -11,7 +11,10 @@ import { MailService } from '../mail/mail.service';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
 import { PurchaseResponseDto } from './dto/purchase-response.dto';
-import { StoresService, type StoreReferenceDto } from '../stores/stores.service';
+import {
+  StoresService,
+  type StoreReferenceDto,
+} from '../stores/stores.service';
 
 type PurchaseCartItem = {
   bookId: number;
@@ -99,7 +102,7 @@ export class PurchasesService {
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
     private readonly storesService: StoresService,
-  ) { }
+  ) {}
 
   async createPurchase(
     clientId: number,
@@ -111,7 +114,10 @@ export class PurchasesService {
       );
     }
 
-    if (dto.deliveryMode === DeliveryMode.homeDelivery && !dto.shippingAddress) {
+    if (
+      dto.deliveryMode === DeliveryMode.homeDelivery &&
+      !dto.shippingAddress
+    ) {
       throw new BadRequestException(
         'shippingAddress es obligatorio cuando deliveryMode es homeDelivery',
       );
@@ -135,7 +141,9 @@ export class PurchasesService {
     });
 
     if (!cart || cart.cartItems.length === 0) {
-      throw new BadRequestException('El carrito no tiene items para confirmar compra');
+      throw new BadRequestException(
+        'El carrito no tiene items para confirmar compra',
+      );
     }
 
     if (cart.status !== 'active') {
@@ -316,7 +324,9 @@ export class PurchasesService {
     }
 
     if (purchase.clientId !== clientId) {
-      throw new ForbiddenException('No tienes permiso para modificar esta compra');
+      throw new ForbiddenException(
+        'No tienes permiso para modificar esta compra',
+      );
     }
 
     if (purchase.status !== PurchaseStatus.inPreparation) {
@@ -529,7 +539,9 @@ export class PurchasesService {
 
     if (books.length !== requestedBookIds.length) {
       const foundIds = new Set(books.map((book) => book.bookId));
-      const missingBookId = requestedBookIds.find((bookId) => !foundIds.has(bookId));
+      const missingBookId = requestedBookIds.find(
+        (bookId) => !foundIds.has(bookId),
+      );
       throw new NotFoundException(
         `Libro con ID ${missingBookId ?? 'desconocido'} no encontrado`,
       );
@@ -549,9 +561,12 @@ export class PurchasesService {
         );
       }
 
-      const pickupStore = await this.storesService.findActiveById(pickupStoreId);
+      const pickupStore =
+        await this.storesService.findActiveById(pickupStoreId);
       if (!pickupStore) {
-        throw new NotFoundException('La tienda de retiro indicada no existe o no esta activa');
+        throw new NotFoundException(
+          'La tienda de retiro indicada no existe o no esta activa',
+        );
       }
 
       const inventories = await tx.inventory.findMany({
@@ -591,7 +606,9 @@ export class PurchasesService {
       }
 
       for (const [bookId, quantity] of requestedItems.entries()) {
-        const bookInventories = inventories.filter((inventory) => inventory.bookId === bookId);
+        const bookInventories = inventories.filter(
+          (inventory) => inventory.bookId === bookId,
+        );
         await this.decrementInventoryForPurchase(tx, bookInventories, quantity);
       }
 
@@ -615,7 +632,9 @@ export class PurchasesService {
     this.assertInventoryAvailability(requestedItems, inventories, books);
 
     for (const [bookId, quantity] of requestedItems.entries()) {
-      const bookInventories = inventories.filter((inventory) => inventory.bookId === bookId);
+      const bookInventories = inventories.filter(
+        (inventory) => inventory.bookId === bookId,
+      );
       await this.decrementInventoryForPurchase(tx, bookInventories, quantity);
     }
 
@@ -647,7 +666,8 @@ export class PurchasesService {
     for (const inventory of inventories) {
       availableByBook.set(
         inventory.bookId,
-        (availableByBook.get(inventory.bookId) ?? 0) + inventory.availableQuantity,
+        (availableByBook.get(inventory.bookId) ?? 0) +
+          inventory.availableQuantity,
       );
     }
 
@@ -672,7 +692,8 @@ export class PurchasesService {
     for (const inventory of inventories) {
       availableByBook.set(
         inventory.bookId,
-        (availableByBook.get(inventory.bookId) ?? 0) + inventory.availableQuantity,
+        (availableByBook.get(inventory.bookId) ?? 0) +
+          inventory.availableQuantity,
       );
     }
 
@@ -740,28 +761,32 @@ export class PurchasesService {
         });
       }
 
-      const candidate = candidates.get(inventory.store.storeId)!;
+      const candidate = candidates.get(inventory.store.storeId);
       candidate.availableByBook.set(
         inventory.bookId,
-        (candidate.availableByBook.get(inventory.bookId) ?? 0) + inventory.availableQuantity,
+        (candidate.availableByBook.get(inventory.bookId) ?? 0) +
+          inventory.availableQuantity,
       );
     }
 
-    const viableCandidates = [...candidates.values()].filter(({ availableByBook }) => {
-      for (const [bookId, quantity] of requestedItems.entries()) {
-        if ((availableByBook.get(bookId) ?? 0) < quantity) {
-          return false;
+    const viableCandidates = [...candidates.values()].filter(
+      ({ availableByBook }) => {
+        for (const [bookId, quantity] of requestedItems.entries()) {
+          if ((availableByBook.get(bookId) ?? 0) < quantity) {
+            return false;
+          }
         }
-      }
-      return true;
-    });
+        return true;
+      },
+    );
 
     if (viableCandidates.length === 0) {
       return null;
     }
 
     const sameCity = (candidate: StoreReferenceDto) =>
-      candidate.city.trim().toLowerCase() === referenceStore.city.trim().toLowerCase();
+      candidate.city.trim().toLowerCase() ===
+      referenceStore.city.trim().toLowerCase();
 
     const distanceKm = (candidate: StoreReferenceDto) => {
       if (
@@ -782,7 +807,10 @@ export class PurchasesService {
 
       const a =
         Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
-        Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2) * Math.cos(lat1) * Math.cos(lat2);
+        Math.sin(deltaLon / 2) *
+          Math.sin(deltaLon / 2) *
+          Math.cos(lat1) *
+          Math.cos(lat2);
       return 2 * earthRadiusKm * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     };
 
@@ -835,7 +863,9 @@ export class PurchasesService {
     }
 
     if (remaining > 0) {
-      throw new BadRequestException('No hay inventario suficiente para completar la compra');
+      throw new BadRequestException(
+        'No hay inventario suficiente para completar la compra',
+      );
     }
   }
 

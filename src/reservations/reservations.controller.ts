@@ -48,12 +48,16 @@ export class ReservationsController {
     isArray: true,
   })
   @ApiUnauthorizedResponse({ description: 'Token JWT invalido o expirado' })
-  @ApiForbiddenResponse({ description: 'Solo los clientes pueden listar sus reservas' })
+  @ApiForbiddenResponse({
+    description: 'Solo los clientes pueden listar sus reservas',
+  })
   async listClientReservations(
     @Req() req: { user: AuthenticatedUser },
   ): Promise<ReservationResponseDto[]> {
     if (!req.user.clientId) {
-      throw new ForbiddenException('Solo los clientes pueden listar sus reservas');
+      throw new ForbiddenException(
+        'Solo los clientes pueden listar sus reservas',
+      );
     }
 
     return this.reservationsService.listClientReservations(req.user.clientId);
@@ -76,7 +80,9 @@ export class ReservationsController {
     description: 'Limites excedidos, datos invalidos o stock insuficiente',
   })
   @ApiUnauthorizedResponse({ description: 'Token JWT invalido o expirado' })
-  @ApiForbiddenResponse({ description: 'Solo los clientes pueden reservar libros' })
+  @ApiForbiddenResponse({
+    description: 'Solo los clientes pueden reservar libros',
+  })
   async createReservation(
     @Req() req: { user: AuthenticatedUser },
     @Body() dto: CreateReservationDto,
@@ -114,7 +120,9 @@ export class ReservationsController {
     @Param('id', ParseIntPipe) reservationId: number,
   ): Promise<ReservationResponseDto> {
     if (!req.user.clientId) {
-      throw new ForbiddenException('Solo los clientes pueden cancelar reservas');
+      throw new ForbiddenException(
+        'Solo los clientes pueden cancelar reservas',
+      );
     }
 
     return this.reservationsService.cancelReservation(

@@ -279,7 +279,9 @@ export function buildPurchaseInvoiceTemplate(
   );
   const safeStatus = escapeHtml(params.status);
   const safePaymentMethod = escapeHtml(params.paymentMethod || 'No informado');
-  const safeShippingAddress = escapeHtml(params.shippingAddress || 'No informada');
+  const safeShippingAddress = escapeHtml(
+    params.shippingAddress || 'No informada',
+  );
 
   const itemsRows = params.items
     .map((item) => {

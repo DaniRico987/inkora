@@ -114,7 +114,10 @@ export class AuthController {
   @ApiBearerAuth('JWT')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Cambiar contraseña autenticado' })
-  @ApiResponse({ status: 200, description: 'Contraseña actualizada correctamente' })
+  @ApiResponse({
+    status: 200,
+    description: 'Contraseña actualizada correctamente',
+  })
   @ApiUnauthorizedResponse({ description: 'Token invalido o expirado' })
   async changePassword(
     @Req() req: Request & { user: AuthenticatedUser },

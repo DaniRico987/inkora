@@ -4,20 +4,20 @@ import { CategoryListItemDto } from './dto/category-list-item.dto';
 
 @Injectable()
 export class CategoriesService {
-	constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-	async findAll(): Promise<CategoryListItemDto[]> {
-		const categories = await this.prisma.category.findMany({
-			orderBy: { name: 'asc' },
-			select: {
-				categoryId: true,
-				name: true,
-			},
-		});
+  async findAll(): Promise<CategoryListItemDto[]> {
+    const categories = await this.prisma.category.findMany({
+      orderBy: { name: 'asc' },
+      select: {
+        categoryId: true,
+        name: true,
+      },
+    });
 
-		return categories.map((category) => ({
-			id: category.categoryId,
-			name: category.name,
-		}));
-	}
+    return categories.map((category) => ({
+      id: category.categoryId,
+      name: category.name,
+    }));
+  }
 }
