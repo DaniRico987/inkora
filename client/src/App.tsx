@@ -19,6 +19,7 @@ import { CartPage } from './pages/CartPage';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { OrderTrackingPage } from './pages/OrderTrackingPage';
 import { MyReservationsPage } from './pages/MyReservationsPage';
+import { MyHistoryPage } from './pages/MyHistoryPage';
 //import { ComponentsTestPage } from './pages/ComponentsTestPage';
 import { SnackbarProvider } from './Components/SnackbarProvider';
 import { NotificationsProvider } from './hooks/useNotifications';
@@ -235,6 +236,14 @@ function AppContent() {
             element={
               <AccessGuard allowedRoles={['client']}>
                 <MyReservationsPage />
+              </AccessGuard>
+            }
+          />
+          <Route
+            path="/my-history"
+            element={
+              <AccessGuard allowedRoles={['client']}>
+                <MyHistoryPage />
               </AccessGuard>
             }
           />
