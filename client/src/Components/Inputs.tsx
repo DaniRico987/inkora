@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   InputTextProps,
   InputNumberProps,
@@ -192,13 +192,93 @@ export function InputDate({
   value,
   onChange,
   calendarIconClassName = "text-text-muted",
+  dateValidationMode = "auto",
   ...props
 }: InputDateProps) {
   const [internalVal, setInternalVal] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftVal, setDraftVal] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const currentVal = value !== undefined ? String(value) : internalVal;
+  const externalVal = value !== undefined ? String(value) : internalVal;
+  const currentVal = isEditing ? draftVal : externalVal;
   const lifted = true;
+
+  useEffect(() => {
+    if (!isEditing) {
+      setDraftVal(externalVal);
+    }
+  }, [externalVal, isEditing]);
+
+  const resolveDateValidationMode = () => {
+    if (dateValidationMode !== "auto") return dateValidationMode;
+
+    const context = `${String(label ?? "")} ${props.name ?? ""} ${props.id ?? ""}`.toLowerCase();
+    const normalizedContext = context
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+
+    if (
+      normalizedContext.includes("nacimiento") ||
+      normalizedContext.includes("birth") ||
+      normalizedContext.includes("dob")
+    ) {
+      return "birthDate";
+    }
+
+    if (
+      normalizedContext.includes("publicacion") ||
+      normalizedContext.includes("published") ||
+      normalizedContext.includes("publication") ||
+      normalizedContext.includes("release")
+    ) {
+      return "publicationDate";
+    }
+
+    return "none";
+  };
+
+  const isValidCalendarDate = (rawDate: string) => {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(rawDate);
+    if (!match) return false;
+
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const date = new Date(Date.UTC(year, month - 1, day));
+
+    return (
+      date.getUTCFullYear() === year &&
+      date.getUTCMonth() === month - 1 &&
+      date.getUTCDate() === day
+    );
+  };
+
+  const validateDateValue = (rawDate: string) => {
+    if (!rawDate) return "";
+    if (rawDate.length < 10) return "";
+    if (!isValidCalendarDate(rawDate)) return "La fecha ingresada no existe.";
+
+    const mode = resolveDateValidationMode();
+    if (mode === "none" || mode === "publicationDate") return "";
+
+    const selectedDate = new Date(`${rawDate}T00:00:00`);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (selectedDate > today) {
+      return "La fecha de nacimiento no puede ser futura.";
+    }
+
+    const minBirthDate = new Date(today);
+    minBirthDate.setFullYear(minBirthDate.getFullYear() - 120);
+
+    if (selectedDate < minBirthDate) {
+      return "La fecha de nacimiento no puede superar los 120 anos.";
+    }
+
+    return "";
+  };
 
   const openDatePicker = () => {
     const input = inputRef.current;
@@ -221,9 +301,33 @@ export function InputDate({
           type="date"
           className={`${inputBase} pr-10 appearance-none ${PlaceholderBase} [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer`}
           value={currentVal}
+          onFocus={(e) => {
+            setIsEditing(true);
+            setDraftVal(e.target.value);
+          }}
           onChange={(e) => {
-            if (value === undefined) setInternalVal(e.target.value);
-            onChange?.(e);
+            // Nunca bloqueamos la escritura del usuario mientras edita manualmente.
+            setDraftVal(e.target.value);
+            const isCompleteDate = e.target.value.length === 10;
+            const errorMessage = isCompleteDate ? validateDateValue(e.target.value) : "";
+            e.target.setCustomValidity(errorMessage);
+            if (isCompleteDate || e.target.value === "") {
+              if (value === undefined) setInternalVal(e.target.value);
+              onChange?.(e);
+            }
+          }}
+          onBlur={(e) => {
+            const errorMessage = validateDateValue(e.target.value);
+            e.target.setCustomValidity(errorMessage);
+            if (errorMessage) {
+              e.target.reportValidity();
+            }
+            setIsEditing(false);
+            if (value === undefined) {
+              setInternalVal(e.target.value);
+            } else if (e.target.value !== externalVal && (e.target.value.length === 10 || e.target.value === "")) {
+              onChange?.(e);
+            }
           }}
           {...props}
         />

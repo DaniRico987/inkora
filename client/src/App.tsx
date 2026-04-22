@@ -32,7 +32,6 @@ import { StoresManagementPage } from './pages/StoresManagementPage';
 import { AdminsManagementPage } from './pages/AdminsManagementPage';
 import { RootAdminCreationPage } from './pages/RootAdminCreationPage';
 import { NewsPage } from './pages/NewsPage';
-import { ProfilePage } from './pages/ProfilePage';
 
 type AppRole = 'visitor' | 'client' | 'admin' | 'root';
 
@@ -260,7 +259,7 @@ function AppContent() {
             path="/profile"
             element={
               <AccessGuard allowedRoles={['client']}>
-                <ProfilePage />
+                <Navigate to="/" replace />
               </AccessGuard>
             }
           />

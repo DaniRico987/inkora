@@ -12,6 +12,18 @@ import { LocationPicker } from '../Components/LocationPicker';
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const passwordPolicy = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/;
 
+function isBirthDateAllowed(birthDate: string): boolean {
+	if (!birthDate) return true;
+	const selectedDate = new Date(`${birthDate}T00:00:00`);
+	if (Number.isNaN(selectedDate.getTime())) return false;
+	const today = new Date();
+	today.setHours(0, 0, 0, 0);
+	if (selectedDate > today) return false;
+	const minBirthDate = new Date(today);
+	minBirthDate.setFullYear(minBirthDate.getFullYear() - 120);
+	return selectedDate >= minBirthDate;
+}
+
 type FormData = {
 	dni: string;
 	firstName: string;
@@ -146,6 +158,9 @@ export function RegisterPage() {
 			const birthDateValue = new Date(`${birthDate}T00:00:00`);
 			if (Number.isNaN(birthDateValue.getTime()) || birthDateValue > new Date()) {
 				nextErrors.birthDate = 'Ingresa una fecha de nacimiento válida.';
+			}
+			if (!isBirthDateAllowed(birthDate)) {
+				nextErrors.birthDate = 'La fecha de nacimiento no puede superar los 120 años.';
 			}
 		}
 

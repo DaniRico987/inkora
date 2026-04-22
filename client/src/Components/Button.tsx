@@ -26,7 +26,7 @@ export function Button({
         disabled={disabled || loading}
         style={{ width: size === 'full' ? '100%' : size ? size : '100%' }}
         className={`
-        
+        cursor-pointer
         transition
         ease-in-out
         flex items-center gap-2

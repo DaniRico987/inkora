@@ -43,6 +43,18 @@ function formatDate(isoDate: string): string {
   return date.toLocaleDateString('es-CO');
 }
 
+function isBirthDateAllowed(birthDate: string): boolean {
+  if (!birthDate) return true;
+  const selectedDate = new Date(`${birthDate}T00:00:00`);
+  if (Number.isNaN(selectedDate.getTime())) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (selectedDate > today) return false;
+  const minBirthDate = new Date(today);
+  minBirthDate.setFullYear(minBirthDate.getFullYear() - 120);
+  return selectedDate >= minBirthDate;
+}
+
 export function ProfilePage() {
   const snackbar = useSnackbar();
   const [activeSection, setActiveSection] = useState<ProfileSection>('personal');
@@ -105,6 +117,11 @@ export function ProfilePage() {
   );
 
   const handleSaveProfile = async () => {
+    if (!isBirthDateAllowed(form.birthDate)) {
+      snackbar.warning('La fecha de nacimiento debe ser válida y no superar 120 años.');
+      return;
+    }
+
     try {
       setSavingProfile(true);
       const updated = await updateClientProfile({
