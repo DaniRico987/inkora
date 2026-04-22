@@ -7,6 +7,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { DeliveryMode, PurchaseStatus } from '@prisma/client';
 import { PrismaService } from 'prisma/prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
+import { StoresService } from '../stores/stores.service';
 import { PurchasesService } from './purchases.service';
 
 describe('PurchasesService', () => {
@@ -26,6 +27,9 @@ describe('PurchasesService', () => {
   };
   let mailService: {
     sendPurchaseInvoice: jest.Mock;
+  };
+  let storesService: {
+    findActiveById: jest.Mock;
   };
 
   const basePurchase = {
@@ -83,6 +87,10 @@ describe('PurchasesService', () => {
       sendPurchaseInvoice: jest.fn(),
     };
 
+    storesService = {
+      findActiveById: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PurchasesService,
@@ -93,6 +101,10 @@ describe('PurchasesService', () => {
         {
           provide: MailService,
           useValue: mailService,
+        },
+        {
+          provide: StoresService,
+          useValue: storesService,
         },
       ],
     }).compile();
@@ -224,6 +236,92 @@ describe('PurchasesService', () => {
       expect(result.status).toBe(PurchaseStatus.inPreparation);
       expect(result.items).toHaveLength(1);
       expect(result.items[0].bookId).toBe(5);
+    });
+
+    it('debe crear compra con retiro en tienda usando stock de la tienda elegida', async () => {
+      const cart = {
+        cartId: 1,
+        clientId: 10,
+        status: 'active',
+        cartItems: [
+          {
+            bookId: 5,
+            quantity: 1,
+            unitPrice: '21490',
+            book: {
+              bookId: 5,
+              title: 'El Quijote',
+              author: 'Miguel de Cervantes',
+            },
+          },
+        ],
+      };
+
+      const createdPurchase = {
+        ...basePurchase,
+        deliveryMode: DeliveryMode.storePickup,
+        pickupStoreId: 2,
+        pickupStore: { name: 'Sucursal Centro' },
+      };
+
+      storesService.findActiveById.mockResolvedValueOnce({
+        storeId: 2,
+        name: 'Sucursal Centro',
+        city: 'Bogota',
+        latitude: null,
+        longitude: null,
+      });
+
+      const tx = {
+        book: {
+          findMany: jest.fn().mockResolvedValue([
+            {
+              bookId: 5,
+              title: 'El Quijote',
+              isAvailable: true,
+            },
+          ]),
+        },
+        inventory: {
+          findMany: jest.fn().mockResolvedValue([
+            {
+              inventoryId: 11,
+              bookId: 5,
+              storeId: 2,
+              availableQuantity: 2,
+            },
+          ]),
+          update: jest.fn().mockResolvedValue({}),
+        },
+        purchase: {
+          create: jest.fn().mockResolvedValue(createdPurchase),
+        },
+        cart: {
+          update: jest.fn().mockResolvedValue({}),
+        },
+        cartItem: {
+          deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+      };
+
+      prisma.cart.findUnique.mockResolvedValueOnce(cart);
+      prisma.$transaction.mockImplementation(async (callback: any) => callback(tx));
+
+      const result = await service.createPurchase(10, {
+        deliveryMode: DeliveryMode.storePickup,
+        pickupStoreId: 2,
+        paymentMethod: 'Tarjeta de credito',
+      });
+
+      expect(storesService.findActiveById).toHaveBeenCalledWith(2);
+      expect(tx.inventory.update).toHaveBeenCalledWith({
+        where: { inventoryId: 11 },
+        data: {
+          availableQuantity: { decrement: 1 },
+        },
+      });
+      expect(result.deliveryMode).toBe(DeliveryMode.storePickup);
+      expect(result.pickupStoreId).toBe(2);
     });
 
     it('debe rechazar la compra si el stock es insuficiente', async () => {

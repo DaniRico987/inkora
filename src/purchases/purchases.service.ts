@@ -11,6 +11,7 @@ import { MailService } from '../mail/mail.service';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
 import { PurchaseResponseDto } from './dto/purchase-response.dto';
+import { StoresService, type StoreReferenceDto } from '../stores/stores.service';
 
 type PurchaseCartItem = {
   bookId: number;
@@ -34,6 +35,22 @@ type PurchaseBookAvailability = {
   bookId: number;
   title: string;
   isAvailable: boolean;
+};
+
+type StoreInventoryView = {
+  inventoryId: number;
+  bookId: number;
+  storeId: number;
+  availableQuantity: number;
+};
+
+const toNullableNumber = (value: unknown): number | null => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
 };
 
 type PurchaseDetails = {
@@ -81,7 +98,8 @@ export class PurchasesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
-  ) {}
+    private readonly storesService: StoresService,
+  ) { }
 
   async createPurchase(
     clientId: number,
@@ -124,100 +142,89 @@ export class PurchasesService {
       throw new BadRequestException('El carrito ya fue procesado');
     }
 
-    let pickupStoreName: string | undefined;
-    if (dto.deliveryMode === DeliveryMode.storePickup) {
-      const store = await this.prisma.store.findUnique({
-        where: { storeId: dto.pickupStoreId },
-        select: { storeId: true, name: true, status: true },
-      });
-
-      if (!store) {
-        throw new NotFoundException('La tienda de retiro indicada no existe');
-      }
-
-      if (store.status !== 'active') {
-        throw new BadRequestException('La tienda de retiro indicada no esta activa');
-      }
-
-      pickupStoreName = store.name;
-    }
-
     const cartItems = cart.cartItems as PurchaseCartItem[];
     const totalAmount = cartItems.reduce((sum, item) => {
       return sum + item.quantity * toNumber(item.unitPrice);
     }, 0);
 
-    const estimatedDeliveryTime = this.calculateEstimatedDeliveryTime(
-      dto.deliveryMode,
-      pickupStoreName,
-    );
+    let pickupStoreName: string | undefined;
 
     const purchase = await this.prisma.$transaction(
       async (tx): Promise<PurchaseDetails> => {
-      await this.validatePurchaseInventory(tx, cartItems);
+        pickupStoreName = await this.validatePurchaseInventory(
+          tx,
+          cartItems,
+          dto.deliveryMode,
+          dto.pickupStoreId,
+        );
 
-      const createdPurchase = await tx.purchase.create({
-        data: {
-          clientId,
-          totalAmount,
-          paymentMethod: dto.paymentMethod,
-          shippingAddress: dto.shippingAddress,
-          deliveryMode: dto.deliveryMode,
-          pickupStoreId:
-            dto.deliveryMode === DeliveryMode.storePickup
-              ? dto.pickupStoreId
-              : null,
-          estimatedDeliveryTime,
-          status: PurchaseStatus.inPreparation,
-          purchaseItems: {
-            create: cartItems.map((item) => ({
-              book: {
-                connect: {
-                  bookId: item.bookId,
+        const estimatedDeliveryTime = this.calculateEstimatedDeliveryTime(
+          dto.deliveryMode,
+          pickupStoreName,
+        );
+
+        const createdPurchase = await tx.purchase.create({
+          data: {
+            clientId,
+            totalAmount,
+            paymentMethod: dto.paymentMethod,
+            shippingAddress: dto.shippingAddress,
+            deliveryMode: dto.deliveryMode,
+            pickupStoreId:
+              dto.deliveryMode === DeliveryMode.storePickup
+                ? dto.pickupStoreId
+                : null,
+            estimatedDeliveryTime,
+            status: PurchaseStatus.inPreparation,
+            purchaseItems: {
+              create: cartItems.map((item) => ({
+                book: {
+                  connect: {
+                    bookId: item.bookId,
+                  },
                 },
-              },
-              quantity: item.quantity,
-              unitPrice: toNumber(item.unitPrice),
-            })),
+                quantity: item.quantity,
+                unitPrice: toNumber(item.unitPrice),
+              })),
+            },
           },
-        },
-        include: {
-          purchaseItems: {
-            include: {
-              book: {
-                select: {
-                  title: true,
-                  author: true,
+          include: {
+            purchaseItems: {
+              include: {
+                book: {
+                  select: {
+                    title: true,
+                    author: true,
+                  },
                 },
               },
             },
-          },
-          client: {
-            include: {
-              user: {
-                select: {
-                  email: true,
-                  firstName: true,
+            client: {
+              include: {
+                user: {
+                  select: {
+                    email: true,
+                    firstName: true,
+                  },
                 },
               },
             },
-          },
-          pickupStore: {
-            select: {
-              name: true,
+            pickupStore: {
+              select: {
+                name: true,
+              },
             },
           },
-        },
-      });
+        });
 
-      await tx.cart.update({
-        where: { cartId: cart.cartId },
-        data: { status: 'processed' },
-      });
+        await tx.cart.update({
+          where: { cartId: cart.cartId },
+          data: { status: 'processed' },
+        });
 
-      await tx.cartItem.deleteMany({ where: { cartId: cart.cartId } });
+        await tx.cartItem.deleteMany({ where: { cartId: cart.cartId } });
 
-      return createdPurchase;
+        return createdPurchase;
       },
     );
 
@@ -446,8 +453,8 @@ export class PurchasesService {
 
     const destinationSuffix =
       deliveryMode === DeliveryMode.homeDelivery && shippingAddress?.trim()
-      ? ` para ${shippingAddress.trim()}`
-      : '';
+        ? ` para ${shippingAddress.trim()}`
+        : '';
 
     return `Entrega estimada entre ${minDate.toLocaleDateString('es-AR')} y ${maxDate.toLocaleDateString('es-AR')}${destinationSuffix}`;
   }
@@ -505,7 +512,9 @@ export class PurchasesService {
   private async validatePurchaseInventory(
     tx: Prisma.TransactionClient,
     cartItems: PurchaseCartItem[],
-  ): Promise<void> {
+    deliveryMode: DeliveryMode,
+    pickupStoreId?: number,
+  ): Promise<string | undefined> {
     const requestedItems = this.groupCartItemsByBook(cartItems);
     const requestedBookIds = [...requestedItems.keys()];
 
@@ -533,6 +542,62 @@ export class PurchasesService {
       );
     }
 
+    if (deliveryMode === DeliveryMode.storePickup) {
+      if (!pickupStoreId) {
+        throw new BadRequestException(
+          'pickupStoreId es obligatorio cuando deliveryMode es storePickup',
+        );
+      }
+
+      const pickupStore = await this.storesService.findActiveById(pickupStoreId);
+      if (!pickupStore) {
+        throw new NotFoundException('La tienda de retiro indicada no existe o no esta activa');
+      }
+
+      const inventories = await tx.inventory.findMany({
+        where: {
+          bookId: { in: requestedBookIds },
+          storeId: pickupStoreId,
+          availableQuantity: { gt: 0 },
+        },
+        select: {
+          inventoryId: true,
+          bookId: true,
+          storeId: true,
+          availableQuantity: true,
+        },
+      });
+
+      const insufficient = this.findInsufficientBooks(
+        requestedItems,
+        inventories,
+        books,
+      );
+
+      if (insufficient) {
+        const alternative = await this.findAlternativePickupStore(
+          tx,
+          requestedItems,
+          pickupStore,
+        );
+
+        const suggestion = alternative
+          ? `Te sugerimos la tienda "${alternative.name}" en ${alternative.city}.`
+          : 'Puedes cambiar a envio a domicilio.';
+
+        throw new BadRequestException(
+          `La tienda seleccionada no tiene stock suficiente para retiro. ${suggestion}`,
+        );
+      }
+
+      for (const [bookId, quantity] of requestedItems.entries()) {
+        const bookInventories = inventories.filter((inventory) => inventory.bookId === bookId);
+        await this.decrementInventoryForPurchase(tx, bookInventories, quantity);
+      }
+
+      return pickupStore.name;
+    }
+
     const inventories = await tx.inventory.findMany({
       where: {
         bookId: { in: requestedBookIds },
@@ -553,6 +618,8 @@ export class PurchasesService {
       const bookInventories = inventories.filter((inventory) => inventory.bookId === bookId);
       await this.decrementInventoryForPurchase(tx, bookInventories, quantity);
     }
+
+    return undefined;
   }
 
   private groupCartItemsByBook(
@@ -593,6 +660,151 @@ export class PurchasesService {
         );
       }
     }
+  }
+
+  private findInsufficientBooks(
+    requestedItems: Map<number, number>,
+    inventories: StoreInventoryView[],
+    books: PurchaseBookAvailability[],
+  ): PurchaseBookAvailability | null {
+    const availableByBook = new Map<number, number>();
+
+    for (const inventory of inventories) {
+      availableByBook.set(
+        inventory.bookId,
+        (availableByBook.get(inventory.bookId) ?? 0) + inventory.availableQuantity,
+      );
+    }
+
+    for (const [bookId, quantity] of requestedItems.entries()) {
+      const available = availableByBook.get(bookId) ?? 0;
+      if (available < quantity) {
+        return books.find((book) => book.bookId === bookId) ?? null;
+      }
+    }
+
+    return null;
+  }
+
+  private async findAlternativePickupStore(
+    tx: Prisma.TransactionClient,
+    requestedItems: Map<number, number>,
+    referenceStore: StoreReferenceDto,
+  ): Promise<StoreReferenceDto | null> {
+    const requestedBookIds = [...requestedItems.keys()];
+
+    const inventories = await tx.inventory.findMany({
+      where: {
+        bookId: { in: requestedBookIds },
+        availableQuantity: { gt: 0 },
+        storeId: { not: referenceStore.storeId },
+        store: {
+          status: 'active',
+        },
+      },
+      select: {
+        bookId: true,
+        availableQuantity: true,
+        store: {
+          select: {
+            storeId: true,
+            name: true,
+            city: true,
+            latitude: true,
+            longitude: true,
+          },
+        },
+      },
+    });
+
+    const candidates = new Map<
+      number,
+      {
+        store: StoreReferenceDto;
+        availableByBook: Map<number, number>;
+      }
+    >();
+
+    for (const inventory of inventories) {
+      const current = candidates.get(inventory.store.storeId);
+      if (!current) {
+        candidates.set(inventory.store.storeId, {
+          store: {
+            storeId: inventory.store.storeId,
+            name: inventory.store.name,
+            city: inventory.store.city,
+            latitude: toNullableNumber(inventory.store.latitude),
+            longitude: toNullableNumber(inventory.store.longitude),
+          },
+          availableByBook: new Map<number, number>(),
+        });
+      }
+
+      const candidate = candidates.get(inventory.store.storeId)!;
+      candidate.availableByBook.set(
+        inventory.bookId,
+        (candidate.availableByBook.get(inventory.bookId) ?? 0) + inventory.availableQuantity,
+      );
+    }
+
+    const viableCandidates = [...candidates.values()].filter(({ availableByBook }) => {
+      for (const [bookId, quantity] of requestedItems.entries()) {
+        if ((availableByBook.get(bookId) ?? 0) < quantity) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    if (viableCandidates.length === 0) {
+      return null;
+    }
+
+    const sameCity = (candidate: StoreReferenceDto) =>
+      candidate.city.trim().toLowerCase() === referenceStore.city.trim().toLowerCase();
+
+    const distanceKm = (candidate: StoreReferenceDto) => {
+      if (
+        referenceStore.latitude == null ||
+        referenceStore.longitude == null ||
+        candidate.latitude == null ||
+        candidate.longitude == null
+      ) {
+        return Number.POSITIVE_INFINITY;
+      }
+
+      const toRad = (degrees: number) => (degrees * Math.PI) / 180;
+      const earthRadiusKm = 6371;
+      const deltaLat = toRad(candidate.latitude - referenceStore.latitude);
+      const deltaLon = toRad(candidate.longitude - referenceStore.longitude);
+      const lat1 = toRad(referenceStore.latitude);
+      const lat2 = toRad(candidate.latitude);
+
+      const a =
+        Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+        Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2) * Math.cos(lat1) * Math.cos(lat2);
+      return 2 * earthRadiusKm * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
+
+    viableCandidates.sort((left, right) => {
+      const sameCityLeft = sameCity(left.store) ? 1 : 0;
+      const sameCityRight = sameCity(right.store) ? 1 : 0;
+
+      if (sameCityLeft !== sameCityRight) {
+        return sameCityRight - sameCityLeft;
+      }
+
+      const distanceLeft = distanceKm(left.store);
+      const distanceRight = distanceKm(right.store);
+
+      if (distanceLeft !== distanceRight) {
+        return distanceLeft - distanceRight;
+      }
+
+      return left.store.name.localeCompare(right.store.name, 'es');
+    });
+
+    return viableCandidates[0].store;
   }
 
   private async decrementInventoryForPurchase(

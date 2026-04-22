@@ -1,11 +1,91 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { StoreStatus } from '@prisma/client';
 import { PrismaService } from 'prisma/prisma/prisma.service';
 import { CreateStoreDto } from './dto/create-store.dto';
 import { UpdateStoreDto } from './dto/update-store.dto';
 
+export type StoreAvailabilityDto = {
+  storeId: number;
+  name: string;
+  address: string;
+  city: string;
+  latitude: number | null;
+  longitude: number | null;
+  capacity: number | null;
+  status: StoreStatus;
+  availableQuantity: number;
+};
+
+export type StoreReferenceDto = {
+  storeId: number;
+  name: string;
+  city: string;
+  latitude: number | null;
+  longitude: number | null;
+};
+
+const toNullableNumber = (value: unknown): number | null => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+};
+
 @Injectable()
 export class StoresService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
+
+  async findAvailableByBook(bookId: number): Promise<StoreAvailabilityDto[]> {
+    const inventories = await this.prisma.inventory.findMany({
+      where: {
+        bookId,
+        availableQuantity: { gt: 0 },
+        store: {
+          status: 'active',
+        },
+      },
+      select: {
+        availableQuantity: true,
+        store: {
+          select: {
+            storeId: true,
+            name: true,
+            address: true,
+            city: true,
+            latitude: true,
+            longitude: true,
+            capacity: true,
+            status: true,
+          },
+        },
+      },
+      orderBy: {
+        storeId: 'asc',
+      },
+    });
+
+    return inventories
+      .map((inventory) => ({
+        storeId: inventory.store.storeId,
+        name: inventory.store.name,
+        address: inventory.store.address,
+        city: inventory.store.city,
+        latitude: toNullableNumber(inventory.store.latitude),
+        longitude: toNullableNumber(inventory.store.longitude),
+        capacity: inventory.store.capacity,
+        status: inventory.store.status,
+        availableQuantity: inventory.availableQuantity,
+      }))
+      .sort((left, right) => {
+        if (left.availableQuantity !== right.availableQuantity) {
+          return right.availableQuantity - left.availableQuantity;
+        }
+
+        return left.name.localeCompare(right.name, 'es');
+      });
+  }
 
   async findAll() {
     return this.prisma.store.findMany({
@@ -42,6 +122,32 @@ export class StoresService {
         ...(dto.status !== undefined ? { status: dto.status } : {}),
       },
     });
+  }
+
+  async findActiveById(storeId: number): Promise<StoreReferenceDto | null> {
+    return this.prisma.store.findFirst({
+      where: {
+        storeId,
+        status: 'active',
+      },
+      select: {
+        storeId: true,
+        name: true,
+        city: true,
+        latitude: true,
+        longitude: true,
+      },
+    }).then((store) =>
+      store
+        ? {
+          storeId: store.storeId,
+          name: store.name,
+          city: store.city,
+          latitude: toNullableNumber(store.latitude),
+          longitude: toNullableNumber(store.longitude),
+        }
+        : null,
+    );
   }
 
   private async assertExists(storeId: number) {
