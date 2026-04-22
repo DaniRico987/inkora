@@ -31,6 +31,7 @@ function getNavItems(variant: NavBarVariant): NavBarItem[] {
                   { label: 'Catalogo', to: '/catalog' },
                   { label: 'Mis reservas', to: '/my-reservations' },
                   { label: 'Mi historial', to: '/my-history' },
+                  { label: 'Mi perfil', to: '/profile' },
                   { label: 'Novedades', to: '/news' },
                   { label: 'Tiendas', to: '/catalog' },
               ]
