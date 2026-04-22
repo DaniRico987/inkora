@@ -352,6 +352,7 @@ describe('AuthService', () => {
       expect(jwtService.signAsync).toHaveBeenCalledWith({
         sub: 33,
         role: 'root',
+        isTemporaryPassword: false,
       });
     });
   });
