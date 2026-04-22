@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { InputText, InputPassword, InputSelect } from '../Components/Inputs';
+import { InputText, InputPassword, InputSelect, InputDate, InputNumber } from '../Components/Inputs';
 import { Button } from '../Components/Button';
 import { AuthHomeButton } from '../Components/AuthHomeButton';
 import { useTheme } from '../theme/useTheme';
 import { extractAuthError, login, register } from '../api/auth';
 import { getCategories, type Category } from '../api/categories';
 import { saveAccessToken } from '../auth/session';
+import { LocationPicker } from '../Components/LocationPicker';
+
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const passwordPolicy = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/;
 
 type FormData = {
   dni: string;
@@ -147,13 +151,18 @@ export function RegisterPage() {
     if (!dni.trim()) nextErrors.dni = 'El DNI es requerido.';
     if (!firstName.trim()) nextErrors.firstName = 'Los nombres son requeridos.';
     if (!lastName.trim()) nextErrors.lastName = 'Los apellidos son requeridos.';
-    if (!birthDate)
-      nextErrors.birthDate = 'La fecha de nacimiento es requerida.';
+    if (!birthDate) nextErrors.birthDate = 'La fecha de nacimiento es requerida.';
     if (!email.trim()) nextErrors.email = 'El correo es requerido.';
     if (!username.trim()) nextErrors.username = 'El username es requerido.';
     if (!password.trim()) nextErrors.password = 'La contraseña es requerida.';
-    if (!confirmPassword.trim())
-      nextErrors.confirmPassword = 'Debes confirmar la contraseña.';
+    if (!confirmPassword.trim()) nextErrors.confirmPassword = 'Debes confirmar la contraseña.';
+
+    if (birthDate) {
+      const birthDateValue = new Date(`${birthDate}T00:00:00`);
+      if (Number.isNaN(birthDateValue.getTime()) || birthDateValue > new Date()) {
+        nextErrors.birthDate = 'Ingresa una fecha de nacimiento válida.';
+      }
+    }
 
     if (dni.length < 6 || dni.length > 20) {
       nextErrors.dni = 'El DNI debe tener entre 6 y 20 caracteres.';
@@ -167,8 +176,7 @@ export function RegisterPage() {
       nextErrors.lastName = 'El apellido no debe exceder 100 caracteres.';
     }
 
-    const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-    if (email.trim() && !validEmail) {
+    if (email.trim() && !emailRegex.test(email.trim())) {
       nextErrors.email = 'Ingresa un correo electrónico válido.';
     }
 
@@ -186,9 +194,8 @@ export function RegisterPage() {
       nextErrors.password = 'La contraseña debe tener al menos 8 caracteres.';
     }
 
-    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
-      nextErrors.password =
-        'La contraseña debe incluir mayúsculas, minúsculas y números.';
+    if (!passwordPolicy.test(password)) {
+      nextErrors.password = 'La contraseña debe incluir mayúsculas, minúsculas y números.';
     }
 
     if (password !== confirmPassword) {
@@ -345,21 +352,17 @@ export function RegisterPage() {
               onSubmit={handleSubmit}
               className="space-y-4 [&_input]:border-border [&_input]:bg-bg-input [&_input]:text-text [&_input]:placeholder:text-placeholder [&_input]:focus:border-border-focus [&_input]:shadow-none [&_label>span:first-of-type]:border-border [&_label>span:last-of-type]:text-label [&_select]:border-border [&_select]:bg-bg-input [&_select]:text-text [&_select]:focus:border-border-focus [&_select]:shadow-none"
             >
-              {/* Row 1: DNI, First Name, Last Name */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-3">
                 <div>
-                  <InputText
+                  <InputNumber
                     label="DNI"
                     name="dni"
-                    type="text"
                     autoComplete="off"
                     value={formData.dni}
                     onChange={handleInputChange}
-                    maxLength={20}
+                    length={20}
                   />
-                  {formErrors.dni && (
-                    <p className="text-xs text-red-300">{formErrors.dni}</p>
-                  )}
+                  {formErrors.dni && <p className="text-xs text-red-300">{formErrors.dni}</p>}
                 </div>
                 <div>
                   <InputText
@@ -370,12 +373,9 @@ export function RegisterPage() {
                     value={formData.firstName}
                     onChange={handleInputChange}
                     maxLength={100}
+                    validationType="name"
                   />
-                  {formErrors.firstName && (
-                    <p className="text-xs text-red-300">
-                      {formErrors.firstName}
-                    </p>
-                  )}
+                  {formErrors.firstName && <p className="text-xs text-red-300">{formErrors.firstName}</p>}
                 </div>
                 <div>
                   <InputText
@@ -386,30 +386,21 @@ export function RegisterPage() {
                     value={formData.lastName}
                     onChange={handleInputChange}
                     maxLength={100}
+                    validationType="name"
                   />
-                  {formErrors.lastName && (
-                    <p className="text-xs text-red-300">
-                      {formErrors.lastName}
-                    </p>
-                  )}
+                  {formErrors.lastName && <p className="text-xs text-red-300">{formErrors.lastName}</p>}
                 </div>
               </div>
 
-              {/* Row 2: Birth Date, Gender */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
                 <div>
-                  <InputText
+                  <InputDate
                     label="Fecha de nacimiento"
                     name="birthDate"
-                    type="date"
                     value={formData.birthDate}
                     onChange={handleInputChange}
                   />
-                  {formErrors.birthDate && (
-                    <p className="text-xs text-red-300">
-                      {formErrors.birthDate}
-                    </p>
-                  )}
+                  {formErrors.birthDate && <p className="text-xs text-red-300">{formErrors.birthDate}</p>}
                 </div>
                 <div>
                   <InputSelect
@@ -419,24 +410,18 @@ export function RegisterPage() {
                     value={formData.gender}
                     onChange={handleInputChange}
                   />
-                  {formErrors.gender && (
-                    <p className="text-xs text-red-300">{formErrors.gender}</p>
-                  )}
+                  {formErrors.gender && <p className="text-xs text-red-300">{formErrors.gender}</p>}
                 </div>
               </div>
 
-              {/* Row 3: Birth Place, Address */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
-                <div>
-                  <InputText
-                    label="Lugar de nacimiento"
-                    name="birthPlace"
-                    type="text"
-                    value={formData.birthPlace}
-                    onChange={handleInputChange}
-                    maxLength={100}
-                  />
-                </div>
+              <div className="grid grid-cols-1 gap-4 mb-3">
+                <LocationPicker
+                  label="Lugar de nacimiento"
+                  value={formData.birthPlace}
+                  onChange={(birthPlace) => {
+                    setFormData((prev) => ({ ...prev, birthPlace }));
+                  }}
+                />
                 <div>
                   <InputText
                     label="Dirección"
@@ -446,11 +431,11 @@ export function RegisterPage() {
                     value={formData.address}
                     onChange={handleInputChange}
                     maxLength={255}
+                    validationType="address"
                   />
                 </div>
               </div>
 
-              {/* Row 4: Email, Username */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
                 <div>
                   <InputText
@@ -460,10 +445,9 @@ export function RegisterPage() {
                     autoComplete="email"
                     value={formData.email}
                     onChange={handleInputChange}
+                    validationType="email"
                   />
-                  {formErrors.email && (
-                    <p className="text-xs text-red-300">{formErrors.email}</p>
-                  )}
+                  {formErrors.email && <p className="text-xs text-red-300">{formErrors.email}</p>}
                 </div>
                 <div>
                   <InputText
@@ -474,12 +458,9 @@ export function RegisterPage() {
                     value={formData.username}
                     onChange={handleInputChange}
                     maxLength={50}
+                    validationType="username"
                   />
-                  {formErrors.username && (
-                    <p className="text-xs text-red-300">
-                      {formErrors.username}
-                    </p>
-                  )}
+                  {formErrors.username && <p className="text-xs text-red-300">{formErrors.username}</p>}
                 </div>
               </div>
 
@@ -518,24 +499,19 @@ export function RegisterPage() {
               <div className="mb-3">
                 {hasPassword && (
                   <div className="flex items-center gap-2 text-xs mb-1">
-                    <span className="text-text-muted">
-                      Fortaleza de contraseña:
-                    </span>
-                    <span className="capitalize text-text">
-                      {passwordStrength}
-                    </span>
+                    <span className="text-text-muted">Fortaleza de contraseña:</span>
+                    <span className="capitalize text-text">{passwordStrength}</span>
                   </div>
                 )}
                 <div className="h-1.5 rounded-full bg-border overflow-hidden">
                   <div
-                    className={`h-full transition-all duration-300 ${
-                      !hasPassword
-                        ? 'bg-transparent'
-                        : passwordStrength === 'fuerte'
-                          ? 'bg-emerald-500'
-                          : passwordStrength === 'media'
-                            ? 'bg-amber-500'
-                            : 'bg-red-500'
+                    className={`h-full transition-all duration-300 ${!hasPassword
+                      ? 'bg-transparent'
+                      : passwordStrength === 'fuerte'
+                        ? 'bg-emerald-500'
+                        : passwordStrength === 'media'
+                          ? 'bg-amber-500'
+                          : 'bg-red-500'
                     }`}
                     style={{
                       width: !hasPassword
@@ -551,30 +527,23 @@ export function RegisterPage() {
               </div>
 
               <div className="mb-3 rounded-xl border border-border p-4">
-                <p className="text-sm font-medium text-text mb-3">
-                  Preferencias literarias
-                </p>
+                <p className="text-sm font-medium text-text mb-3">Preferencias literarias</p>
                 {categoriesLoading ? (
-                  <p className="text-xs text-text-muted">
-                    Cargando categorías...
-                  </p>
+                  <p className="text-xs text-text-muted">Cargando categorías...</p>
                 ) : (
                   <div className="flex flex-wrap gap-2">
                     {categories.map((category) => {
                       const categoryId = Number(category.categoryId);
-                      const selected =
-                        Number.isFinite(categoryId) &&
-                        formData.categoryIds.includes(categoryId);
+                      const selected = Number.isFinite(categoryId) && formData.categoryIds.includes(categoryId);
                       return (
                         <button
                           key={categoryId}
                           type="button"
                           onClick={() => toggleCategory(categoryId)}
                           disabled={!Number.isFinite(categoryId)}
-                          className={`rounded-full border px-3 py-1 text-xs transition-colors cursor-pointer ${
-                            selected
-                              ? 'border-primary-500 bg-primary-500/20 text-primary-500'
-                              : 'border-border text-text-muted hover:border-primary-400 hover:text-text'
+                          className={`rounded-full border px-3 py-1 text-xs transition-colors ${selected
+                            ? 'border-primary-500 bg-primary-500/20 text-primary-500'
+                            : 'border-border text-text-muted hover:border-primary-400 hover:text-text'
                           }`}
                         >
                           {category.name}
@@ -583,11 +552,7 @@ export function RegisterPage() {
                     })}
                   </div>
                 )}
-                {formErrors.categoryIds && (
-                  <p className="text-xs text-red-300 mt-2">
-                    {formErrors.categoryIds}
-                  </p>
-                )}
+                {formErrors.categoryIds && <p className="text-xs text-red-300 mt-2">{formErrors.categoryIds}</p>}
               </div>
 
               {/* Error Message */}

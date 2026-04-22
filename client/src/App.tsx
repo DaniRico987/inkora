@@ -19,6 +19,7 @@ import { CartPage } from './pages/CartPage';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { OrderTrackingPage } from './pages/OrderTrackingPage';
 import { MyReservationsPage } from './pages/MyReservationsPage';
+import { MyHistoryPage } from './pages/MyHistoryPage';
 //import { ComponentsTestPage } from './pages/ComponentsTestPage';
 import { SnackbarProvider } from './Components/SnackbarProvider';
 import { NotificationsProvider } from './hooks/useNotifications';
@@ -31,6 +32,7 @@ import { StoresManagementPage } from './pages/StoresManagementPage';
 import { AdminsManagementPage } from './pages/AdminsManagementPage';
 import { RootAdminCreationPage } from './pages/RootAdminCreationPage';
 import { NewsPage } from './pages/NewsPage';
+import { ProfilePage } from './pages/ProfilePage';
 
 type AppRole = 'visitor' | 'client' | 'admin' | 'root';
 
@@ -239,10 +241,26 @@ function AppContent() {
             }
           />
           <Route
+            path="/my-history"
+            element={
+              <AccessGuard allowedRoles={['client']}>
+                <MyHistoryPage />
+              </AccessGuard>
+            }
+          />
+          <Route
             path="/news"
             element={
               <AccessGuard allowedRoles={['client']}>
                 <NewsPage />
+              </AccessGuard>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <AccessGuard allowedRoles={['client']}>
+                <ProfilePage />
               </AccessGuard>
             }
           />

@@ -69,3 +69,27 @@ export async function deleteStore(storeId: string) {
     throw error;
   }
 }
+
+export type AvailableStore = {
+  storeId: number;
+  name: string;
+  address: string;
+  city: string;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  capacity?: number | null;
+  status?: 'active' | 'inactive';
+  availableQuantity: number;
+};
+
+export async function getAvailableStores(bookId: number): Promise<AvailableStore[]> {
+  try {
+    const response = await apiClient.get<AvailableStore[]>('/stores/available', {
+      params: { bookId },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching available stores:', error);
+    throw error;
+  }
+}

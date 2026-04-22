@@ -321,6 +321,10 @@ describe('Catalog (e2e)', () => {
         throw new UnauthorizedException('Token inválido o ausente');
       });
 
+    rolesGuardSpy = jest
+      .spyOn(RolesGuard.prototype, 'canActivate')
+      .mockImplementation(() => true);
+
     prismaMock = {
       book: {
         findMany: jest.fn(({ where, skip = 0, take = 10, orderBy }) => {

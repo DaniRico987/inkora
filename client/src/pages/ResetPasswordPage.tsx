@@ -6,6 +6,8 @@ import { AuthHomeButton } from "../Components/AuthHomeButton";
 import { useTheme } from "../theme/useTheme";
 import { resetPassword } from "../api/auth";
 
+const passwordPolicy = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/;
+
 type Strength = "débil" | "media" | "fuerte";
 
 function getPasswordStrength(password: string): Strength {
@@ -47,6 +49,10 @@ export function ResetPasswordPage() {
       setErrorMessage("La contraseña debe tener al menos 8 caracteres.");
       return;
     }
+    if (!passwordPolicy.test(password)) {
+      setErrorMessage("La contraseña debe incluir mayúsculas, minúsculas y números.");
+      return;
+    }
     if (password !== confirmPassword) {
       setErrorMessage("Las contraseñas no coinciden.");
       return;
@@ -79,8 +85,8 @@ export function ResetPasswordPage() {
     strength === "fuerte"
       ? "bg-emerald-500"
       : strength === "media"
-      ? "bg-amber-500"
-      : "bg-red-500";
+        ? "bg-amber-500"
+        : "bg-red-500";
 
   return (
     <div className="w-full flex items-center justify-center px-4">
@@ -112,8 +118,8 @@ export function ResetPasswordPage() {
                     strength === "fuerte"
                       ? "100%"
                       : strength === "media"
-                      ? "66%"
-                      : "33%",
+                        ? "66%"
+                        : "33%",
                 }}
               />
             </div>

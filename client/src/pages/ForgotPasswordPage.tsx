@@ -5,6 +5,8 @@ import { AuthHomeButton } from '../Components/AuthHomeButton';
 import { useTheme } from '../theme/useTheme';
 import { forgotPassword } from '../api/auth';
 
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export function ForgotPasswordPage() {
   useTheme();
 
@@ -20,6 +22,10 @@ export function ForgotPasswordPage() {
 
     if (!email.trim()) {
       setErrorMessage('Por favor ingresa un correo electrónico.');
+      return;
+    }
+    if (!emailRegex.test(email.trim())) {
+      setErrorMessage('Ingresa un correo electrónico válido.');
       return;
     }
 
@@ -60,6 +66,7 @@ export function ForgotPasswordPage() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            validationType="email"
           />
 
           {/* Lugar reservado para reCAPTCHA widget / integración */}

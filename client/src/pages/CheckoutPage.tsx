@@ -1,15 +1,17 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { InputText, InputTextarea, InputSelect } from '../Components/Inputs';
 import { Spinner } from '../Components/Spinner';
 import { useSnackbar } from '../Components/SnackbarProvider';
 import { createPurchase } from '../api/purchases';
+import { getAvailableStores, type AvailableStore } from '../api/stores';
 import { useCart } from '../hooks/useCart';
 import type { CartItem } from '../interfaces/CartInterface';
 import type { Purchase } from '../interfaces/PurchaseInterface';
 
 type CheckoutStep = 1 | 2 | 3 | 4;
 type PaymentChoice = 'registered' | 'new';
+type DeliveryChoice = 'homeDelivery' | 'storePickup';
 
 type AddressFormState = {
   fullName: string;
@@ -27,7 +29,122 @@ type PaymentFormState = {
   cvv: string;
 };
 
-type FieldErrors = Partial<Record<keyof AddressFormState | keyof PaymentFormState, string>>;
+type FieldErrors = Partial<Record<keyof AddressFormState | keyof PaymentFormState | 'pickupStoreId', string>>;
+
+type PickupStoreOption = {
+  storeId: number;
+  name: string;
+  address: string;
+  city: string;
+  latitude: number | null;
+  longitude: number | null;
+  capacity?: number | null;
+  status?: 'active' | 'inactive';
+  availableByBook: Record<number, number>;
+  isFullyAvailable: boolean;
+  coveredBooks: number;
+  totalBooks: number;
+  missingBooks: string[];
+  totalAvailableQuantity: number;
+};
+
+function groupCartItemsByBook(items: CartItem[]): Map<number, { title: string; quantity: number }> {
+  const grouped = new Map<number, { title: string; quantity: number }>();
+
+  for (const item of items) {
+    const current = grouped.get(item.bookId);
+    if (current) {
+      current.quantity += item.quantity;
+      continue;
+    }
+
+    grouped.set(item.bookId, { title: item.title, quantity: item.quantity });
+  }
+
+  return grouped;
+}
+
+function buildPickupStoreOptions(
+  requirements: Map<number, { title: string; quantity: number }>,
+  storeResponses: Array<{ bookId: number; stores: AvailableStore[] }>,
+): PickupStoreOption[] {
+  const storeMap = new Map<
+    number,
+    {
+      store: Omit<PickupStoreOption, 'availableByBook' | 'isFullyAvailable' | 'coveredBooks' | 'totalBooks' | 'missingBooks' | 'totalAvailableQuantity'>;
+      availableByBook: Record<number, number>;
+    }
+  >();
+
+  for (const { bookId, stores } of storeResponses) {
+    for (const store of stores) {
+      const current = storeMap.get(store.storeId);
+      if (!current) {
+        storeMap.set(store.storeId, {
+          store: {
+            storeId: store.storeId,
+            name: store.name,
+            address: store.address,
+            city: store.city,
+            latitude: typeof store.latitude === 'number' ? store.latitude : null,
+            longitude: typeof store.longitude === 'number' ? store.longitude : null,
+            capacity: store.capacity ?? null,
+            status: store.status,
+          },
+          availableByBook: {},
+        });
+      }
+
+      const next = storeMap.get(store.storeId)!;
+      next.availableByBook[bookId] = store.availableQuantity;
+    }
+  }
+
+  const result = [...storeMap.values()].map(({ store, availableByBook }) => {
+    const missingBooks: string[] = [];
+    let coveredBooks = 0;
+    let totalAvailableQuantity = 0;
+
+    for (const [bookId, requirement] of requirements.entries()) {
+      const availableQuantity = availableByBook[bookId] ?? 0;
+      totalAvailableQuantity += availableQuantity;
+
+      if (availableQuantity >= requirement.quantity) {
+        coveredBooks += 1;
+        continue;
+      }
+
+      const shortage = requirement.quantity - availableQuantity;
+      missingBooks.push(`${requirement.title} (${shortage} faltante${shortage > 1 ? 's' : ''})`);
+    }
+
+    return {
+      ...store,
+      availableByBook,
+      isFullyAvailable: coveredBooks === requirements.size,
+      coveredBooks,
+      totalBooks: requirements.size,
+      missingBooks,
+      totalAvailableQuantity,
+    } satisfies PickupStoreOption;
+  });
+
+  return result.sort((left, right) => {
+    if (left.isFullyAvailable !== right.isFullyAvailable) {
+      return left.isFullyAvailable ? -1 : 1;
+    }
+
+    if (left.coveredBooks !== right.coveredBooks) {
+      return right.coveredBooks - left.coveredBooks;
+    }
+
+    if (left.totalAvailableQuantity !== right.totalAvailableQuantity) {
+      return right.totalAvailableQuantity - left.totalAvailableQuantity;
+    }
+
+    return left.name.localeCompare(right.name, 'es');
+  });
+}
 
 const initialAddressState: AddressFormState = {
   fullName: '',
@@ -50,17 +167,17 @@ const PAYMENT_METHODS: Array<{
   title: string;
   description: string;
 }> = [
-  {
-    value: 'registered',
-    title: 'Tarjeta registrada',
-    description: 'Usa el medio guardado para confirmar el pedido sin volver a cargar datos.',
-  },
-  {
-    value: 'new',
-    title: 'Nueva tarjeta',
-    description: 'Ingresa los datos de una tarjeta nueva para este checkout.',
-  },
-];
+    {
+      value: 'registered',
+      title: 'Tarjeta registrada',
+      description: 'Usa el medio guardado para confirmar el pedido sin volver a cargar datos.',
+    },
+    {
+      value: 'new',
+      title: 'Nueva tarjeta',
+      description: 'Ingresa los datos de una tarjeta nueva para este checkout.',
+    },
+  ];
 
 const PROVINCES = [
   'Buenos Aires',
@@ -105,7 +222,7 @@ function getStepLabel(step: CheckoutStep): string {
     case 1:
       return 'Resumen';
     case 2:
-      return 'Dirección';
+      return 'Entrega';
     case 3:
       return 'Pago';
     case 4:
@@ -189,6 +306,11 @@ export function CheckoutPage() {
   const { cart, loading: cartLoading, error: cartError, loadCart } = useCart();
   const [currentStep, setCurrentStep] = useState<CheckoutStep>(1);
   const [addressForm, setAddressForm] = useState<AddressFormState>(initialAddressState);
+  const [deliveryMode, setDeliveryMode] = useState<DeliveryChoice>('homeDelivery');
+  const [pickupStoreId, setPickupStoreId] = useState<number | null>(null);
+  const [pickupStores, setPickupStores] = useState<PickupStoreOption[]>([]);
+  const [pickupStoresLoading, setPickupStoresLoading] = useState(false);
+  const [pickupStoresError, setPickupStoresError] = useState<string | null>(null);
   const [paymentChoice, setPaymentChoice] = useState<PaymentChoice>('registered');
   const [paymentForm, setPaymentForm] = useState<PaymentFormState>(initialPaymentState);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -202,6 +324,70 @@ export function CheckoutPage() {
   const hasItems = cartItems.length > 0;
   const shippingAddress = useMemo(() => composeShippingAddress(addressForm), [addressForm]);
   const paymentMethodLabel = paymentChoice === 'registered' ? 'Tarjeta registrada' : 'Nueva tarjeta';
+  const requiredByBook = useMemo(() => groupCartItemsByBook(cartItems), [cartItems]);
+  const selectedPickupStore = useMemo(
+    () => pickupStores.find((store) => store.storeId === pickupStoreId) ?? null,
+    [pickupStores, pickupStoreId],
+  );
+  const fullyAvailablePickupStores = useMemo(
+    () => pickupStores.filter((store) => store.isFullyAvailable),
+    [pickupStores],
+  );
+
+  useEffect(() => {
+    if (deliveryMode !== 'storePickup' || requiredByBook.size === 0) {
+      setPickupStores([]);
+      setPickupStoresError(null);
+      setPickupStoresLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadPickupStores = async () => {
+      setPickupStoresLoading(true);
+      setPickupStoresError(null);
+
+      try {
+        const responses = await Promise.all(
+          [...requiredByBook.keys()].map(async (bookId) => ({
+            bookId,
+            stores: await getAvailableStores(bookId),
+          })),
+        );
+
+        if (cancelled) return;
+
+        const options = buildPickupStoreOptions(requiredByBook, responses);
+        setPickupStores(options);
+
+        setPickupStoreId((current) => {
+          if (current && options.some((store) => store.storeId === current && store.isFullyAvailable)) {
+            return current;
+          }
+
+          return options.find((store) => store.isFullyAvailable)?.storeId ?? null;
+        });
+      } catch (error) {
+        if (!cancelled) {
+          const message = error instanceof Error ? error.message : 'No se pudieron cargar las tiendas disponibles';
+          setPickupStoresError(message);
+          setPickupStores([]);
+          setPickupStoreId(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setPickupStoresLoading(false);
+        }
+      }
+    };
+
+    void loadPickupStores();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [deliveryMode, requiredByBook]);
 
   const paymentSummary = useMemo(() => {
     if (paymentChoice === 'registered') {
@@ -213,6 +399,18 @@ export function CheckoutPage() {
       ? `Tarjeta terminada en ${cardNumber.slice(-4)}`
       : 'Nueva tarjeta cargada manualmente.';
   }, [paymentChoice, paymentForm.cardNumber]);
+
+  const deliverySummary = useMemo(() => {
+    if (deliveryMode === 'homeDelivery') {
+      return shippingAddress || 'Aún no completada';
+    }
+
+    if (selectedPickupStore) {
+      return `${selectedPickupStore.name} · ${selectedPickupStore.address} · ${selectedPickupStore.city}`;
+    }
+
+    return 'Selecciona una tienda disponible';
+  }, [deliveryMode, selectedPickupStore, shippingAddress]);
 
   const updateAddressField = (field: keyof AddressFormState, value: string) => {
     setAddressForm((prev) => ({ ...prev, [field]: value }));
@@ -267,6 +465,19 @@ export function CheckoutPage() {
     return Object.keys(nextErrors).length === 0;
   };
 
+  const validatePickupStep = (): boolean => {
+    const nextErrors: FieldErrors = {};
+
+    if (!pickupStoreId) {
+      nextErrors.pickupStoreId = 'Selecciona una tienda con stock suficiente para continuar';
+    } else if (!selectedPickupStore?.isFullyAvailable) {
+      nextErrors.pickupStoreId = 'La tienda seleccionada no cubre todo el carrito';
+    }
+
+    setFieldErrors((prev) => ({ ...prev, ...nextErrors }));
+    return Object.keys(nextErrors).length === 0;
+  };
+
   const validatePaymentStep = (): boolean => {
     const nextErrors: FieldErrors = {};
 
@@ -298,8 +509,13 @@ export function CheckoutPage() {
   };
 
   const goToPaymentStep = () => {
-    if (!validateAddressStep()) {
-      snackbar.error('Corrige la dirección de envío para continuar');
+    if (deliveryMode === 'homeDelivery') {
+      if (!validateAddressStep()) {
+        snackbar.error('Corrige la dirección de envío para continuar');
+        return;
+      }
+    } else if (!validatePickupStep()) {
+      snackbar.error('Selecciona una tienda con stock suficiente para continuar');
       return;
     }
 
@@ -329,8 +545,28 @@ export function CheckoutPage() {
     }
   };
 
+  const handleDeliveryModeChange = (mode: DeliveryChoice) => {
+    setDeliveryMode(mode);
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      delete next.pickupStoreId;
+      delete next.fullName;
+      delete next.street;
+      delete next.city;
+      delete next.province;
+      delete next.postalCode;
+      return next;
+    });
+
+    if (mode === 'homeDelivery') {
+      setPickupStoreId(null);
+    }
+  };
+
   const submitPurchase = async () => {
-    if (!validateAddressStep() || !validatePaymentStep()) {
+    const deliveryValid = deliveryMode === 'homeDelivery' ? validateAddressStep() : validatePickupStep();
+
+    if (!deliveryValid || !validatePaymentStep()) {
       snackbar.error('Revisa los campos antes de confirmar la compra');
       return;
     }
@@ -338,8 +574,9 @@ export function CheckoutPage() {
     setIsSubmitting(true);
     try {
       const createdPurchase = await createPurchase({
-        deliveryMode: 'homeDelivery',
-        shippingAddress,
+        deliveryMode,
+        pickupStoreId: deliveryMode === 'storePickup' ? pickupStoreId ?? undefined : undefined,
+        shippingAddress: deliveryMode === 'homeDelivery' ? shippingAddress : undefined,
         paymentMethod: paymentMethodLabel,
       });
 
@@ -436,7 +673,7 @@ export function CheckoutPage() {
                   Finaliza tu compra sin perder el contexto.
                 </h1>
                 <p className="max-w-2xl text-sm leading-6 text-text-muted sm:text-base">
-                  Revisa tu carrito, completa la dirección, elige cómo pagar y confirma la compra.
+                  Revisa tu carrito, elige envío a domicilio o recogida en tienda, completa los datos y confirma la compra.
                 </p>
               </div>
 
@@ -517,7 +754,7 @@ export function CheckoutPage() {
                     onClick={goToAddressStep}
                     className="inline-flex items-center justify-center rounded-full bg-babyblue-600 px-5 py-3 font-semibold text-white transition hover:bg-babyblue-700"
                   >
-                    Continuar a dirección
+                    Continuar a entrega
                   </button>
                 </div>
               </section>
@@ -526,90 +763,239 @@ export function CheckoutPage() {
             {currentStep === 2 && (
               <section className="rounded-4xl border border-border bg-bg-secondary p-6 shadow-sm sm:p-8">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Paso 2</p>
-                <h2 className="mt-2 text-2xl font-bold text-text">Dirección de envío</h2>
+                <h2 className="mt-2 text-2xl font-bold text-text">Entrega</h2>
                 <p className="mt-2 text-sm leading-6 text-text-muted">
-                  Completa la dirección para calcular el envío y confirmar la compra.
+                  Elige envío a domicilio o recogida en tienda antes de pasar al pago.
                 </p>
 
-                <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                  <div className="sm:col-span-2">
-                    <InputText
-                      label="Nombre y apellido del destinatario"
-                      value={addressForm.fullName}
-                      onChange={(event) => updateAddressField('fullName', event.target.value)}
-                      autoComplete="name"
-                      maxLength={80}
-                      required
-                    />
-                    {fieldErrors.fullName && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.fullName}</p>}
-                  </div>
+                <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                  {([
+                    {
+                      value: 'homeDelivery',
+                      title: 'Envío a domicilio',
+                      description: 'Recibe el pedido en la dirección que cargues en el checkout.',
+                    },
+                    {
+                      value: 'storePickup',
+                      title: 'Recoger en tienda',
+                      description: 'Retira tu compra en una sucursal con stock disponible.',
+                    },
+                  ] as const).map((option) => {
+                    const isActive = deliveryMode === option.value;
 
-                  <div className="sm:col-span-2">
-                    <InputText
-                      label="Calle y altura"
-                      value={addressForm.street}
-                      onChange={(event) => updateAddressField('street', event.target.value)}
-                      autoComplete="street-address"
-                      maxLength={120}
-                      required
-                    />
-                    {fieldErrors.street && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.street}</p>}
-                  </div>
-
-                  <div>
-                    <InputText
-                      label="Ciudad"
-                      value={addressForm.city}
-                      onChange={(event) => updateAddressField('city', event.target.value)}
-                      autoComplete="address-level2"
-                      maxLength={60}
-                      required
-                    />
-                    {fieldErrors.city && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.city}</p>}
-                  </div>
-
-                  <div>
-                    <InputSelect
-                      label="Provincia"
-                      value={addressForm.province}
-                      onChange={(event) => updateAddressField('province', event.target.value)}
-                      options={['', ...PROVINCES].map((province) => ({
-                        label: province || 'Seleccionar provincia',
-                        value: province,
-                      }))}
-                      required
-                    />
-                    {fieldErrors.province && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.province}</p>}
-                  </div>
-
-                  <div>
-                    <InputText
-                      label="Código postal"
-                      value={addressForm.postalCode}
-                      onChange={(event) => updateAddressField('postalCode', event.target.value)}
-                      autoComplete="postal-code"
-                      maxLength={5}
-                      inputMode="numeric"
-                      required
-                    />
-                    {fieldErrors.postalCode && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.postalCode}</p>}
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <InputTextarea
-                      label="Indicaciones opcionales"
-                      value={addressForm.notes}
-                      onChange={(event) => updateAddressField('notes', event.target.value)}
-                      maxLength={255}
-                      placeholder="Portería, piso, horario de entrega..."
-                    />
-                  </div>
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => handleDeliveryModeChange(option.value)}
+                        className={[
+                          'rounded-3xl border p-4 text-left transition',
+                          isActive
+                            ? 'border-babyblue-400 bg-babyblue-50/80 shadow-sm'
+                            : 'border-border bg-bg hover:border-babyblue-300',
+                        ].join(' ')}
+                      >
+                        <div className="flex items-start gap-4">
+                          <span
+                            className={[
+                              'mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2',
+                              isActive ? 'border-babyblue-600 bg-babyblue-600' : 'border-border bg-bg',
+                            ].join(' ')}
+                            aria-hidden="true"
+                          >
+                            {isActive && <span className="h-2.5 w-2.5 rounded-full bg-white" />}
+                          </span>
+                          <div>
+                            <p className="text-base font-bold text-text">{option.title}</p>
+                            <p className="mt-1 text-sm leading-6 text-text-muted">{option.description}</p>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
 
-                <div className="mt-4 rounded-2xl border border-border bg-bg p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Vista previa</p>
-                  <p className="mt-2 text-sm leading-6 text-text">{shippingAddress || 'Completa los campos para ver la dirección formateada.'}</p>
-                </div>
+                {deliveryMode === 'homeDelivery' ? (
+                  <>
+                    <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                      <div className="sm:col-span-2">
+                        <InputText
+                          label="Nombre y apellido del destinatario"
+                          value={addressForm.fullName}
+                          onChange={(event) => updateAddressField('fullName', event.target.value)}
+                          autoComplete="name"
+                          maxLength={80}
+                          required
+                        />
+                        {fieldErrors.fullName && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.fullName}</p>}
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <InputText
+                          label="Calle y altura"
+                          value={addressForm.street}
+                          onChange={(event) => updateAddressField('street', event.target.value)}
+                          autoComplete="street-address"
+                          maxLength={120}
+                          required
+                        />
+                        {fieldErrors.street && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.street}</p>}
+                      </div>
+
+                      <div>
+                        <InputText
+                          label="Ciudad"
+                          value={addressForm.city}
+                          onChange={(event) => updateAddressField('city', event.target.value)}
+                          autoComplete="address-level2"
+                          maxLength={60}
+                          required
+                        />
+                        {fieldErrors.city && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.city}</p>}
+                      </div>
+
+                      <div>
+                        <InputSelect
+                          label="Provincia"
+                          value={addressForm.province}
+                          onChange={(event) => updateAddressField('province', event.target.value)}
+                          options={['', ...PROVINCES].map((province) => ({
+                            label: province || 'Seleccionar provincia',
+                            value: province,
+                          }))}
+                          required
+                        />
+                        {fieldErrors.province && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.province}</p>}
+                      </div>
+
+                      <div>
+                        <InputText
+                          label="Código postal"
+                          value={addressForm.postalCode}
+                          onChange={(event) => updateAddressField('postalCode', event.target.value)}
+                          autoComplete="postal-code"
+                          maxLength={5}
+                          inputMode="numeric"
+                          required
+                        />
+                        {fieldErrors.postalCode && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.postalCode}</p>}
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <InputTextarea
+                          label="Indicaciones opcionales"
+                          value={addressForm.notes}
+                          onChange={(event) => updateAddressField('notes', event.target.value)}
+                          maxLength={255}
+                          placeholder="Portería, piso, horario de entrega..."
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-4 rounded-2xl border border-border bg-bg p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Vista previa</p>
+                      <p className="mt-2 text-sm leading-6 text-text">{shippingAddress || 'Completa los campos para ver la dirección formateada.'}</p>
+                    </div>
+                  </>
+                ) : (
+                  <div className="mt-6 space-y-4">
+                    <div className="rounded-3xl border border-babyblue-200 bg-babyblue-50/70 p-4 text-sm text-babyblue-900">
+                      <p className="font-semibold">Selecciona una tienda con stock suficiente</p>
+                      <p className="mt-1 leading-6">
+                        Solo podrás confirmar la compra en una sucursal que cubra todo el carrito. Si no hay una opción válida,
+                        te sugerimos cambiar a envío a domicilio.
+                      </p>
+                    </div>
+
+                    {pickupStoresLoading ? (
+                      <div className="rounded-3xl border border-border bg-bg p-6">
+                        <Spinner size="md" tone="calm" label="Buscando tiendas disponibles..." fullScreen={false} />
+                      </div>
+                    ) : pickupStoresError ? (
+                      <div className="rounded-3xl border border-danger-200 bg-danger-50 p-4 text-sm text-danger-800">
+                        {pickupStoresError}
+                      </div>
+                    ) : pickupStores.length === 0 ? (
+                      <div className="rounded-3xl border border-border bg-bg p-5 text-sm text-text-muted">
+                        No encontramos tiendas con stock para recoger este carrito. Puedes continuar con envío a domicilio.
+                      </div>
+                    ) : (
+                      <>
+                        {pickupStores.some((store) => !store.isFullyAvailable) && (
+                          <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                            Algunas tiendas tienen stock parcial. Las marcadas en rojo no cubren todo el carrito y no se pueden seleccionar.
+                          </div>
+                        )}
+
+                        <div className="grid gap-3 lg:grid-cols-2">
+                          {pickupStores.map((store) => {
+                            const isSelected = selectedPickupStore?.storeId === store.storeId;
+                            const isSelectable = store.isFullyAvailable;
+
+                            return (
+                              <button
+                                key={store.storeId}
+                                type="button"
+                                onClick={() => {
+                                  if (isSelectable) {
+                                    setPickupStoreId(store.storeId);
+                                  }
+                                }}
+                                className={[
+                                  'rounded-3xl border p-4 text-left transition',
+                                  isSelectable
+                                    ? isSelected
+                                      ? 'border-emerald-400 bg-emerald-50/70 shadow-sm'
+                                      : 'border-border bg-bg hover:border-babyblue-300'
+                                    : 'border-red-300 bg-red-50/70 opacity-90',
+                                ].join(' ')}
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div>
+                                    <p className="text-base font-bold text-text">{store.name}</p>
+                                    <p className="mt-1 text-sm text-text-muted">{store.address}</p>
+                                    <p className="text-sm text-text-muted">{store.city}</p>
+                                  </div>
+                                  <span
+                                    className={[
+                                      'rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]',
+                                      isSelectable ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700',
+                                    ].join(' ')}
+                                  >
+                                    {isSelectable ? 'Disponible' : 'Sin stock suficiente'}
+                                  </span>
+                                </div>
+
+                                <div className="mt-4 flex flex-wrap gap-2 text-xs">
+                                  <span className="rounded-full bg-bg px-3 py-1 text-text-muted">
+                                    {store.coveredBooks}/{store.totalBooks} libros cubiertos
+                                  </span>
+                                  <span className="rounded-full bg-bg px-3 py-1 text-text-muted">
+                                    {store.totalAvailableQuantity} unidades disponibles
+                                  </span>
+                                </div>
+
+                                {!isSelectable && store.missingBooks.length > 0 && (
+                                  <div className="mt-4 rounded-2xl border border-red-200 bg-white/80 p-3 text-sm text-red-700">
+                                    Falta stock para: {store.missingBooks.join(', ')}
+                                  </div>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {!fullyAvailablePickupStores.length && (
+                          <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                            No hay ninguna tienda que cubra todo el carrito. Te sugerimos cambiar a envío a domicilio para continuar.
+                          </div>
+                        )}
+
+                        {fieldErrors.pickupStoreId && <p className="text-sm text-red-600">{fieldErrors.pickupStoreId}</p>}
+                      </>
+                    )}
+                  </div>
+                )}
 
                 <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                   <button
@@ -785,9 +1171,7 @@ export function CheckoutPage() {
                   <p className="mt-2 text-sm leading-6 text-emerald-800">
                     {paymentMethodLabel} · {paymentSummary}
                   </p>
-                  <p className="mt-2 text-sm leading-6 text-emerald-800">
-                    {purchase.shippingAddress || shippingAddress}
-                  </p>
+                  <p className="mt-2 text-sm leading-6 text-emerald-800">{purchase.shippingAddress || deliverySummary}</p>
                 </div>
 
                 <div className="mt-6 flex flex-col gap-3 sm:flex-row">
@@ -813,8 +1197,12 @@ export function CheckoutPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Vista previa</p>
               <div className="mt-4 space-y-4">
                 <div className="rounded-3xl border border-border bg-bg p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Dirección</p>
-                  <p className="mt-2 text-sm leading-6 text-text">{shippingAddress || 'Aún no completada'}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">
+                    {deliveryMode === 'homeDelivery' ? 'Dirección' : 'Tienda seleccionada'}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-text">
+                    {deliveryMode === 'homeDelivery' ? shippingAddress || 'Aún no completada' : deliverySummary}
+                  </p>
                 </div>
                 <div className="rounded-3xl border border-border bg-bg p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Pago</p>

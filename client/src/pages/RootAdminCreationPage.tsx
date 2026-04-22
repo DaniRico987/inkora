@@ -119,6 +119,7 @@ export function RootAdminCreationPage() {
         {/* Form Card */}
         <div className="rounded-2xl border border-border bg-bg-secondary p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Row 1: Nombre y Email */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label
@@ -134,11 +135,10 @@ export function RootAdminCreationPage() {
                   value={formData.firstName}
                   onChange={handleInputChange}
                   placeholder="Ej: Ana"
-                  className={`w-full px-4 py-3 rounded-lg border ${
-                    formErrors.firstName
-                      ? 'border-red-500 bg-red-50 focus:bg-red-50'
-                      : 'border-border bg-bg focus:bg-bg-secondary'
-                  } text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all`}
+                  className={`w-full px-4 py-3 rounded-lg border ${formErrors.firstName
+                    ? 'border-red-500 bg-red-50 focus:bg-red-50'
+                    : 'border-border bg-bg focus:bg-bg-secondary'
+                    } text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all`}
                   disabled={isLoading}
                 />
                 {formErrors.firstName && (
@@ -162,11 +162,10 @@ export function RootAdminCreationPage() {
                   value={formData.email}
                   onChange={handleInputChange}
                   placeholder="admin@inkora.com"
-                  className={`w-full px-4 py-3 rounded-lg border ${
-                    formErrors.email
+                  className={`w-full px-4 py-3 rounded-lg border ${formErrors.email
                       ? 'border-red-500 bg-red-50 focus:bg-red-50'
                       : 'border-border bg-bg focus:bg-bg-secondary'
-                  } text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all`}
+                    } text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all`}
                   disabled={isLoading}
                 />
                 {formErrors.email && (
