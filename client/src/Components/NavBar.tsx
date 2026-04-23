@@ -21,6 +21,7 @@ function getNavItems(variant: NavBarVariant): NavBarItem[] {
         return [
             { label: 'Inicio', to: '/catalog' },
             { label: 'Catalogo', to: '/catalog' },
+            { label: 'Tiendas', to: '/stores' },
         ];
     }
 
@@ -33,7 +34,7 @@ function getNavItems(variant: NavBarVariant): NavBarItem[] {
                   { label: 'Mi historial', to: '/my-history' },
                   { label: 'Mi perfil', to: '/profile' },
                   { label: 'Novedades', to: '/news' },
-                  { label: 'Tiendas', to: '/catalog' },
+                  { label: 'Tiendas', to: '/stores' },
               ]
             : []),
     ];
