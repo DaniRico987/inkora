@@ -23,7 +23,11 @@ import { MyHistoryPage } from './pages/MyHistoryPage';
 //import { ComponentsTestPage } from './pages/ComponentsTestPage';
 import { SnackbarProvider } from './Components/SnackbarProvider';
 import { NotificationsProvider } from './hooks/useNotifications';
-import { getAccessToken, getIsTemporaryPasswordFromToken, getRoleFromToken } from './auth/session';
+import {
+  getAccessToken,
+  getIsTemporaryPasswordFromToken,
+  getRoleFromToken,
+} from './auth/session';
 import { ClientHomePage } from './pages/ClientHomePage';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { AdminChangePasswordPage } from './pages/AdminChangePasswordPage.tsx';
@@ -166,14 +170,16 @@ function AppContent() {
       <header
         className={`relative pointer-events-none w-full ${shouldHideNavBar && location.pathname.startsWith('/admin') ? 'hidden' : ''}`}
       >
-        <div className={`mx-auto w-full px-4 ${hasTopNav ? 'max-w-7xl pt-1 pb-2' : 'pt-4 pb-2'}`}>
+        <div
+          className={`mx-auto w-full px-4 ${hasTopNav ? 'max-w-7xl pt-1 pb-2' : 'pt-4 pb-2'}`}
+        >
           <div className="pointer-events-auto flex w-full justify-end">
             <Toggle />
           </div>
         </div>
       </header>
       <main
-        className={`flex-1 ${location.pathname.startsWith('/admin') || location.pathname === '/checkout' ? '' : 'flex items-center justify-center'}`}
+        className={`flex-1 ${location.pathname.startsWith('/admin') || location.pathname === '/checkout' || location.pathname === '/' ? '' : 'flex items-center justify-center'}`}
       >
         <Routes>
           {/* Login */}
@@ -265,8 +271,18 @@ function AppContent() {
           />
 
           {/* Admin */}
-          <Route path="/admin" element={<AdminRouteGuard><AdminDashboard /></AdminRouteGuard>} />
-          <Route path="/admin/change-password" element={<AdminChangePasswordRoute />} />
+          <Route
+            path="/admin"
+            element={
+              <AdminRouteGuard>
+                <AdminDashboard />
+              </AdminRouteGuard>
+            }
+          />
+          <Route
+            path="/admin/change-password"
+            element={<AdminChangePasswordRoute />}
+          />
 
           {/* Root */}
           <Route

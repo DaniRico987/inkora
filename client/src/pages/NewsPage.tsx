@@ -77,7 +77,7 @@ export function NewsPage() {
                 }`}
               >
                 <div className="flex items-start space-x-4">
-                  <div className="flex-shrink-0">
+                  <div className="shrink-0">
                     {notification.book?.coverUrl ? (
                       <img
                         src={notification.book.coverUrl}

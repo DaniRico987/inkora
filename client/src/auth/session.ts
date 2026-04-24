@@ -1,6 +1,7 @@
 export type UserRole = 'client' | 'admin' | 'root';
 
 const TOKEN_KEY = 'inkora_access_token';
+const TOKEN_CHANGED_EVENT = 'inkora:access-token-changed';
 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
   const parts = token.split('.');
@@ -24,6 +25,7 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
 
 export function saveAccessToken(token: string) {
   sessionStorage.setItem(TOKEN_KEY, token);
+  window.dispatchEvent(new Event(TOKEN_CHANGED_EVENT));
 }
 
 export function getAccessToken() {
@@ -32,6 +34,12 @@ export function getAccessToken() {
 
 export function clearAccessToken() {
   sessionStorage.removeItem(TOKEN_KEY);
+  window.dispatchEvent(new Event(TOKEN_CHANGED_EVENT));
+}
+
+export function subscribeToAccessTokenChanges(handler: () => void) {
+  window.addEventListener(TOKEN_CHANGED_EVENT, handler);
+  return () => window.removeEventListener(TOKEN_CHANGED_EVENT, handler);
 }
 
 export function getRoleFromToken(token?: string | null): UserRole | null {
