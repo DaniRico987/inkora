@@ -8,6 +8,7 @@ import {
 } from 'react';
 import { getNotifications, markNotificationAsRead } from '../api/notifications';
 import type { Notification, NotificationResponse } from '../interfaces/notification.interface';
+import { getAccessToken, subscribeToAccessTokenChanges } from '../auth/session';
 
 export interface UseNotificationsState {
   notifications: Notification[];
@@ -30,6 +31,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(() => getAccessToken());
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
@@ -40,10 +42,15 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       const data: NotificationResponse = await getNotifications();
       setNotifications(data.notifications);
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Error al cargar las notificaciones';
-      setError(message);
-      console.error('Error loading notifications:', err);
+      if (getAccessToken()) {
+        const message =
+          err instanceof Error ? err.message : 'Error al cargar las notificaciones';
+        setError(message);
+        console.error('Error loading notifications:', err);
+      } else {
+        setNotifications([]);
+        setError(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -73,8 +80,23 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    loadNotifications();
-  }, [loadNotifications]);
+    const unsubscribe = subscribeToAccessTokenChanges(() => {
+      setAccessToken(getAccessToken());
+    });
+
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    if (!accessToken) {
+      setNotifications([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
+    void loadNotifications();
+  }, [accessToken, loadNotifications]);
 
   return (
     <NotificationsContext.Provider
