@@ -4,6 +4,7 @@ import { Button } from '../Button';
 import { Spinner } from '../Spinner';
 import {
     getClientHistory,
+    type GetClientHistoryOptions,
     type ClientHistoryResponse,
     type HistoryPurchaseStatus,
     type HistoryReservationStatus,
@@ -60,9 +61,10 @@ function getRemainingTimeLabel(expirationDate?: string | null): string | null {
 
 type MyHistoryViewProps = {
     embedded?: boolean;
+    showReservations?: boolean;
 };
 
-export function MyHistoryView({ embedded = false }: MyHistoryViewProps) {
+export function MyHistoryView({ embedded = false, showReservations = true }: MyHistoryViewProps) {
     const [activeTab, setActiveTab] = useState<HistoryTab>('purchases');
     const [history, setHistory] = useState<ClientHistoryResponse>({ purchases: [], reservations: [] });
     const [loading, setLoading] = useState(true);
@@ -72,7 +74,8 @@ export function MyHistoryView({ embedded = false }: MyHistoryViewProps) {
         try {
             setLoading(true);
             setError(null);
-            const result = await getClientHistory();
+            const historyOptions: GetClientHistoryOptions = showReservations ? {} : { type: 'purchases' };
+            const result = await getClientHistory(historyOptions);
             setHistory(result);
         } catch (loadError) {
             const message = loadError instanceof Error ? loadError.message : 'No se pudo cargar tu historial';
@@ -125,7 +128,7 @@ export function MyHistoryView({ embedded = false }: MyHistoryViewProps) {
         );
     }
 
-    const isPurchasesTab = activeTab === 'purchases';
+    const isPurchasesTab = activeTab === 'purchases' || !showReservations;
     const hasEmptyState = isPurchasesTab ? purchaseCards.length === 0 : reservationCards.length === 0;
 
     return (
@@ -133,32 +136,34 @@ export function MyHistoryView({ embedded = false }: MyHistoryViewProps) {
             <div className={embedded ? 'space-y-6' : 'mx-auto max-w-7xl space-y-6'}>
                 <header className="rounded-3xl border border-border bg-bg-secondary p-5 shadow-sm sm:p-6">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Mi historial</p>
-                    <h1 className="mt-2 text-3xl font-bold text-text">Compras y reservas</h1>
+                    <h1 className="mt-2 text-3xl font-bold text-text">{showReservations ? 'Compras y reservas' : 'Compras'}</h1>
                     <p className="mt-2 text-sm leading-6 text-text-muted sm:text-base">
-                        Consulta el estado, fecha, productos y valor de cada transacción.
+                        {showReservations ? 'Consulta el estado, fecha, productos y valor de cada transacción.' : 'Consulta el historial de compras: fecha, productos y valor de cada pedido.'}
                     </p>
                 </header>
 
-                <section className="rounded-3xl border border-border bg-bg-secondary p-4 shadow-sm sm:p-5">
-                    <div className="flex flex-wrap gap-3">
-                        <Button
-                            variant={isPurchasesTab ? 'primary' : 'secondary'}
-                            size="auto"
-                            className="rounded-full px-5 py-2 text-sm"
-                            onClick={() => setActiveTab('purchases')}
-                        >
-                            Compras
-                        </Button>
-                        <Button
-                            variant={!isPurchasesTab ? 'primary' : 'secondary'}
-                            size="auto"
-                            className="rounded-full px-5 py-2 text-sm"
-                            onClick={() => setActiveTab('reservations')}
-                        >
-                            Reservas
-                        </Button>
-                    </div>
-                </section>
+                {showReservations ? (
+                    <section className="rounded-3xl border border-border bg-bg-secondary p-4 shadow-sm sm:p-5">
+                        <div className="flex flex-wrap gap-3">
+                            <Button
+                                variant={isPurchasesTab ? 'primary' : 'secondary'}
+                                size="auto"
+                                className="rounded-full px-5 py-2 text-sm"
+                                onClick={() => setActiveTab('purchases')}
+                            >
+                                Compras
+                            </Button>
+                            <Button
+                                variant={!isPurchasesTab ? 'primary' : 'secondary'}
+                                size="auto"
+                                className="rounded-full px-5 py-2 text-sm"
+                                onClick={() => setActiveTab('reservations')}
+                            >
+                                Reservas
+                            </Button>
+                        </div>
+                    </section>
+                ) : null}
 
                 {hasEmptyState ? (
                     <section className="rounded-3xl border border-border bg-bg-secondary p-6 text-text-muted shadow-sm">

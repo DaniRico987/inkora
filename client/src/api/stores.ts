@@ -61,7 +61,15 @@ export async function createStore(data: CreateStoreRequest) {
     const response = await apiClient.post('/stores', data);
     return response.data;
   } catch (error) {
-    console.error('Error creating store:', error);
+    if (axios.isAxiosError(error) && error.response) {
+      console.error('Error response from server:', {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data,
+      });
+    } else {
+      console.error('Error creating store:', error);
+    }
     throw error;
   }
 }

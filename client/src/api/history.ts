@@ -79,9 +79,24 @@ function asString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback;
 }
 
-export async function getClientHistory(): Promise<ClientHistoryResponse> {
+export type GetClientHistoryOptions = {
+  type?: 'purchases' | 'reservations';
+  status?: string;
+};
+
+export async function getClientHistory(options: GetClientHistoryOptions = {}): Promise<ClientHistoryResponse> {
   try {
-    const response = await apiClient.get<unknown>('/clients/me/history');
+    const params = new URLSearchParams();
+
+    if (options.type) {
+      params.set('type', options.type);
+    }
+
+    if (options.status) {
+      params.set('status', options.status);
+    }
+
+    const response = await apiClient.get<unknown>(`/clients/me/history${params.toString() ? `?${params.toString()}` : ''}`);
     const data = response.data ?? {};
 
     // Server may return either a shaped object { purchases: [...], reservations: [...] }

@@ -36,7 +36,7 @@ const toNullableNumber = (value: unknown): number | null => {
 
 @Injectable()
 export class StoresService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async findAvailableByBook(bookId: number): Promise<StoreAvailabilityDto[]> {
     const inventories = await this.prisma.inventory.findMany({
@@ -196,12 +196,12 @@ export class StoresService {
       .then((store) =>
         store
           ? {
-              storeId: store.storeId,
-              name: store.name,
-              city: store.city,
-              latitude: toNullableNumber(store.latitude),
-              longitude: toNullableNumber(store.longitude),
-            }
+            storeId: store.storeId,
+            name: store.name,
+            city: store.city,
+            latitude: toNullableNumber(store.latitude),
+            longitude: toNullableNumber(store.longitude),
+          }
           : null,
       );
   }

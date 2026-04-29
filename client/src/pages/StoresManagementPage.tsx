@@ -39,7 +39,7 @@ export function StoresManagementPage() {
   const navigate = useNavigate();
   const token = getAccessToken();
   const role = getRoleFromToken(token);
-  
+
   const { success, error } = useSnackbar();
   const [stores, setStores] = useState<Store[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -172,6 +172,8 @@ export function StoresManagementPage() {
 
       data.name = normalizeStoreName(nameValue);
       data.address = normalizeStoreAddress(addressValue);
+
+      console.log('Sending store data:', data);
 
       if (editingStore) {
         await updateStore(editingStore.storeId, data);

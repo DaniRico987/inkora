@@ -536,7 +536,7 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
 
               {activeSection === 'reservations' && <MyReservationsView embedded />}
 
-              {activeSection === 'history' && <MyHistoryView embedded />}
+              {activeSection === 'history' && <MyHistoryView embedded showReservations={false} />}
 
             </div>
           )}

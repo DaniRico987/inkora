@@ -315,7 +315,6 @@ export function CheckoutPage() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [purchase, setPurchase] = useState<Purchase | null>(null);
-
   const cartItems = cart?.items ?? [];
   const subtotal = cart?.subtotal ?? 0;
   const total = cart?.total ?? 0;
@@ -368,6 +367,14 @@ export function CheckoutPage() {
     };
 
     void loadRegisteredCards();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
 
     return () => {
       cancelled = true;
@@ -649,6 +656,12 @@ export function CheckoutPage() {
       setPurchase(createdPurchase);
       setCurrentStep(4);
       await loadCart();
+      // Notificar a otros componentes (ej. ícono del carrito) que recarguen su estado
+      try {
+        window.dispatchEvent(new Event('cart:refresh'));
+      } catch {
+        // noop
+      }
       snackbar.success(`Compra confirmada. Pedido #${createdPurchase.purchaseId}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo confirmar la compra';
@@ -898,7 +911,7 @@ export function CheckoutPage() {
 
                       <div className="sm:col-span-2">
                         <InputText
-                          label="Calle y altura"
+                          label="Dirección de entrega"
                           value={addressForm.street}
                           onChange={(event) => updateAddressField('street', event.target.value)}
                           autoComplete="street-address"
@@ -936,7 +949,6 @@ export function CheckoutPage() {
                           value={addressForm.notes}
                           onChange={(event) => updateAddressField('notes', event.target.value)}
                           maxLength={255}
-                          placeholder="Portería, piso, horario de entrega..."
                         />
                       </div>
                     </div>

@@ -829,6 +829,8 @@ async function seedInventory() {
     },
   });
 
+  await syncStoreSequence();
+
   const seededIsbns = books.map((book) => book.isbn);
   const existingBooks = await prisma.book.findMany({
     where: { isbn: { in: seededIsbns } },
@@ -867,6 +869,16 @@ async function seedInventory() {
   );
 
   console.log(`Inventory seeded successfully for ${existingBooks.length} books in store ${defaultStore.storeId}.`);
+}
+
+async function syncStoreSequence() {
+  await prisma.$executeRawUnsafe(`
+    SELECT setval(
+      pg_get_serial_sequence('store', 'storeId'),
+      COALESCE((SELECT MAX("storeId") FROM "store"), 0),
+      true
+    )
+  `);
 }
 
 function getSeedMode(): 'all' | 'categories' {

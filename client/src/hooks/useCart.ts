@@ -61,6 +61,11 @@ export function useCart(): UseCartReturn {
         setError(null);
         await addToCart(bookId, quantity);
         await loadCart(); // Refrescar carrito completo
+        try {
+          window.dispatchEvent(new Event('cart:refresh'));
+        } catch {
+          // noop
+        }
       } catch (err) {
         const message =
           err instanceof Error ? err.message : 'Error al agregar al carrito';
@@ -84,6 +89,9 @@ export function useCart(): UseCartReturn {
         setError(null);
         await updateCartItem(cartItemId, quantity);
         await loadCart(); // Refrescar carrito completo
+        try {
+          window.dispatchEvent(new Event('cart:refresh'));
+        } catch { }
       } catch (err) {
         const message =
           err instanceof Error
@@ -119,6 +127,9 @@ export function useCart(): UseCartReturn {
             itemCount: updatedItems.length,
           };
         });
+        try {
+          window.dispatchEvent(new Event('cart:refresh'));
+        } catch { }
       } catch (err) {
         const message =
           err instanceof Error ? err.message : 'Error al eliminar item';
@@ -144,6 +155,9 @@ export function useCart(): UseCartReturn {
           total: 0,
           itemCount: 0,
         });
+        try {
+          window.dispatchEvent(new Event('cart:refresh'));
+        } catch { }
       }
     } catch (err) {
       const message =
@@ -162,7 +176,18 @@ export function useCart(): UseCartReturn {
   // ======================== INITIAL LOAD ========================
 
   useEffect(() => {
+    // Carga inicial del carrito y escucha eventos globales para recargarlo
     loadCart();
+
+    const handleRefresh = () => {
+      void loadCart();
+    };
+
+    window.addEventListener('cart:refresh', handleRefresh);
+
+    return () => {
+      window.removeEventListener('cart:refresh', handleRefresh);
+    };
   }, [loadCart]);
 
   return {
