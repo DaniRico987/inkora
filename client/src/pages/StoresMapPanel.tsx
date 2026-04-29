@@ -1,113 +1,74 @@
-import { useCallback, useEffect, useMemo, useRef, type CSSProperties } from 'react';
-import { GoogleMap, InfoWindow, Marker, useJsApiLoader } from '@react-google-maps/api';
-import type { PublicStore } from '../api/stores';
-
-const mapContainerStyle: CSSProperties = {
-  width: '100%',
-  height: '100%',
-  minHeight: '420px',
-  borderRadius: '0.75rem',
-};
+import { useEffect, useMemo, useRef } from 'react';
+import L from 'leaflet';
+import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import type { StoreLocation } from '../types/store';
 
 type StoresMapPanelProps = {
-  stores: PublicStore[];
+  stores: StoreLocation[];
   selectedStoreId: number | null;
   onSelectStore: (storeId: number | null) => void;
 };
 
-const defaultPereira = { lat: 4.8133, lng: -75.6961 };
+const defaultPereira: [number, number] = [4.8133, -75.6961];
+
+const storeIcon = new L.Icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
+
+function MapViewportController({
+  stores,
+  selectedStoreId,
+}: {
+  stores: StoreLocation[];
+  selectedStoreId: number | null;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (stores.length >= 2) {
+      const bounds = L.latLngBounds(stores.map((store) => store.position));
+      map.fitBounds(bounds, { padding: [56, 56] });
+      return;
+    }
+
+    if (stores.length === 1) {
+      map.setView(stores[0].position, 15);
+    }
+  }, [map, stores]);
+
+  useEffect(() => {
+    if (selectedStoreId == null) {
+      return;
+    }
+    const selected = stores.find((store) => store.id === selectedStoreId);
+    if (!selected) {
+      return;
+    }
+    map.setView(selected.position, 15, { animate: true });
+  }, [map, selectedStoreId, stores]);
+
+  return null;
+}
 
 function StoresMapPanel({ stores, selectedStoreId, onSelectStore }: StoresMapPanelProps) {
-  const mapRef = useRef<google.maps.Map | null>(null);
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
-
-  const { isLoaded, loadError } = useJsApiLoader({
-    id: 'inkora-google-maps',
-    googleMapsApiKey: apiKey ?? '',
-  });
-
-  const validStores = useMemo(
-    () =>
-      stores.filter(
-        (s) =>
-          s.latitude != null &&
-          s.longitude != null &&
-          Number.isFinite(Number(s.latitude)) &&
-          Number.isFinite(Number(s.longitude)),
-      ),
-    [stores],
-  );
+  const mapRef = useRef<L.Map | null>(null);
+  const validStores = useMemo(() => stores, [stores]);
 
   const center = useMemo(() => {
     if (validStores.length === 0) {
       return defaultPereira;
     }
-    const lat =
-      validStores.reduce((acc, s) => acc + Number(s.latitude), 0) / validStores.length;
-    const lng =
-      validStores.reduce((acc, s) => acc + Number(s.longitude), 0) / validStores.length;
-    return { lat, lng };
+    const lat = validStores.reduce((acc, s) => acc + s.position[0], 0) / validStores.length;
+    const lng = validStores.reduce((acc, s) => acc + s.position[1], 0) / validStores.length;
+    return [lat, lng] as [number, number];
   }, [validStores]);
-
-  const onMapLoad = useCallback(
-    (map: google.maps.Map) => {
-      mapRef.current = map;
-      if (validStores.length >= 2) {
-        const bounds = new google.maps.LatLngBounds();
-        validStores.forEach((s) => {
-          bounds.extend({
-            lat: Number(s.latitude),
-            lng: Number(s.longitude),
-          });
-        });
-        map.fitBounds(bounds, 56);
-      } else if (validStores.length === 1) {
-        const s = validStores[0];
-        map.panTo({ lat: Number(s.latitude), lng: Number(s.longitude) });
-        map.setZoom(15);
-      }
-    },
-    [validStores],
-  );
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || selectedStoreId == null) {
-      return;
-    }
-    const s = validStores.find((x) => x.storeId === selectedStoreId);
-    if (!s) {
-      return;
-    }
-    map.panTo({ lat: Number(s.latitude), lng: Number(s.longitude) });
-    map.setZoom(15);
-  }, [selectedStoreId, validStores]);
-
-  if (!apiKey) {
-    return (
-      <div className="flex min-h-[420px] items-center justify-center rounded-xl border border-white/20 bg-white/5 px-4 text-center text-sm text-babyblue-50/90">
-        Falta la variable de entorno VITE_GOOGLE_MAPS_API_KEY. Creá client/.env.local con tu clave
-        de Google Maps (Maps JavaScript API).
-      </div>
-    );
-  }
-
-  if (loadError) {
-    return (
-      <div className="flex min-h-[420px] items-center justify-center rounded-xl border border-red-400/40 bg-red-950/20 px-4 text-center text-sm text-red-200">
-        No se pudo cargar Google Maps. Revisá la clave y la facturación del proyecto en Google
-        Cloud.
-      </div>
-    );
-  }
-
-  if (!isLoaded) {
-    return (
-      <div className="flex min-h-[420px] items-center justify-center rounded-xl border border-white/15 bg-white/5 text-babyblue-50/80">
-        Cargando mapa…
-      </div>
-    );
-  }
 
   if (validStores.length === 0) {
     return (
@@ -118,38 +79,29 @@ function StoresMapPanel({ stores, selectedStoreId, onSelectStore }: StoresMapPan
   }
 
   return (
-    <GoogleMap
-      mapContainerStyle={mapContainerStyle}
+    <MapContainer
       center={center}
       zoom={12}
-      onLoad={onMapLoad}
-      options={{
-        streetViewControl: false,
-        mapTypeControl: false,
-        fullscreenControl: true,
-      }}
+      style={{ width: '100%', height: '100%', minHeight: '420px', borderRadius: '0.75rem' }}
+      ref={mapRef}
     >
+      <TileLayer
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution="&copy; OpenStreetMap contributors"
+      />
+      <MapViewportController stores={validStores} selectedStoreId={selectedStoreId} />
       {validStores.map((store) => (
-        <Marker
-          key={store.storeId}
-          position={{
-            lat: Number(store.latitude),
-            lng: Number(store.longitude),
-          }}
-          onClick={() => onSelectStore(store.storeId)}
-        >
-          {selectedStoreId === store.storeId && (
-            <InfoWindow onCloseClick={() => onSelectStore(null)}>
-              <div className="max-w-[220px] px-1 py-0.5 text-gray-900">
-                <p className="font-semibold leading-tight">{store.name}</p>
-                <p className="mt-1 text-xs leading-snug text-gray-700">{store.address}</p>
-                <p className="mt-0.5 text-xs text-gray-600">{store.city}</p>
-              </div>
-            </InfoWindow>
-          )}
+        <Marker key={store.id} position={store.position} icon={storeIcon} eventHandlers={{ click: () => onSelectStore(store.id) }}>
+          <Popup>
+            <div className="max-w-[220px] px-1 py-0.5 text-gray-900">
+              <p className="font-semibold leading-tight">{store.name}</p>
+              <p className="mt-1 text-xs leading-snug text-gray-700">{store.description}</p>
+              <p className="mt-1 text-xs text-gray-600">Estado: {store.status}</p>
+            </div>
+          </Popup>
         </Marker>
       ))}
-    </GoogleMap>
+    </MapContainer>
   );
 }
 

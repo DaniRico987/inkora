@@ -1,14 +1,12 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { getPublicStores, type PublicStore } from '../api/stores';
+import { getPublicStores } from '../api/stores';
+import { mapPublicStoresToLocations } from '../data/stores';
+import type { StoreLocation } from '../types/store';
 
 const StoresMapPanel = lazy(() => import('./StoresMapPanel'));
 
-function storeStatusLabel(): string {
-  return 'Activa';
-}
-
 export function StoresPage() {
-  const [stores, setStores] = useState<PublicStore[]>([]);
+  const [stores, setStores] = useState<StoreLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null);
@@ -24,7 +22,8 @@ export function StoresPage() {
         if (!mounted) {
           return;
         }
-        setStores(Array.isArray(data) ? data : []);
+        const normalizedStores = mapPublicStoresToLocations(Array.isArray(data) ? data : []);
+        setStores(normalizedStores);
       } catch (e) {
         if (!mounted) {
           return;
@@ -74,13 +73,13 @@ export function StoresPage() {
           </h2>
           <ul className="flex flex-col gap-3">
             {stores.map((store) => {
-              const isSelected = selectedStoreId === store.storeId;
+              const isSelected = selectedStoreId === store.id;
               return (
-                <li key={store.storeId}>
+                <li key={store.id}>
                   <button
                     type="button"
                     onClick={() =>
-                      setSelectedStoreId((prev) => (prev === store.storeId ? null : store.storeId))
+                      setSelectedStoreId((prev) => (prev === store.id ? null : store.id))
                     }
                     className={`w-full rounded-xl border px-4 py-3 text-left transition-colors ${
                       isSelected
@@ -90,7 +89,7 @@ export function StoresPage() {
                   >
                     <p className="font-medium text-babyblue-50">{store.name}</p>
                     <p className="mt-1 text-sm text-babyblue-50/80">{store.address}</p>
-                    <p className="mt-2 text-xs text-metallicgold-100/90">{storeStatusLabel()}</p>
+                    <p className="mt-2 text-xs text-metallicgold-100/90">{store.status}</p>
                   </button>
                 </li>
               );
