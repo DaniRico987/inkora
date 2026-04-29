@@ -182,7 +182,7 @@ export function ProfilePage() {
       return;
     }
 
-    const expirationDateError = validateDateValue(cardForm.expirationDate, 'futureDate');
+    const expirationDateError = validateDateValue(cardForm.expirationDate, 'cardExpiration');
     if (expirationDateError) {
       snackbar.warning(expirationDateError);
       return;
@@ -432,7 +432,8 @@ export function ProfilePage() {
               <InputDate
                 label="Fecha de expiración"
                 value={cardForm.expirationDate}
-                dateValidationMode="futureDate"
+                dateValidationMode="cardExpiration"
+                datePickerMode="monthYear"
                 onChange={(event) => setCardForm((prev) => ({ ...prev, expirationDate: event.target.value }))}
               />
               <InputSelect

@@ -72,7 +72,7 @@ function StoresMapPanel({ stores, selectedStoreId, onSelectStore }: StoresMapPan
 
   if (validStores.length === 0) {
     return (
-      <div className="flex min-h-[420px] items-center justify-center rounded-xl border border-border bg-bg-secondary px-4 text-center text-sm text-text-muted">
+      <div className="flex min-h-105 items-center justify-center rounded-xl border border-border bg-bg-secondary px-4 text-center text-sm text-text-muted">
         No hay tiendas con ubicación para mostrar en el mapa.
       </div>
     );
@@ -82,6 +82,7 @@ function StoresMapPanel({ stores, selectedStoreId, onSelectStore }: StoresMapPan
     <MapContainer
       center={center}
       zoom={12}
+      className="stores-map relative z-0"
       style={{ width: '100%', height: '100%', minHeight: '420px', borderRadius: '0.75rem' }}
       ref={mapRef}
     >
@@ -93,7 +94,7 @@ function StoresMapPanel({ stores, selectedStoreId, onSelectStore }: StoresMapPan
       {validStores.map((store) => (
         <Marker key={store.id} position={store.position} icon={storeIcon} eventHandlers={{ click: () => onSelectStore(store.id) }}>
           <Popup>
-            <div className="max-w-[220px] px-1 py-0.5 text-gray-900">
+            <div className="max-w-55 px-1 py-0.5 text-gray-900">
               <p className="font-semibold leading-tight">{store.name}</p>
               <p className="mt-1 text-xs leading-snug text-gray-700">{store.description}</p>
               <p className="mt-1 text-xs text-gray-600">Estado: {store.status}</p>

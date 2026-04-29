@@ -99,10 +99,10 @@ export function StoresPage() {
           )}
         </aside>
 
-        <div className="order-1 min-h-[420px] min-w-0 flex-1 lg:order-2">
+        <div className="order-1 min-h-105 min-w-0 flex-1 lg:order-2">
           <Suspense
             fallback={
-              <div className="flex min-h-[420px] items-center justify-center rounded-xl border border-border bg-bg-secondary text-text-muted">
+              <div className="flex min-h-105 items-center justify-center rounded-xl border border-border bg-bg-secondary text-text-muted">
                 Preparando mapa…
               </div>
             }

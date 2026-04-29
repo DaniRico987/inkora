@@ -41,6 +41,19 @@ html {
   min-height: 100vh;
 }
 
+.stores-map,
+.leaflet-container {
+  position: relative;
+  z-index: 0;
+}
+
+.leaflet-pane,
+.leaflet-top,
+.leaflet-bottom,
+.leaflet-control-container {
+  z-index: 0;
+}
+
 .profile-modal-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: rgba(148, 163, 184, 0.34) transparent;

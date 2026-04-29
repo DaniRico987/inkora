@@ -218,7 +218,7 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
       return;
     }
 
-    const expirationDateError = validateDateValue(cardForm.expirationDate, 'futureDate');
+    const expirationDateError = validateDateValue(cardForm.expirationDate, 'cardExpiration');
     if (expirationDateError) {
       snackbar.warning(expirationDateError);
       return;
@@ -496,7 +496,8 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
                     <InputDate
                       label="Fecha de expiración"
                       value={cardForm.expirationDate}
-                      dateValidationMode="futureDate"
+                      dateValidationMode="cardExpiration"
+                      datePickerMode="monthYear"
                       onChange={(event) => setCardForm((prev) => ({ ...prev, expirationDate: event.target.value }))}
                     />
                     <InputSelect

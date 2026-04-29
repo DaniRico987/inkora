@@ -210,6 +210,7 @@ export function InputDate({
   onChange,
   calendarIconClassName = `${inputBase} ${PlaceholderBase}`,
   dateValidationMode = "auto",
+  datePickerMode = 'day',
   ...props
 }: InputDateProps) {
   const [internalVal, setInternalVal] = useState("");
@@ -225,6 +226,7 @@ export function InputDate({
   const pickerValue = externalVal ? dayjs(externalVal, 'YYYY-MM-DD', true) : null;
   const selectedValue = pickerValue?.isValid() ? pickerValue : null;
   const lifted = true;
+  const isMonthYearPicker = datePickerMode === 'monthYear';
   const textFieldProps = {
     label: '',
     fullWidth: true,
@@ -243,7 +245,11 @@ export function InputDate({
   };
 
   const handleChange = (nextValue: Dayjs | null) => {
-    const nextDate = nextValue && nextValue.isValid() ? nextValue.format('YYYY-MM-DD') : '';
+    const nextDate = nextValue && nextValue.isValid()
+      ? (isMonthYearPicker
+        ? nextValue.endOf('month').format('YYYY-MM-DD')
+        : nextValue.format('YYYY-MM-DD'))
+      : '';
 
     if (value === undefined) {
       setInternalVal(nextDate);
@@ -253,12 +259,12 @@ export function InputDate({
       target: {
         value: nextDate,
         name: props.name ?? '',
-        type: 'date',
+        type: isMonthYearPicker ? 'month' : 'date',
       },
       currentTarget: {
         value: nextDate,
         name: props.name ?? '',
-        type: 'date',
+        type: isMonthYearPicker ? 'month' : 'date',
       },
     } as React.ChangeEvent<HTMLInputElement>;
 
@@ -271,7 +277,9 @@ export function InputDate({
       <DatePicker
         value={selectedValue}
         onChange={handleChange}
-        format="DD/MM/YYYY"
+        format={isMonthYearPicker ? 'MM/YYYY' : 'DD/MM/YYYY'}
+        views={isMonthYearPicker ? ['year', 'month'] : undefined}
+        openTo={isMonthYearPicker ? 'month' : undefined}
         minDate={bounds.minDate ? dayjs(bounds.minDate) : undefined}
         maxDate={bounds.maxDate ? dayjs(bounds.maxDate) : undefined}
         slotProps={{

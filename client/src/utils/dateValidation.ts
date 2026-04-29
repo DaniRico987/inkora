@@ -3,6 +3,7 @@ export type DateValidationMode =
     | 'birthDate'
     | 'publicationDate'
     | 'futureDate'
+    | 'cardExpiration'
     | 'none';
 
 type DateValidationContext = {
@@ -42,6 +43,13 @@ function shiftDays(date: Date, amount: number): Date {
     return startOfDay(nextDate);
 }
 
+function endOfMonth(date: Date): Date {
+    const nextDate = new Date(date);
+    nextDate.setMonth(nextDate.getMonth() + 1, 0);
+    nextDate.setHours(23, 59, 59, 999);
+    return nextDate;
+}
+
 export function resolveDateValidationMode({
     label,
     name,
@@ -77,8 +85,13 @@ export function resolveDateValidationMode({
         normalizedContext.includes('caduc') ||
         normalizedContext.includes('expiry') ||
         normalizedContext.includes('issue') ||
-        normalizedContext.includes('expedition')
+        normalizedContext.includes('expedition') ||
+        normalizedContext.includes('tarjet')
     ) {
+        if (normalizedContext.includes('card') || normalizedContext.includes('tarjet')) {
+            return 'cardExpiration';
+        }
+
         return 'futureDate';
     }
 
@@ -105,6 +118,14 @@ export function getDateValidationBounds(mode: Exclude<DateValidationMode, 'auto'
     if (mode === 'futureDate') {
         return {
             minDate: shiftDays(today, 1),
+        };
+    }
+
+    if (mode === 'cardExpiration') {
+        const maxDate = endOfMonth(new Date(today.getFullYear() + 5, today.getMonth(), 1));
+        return {
+            minDate: startOfDay(new Date(today.getFullYear(), today.getMonth(), 1)),
+            maxDate: startOfDay(maxDate),
         };
     }
 
@@ -142,6 +163,12 @@ function getBoundsError(mode: Exclude<DateValidationMode, 'auto'> | 'none', reas
 
     if (mode === 'futureDate') {
         return 'La fecha debe ser futura.';
+    }
+
+    if (mode === 'cardExpiration') {
+        return reason === 'max'
+            ? 'La fecha de vencimiento no puede superar 5 años hacia el futuro.'
+            : 'La fecha de vencimiento debe ser desde el mes actual en adelante.';
     }
 
     return 'La fecha no es válida.';
