@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
 import { Button } from './Button';
-import { InputDate, InputNumber, InputSelect, InputText } from './Inputs';
+import { InputDate, InputSelect, InputText } from './Inputs';
+import { LocationPicker } from './LocationPicker';
 import { Spinner } from './Spinner';
 import { useSnackbar } from './SnackbarProvider';
 import { MyHistoryView } from './profile/MyHistoryView';
@@ -17,6 +18,7 @@ import {
 } from '../api/clients';
 import { getCategories, type Category } from '../api/categories';
 import { subscribeToCategory, unsubscribeFromCategory } from '../api/subscriptions';
+import { formatCardNumberInput, maskCardNumber, normalizeCardNumber } from '../utils/cardNumber';
 import { validateDateValue } from '../utils/dateValidation';
 
 interface UserProfileModalProps {
@@ -39,13 +41,6 @@ const initialCardForm: CardFormState = {
   expirationDate: '',
   cardType: 'credit',
 };
-
-function maskCardNumber(rawValue: string): string {
-  const digits = rawValue.replace(/\D/g, '');
-  if (!digits) return '';
-  const visible = digits.slice(-4);
-  return `**** **** **** ${visible}`;
-}
 
 function formatDate(isoDate: string): string {
   const date = new Date(isoDate);
@@ -213,7 +208,7 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
   };
 
   const handleAddCard = async () => {
-    if (!cardForm.number || cardForm.number.replace(/\D/g, '').length < 12) {
+    if (normalizeCardNumber(cardForm.number).length !== 16) {
       snackbar.warning('Ingresa un número de tarjeta válido');
       return;
     }
@@ -371,15 +366,23 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
                       dateValidationMode="birthDate"
                       onChange={(event) => setForm((prev) => ({ ...prev, birthDate: event.target.value }))}
                     />
-                    <InputText
-                      label="Lugar de nacimiento"
-                      value={form.birthPlace}
-                      validationType="name"
-                      onChange={(event) => setForm((prev) => ({ ...prev, birthPlace: event.target.value }))}
-                    />
-                    <InputText
+                    <div>
+                      <LocationPicker
+                        label="Lugar de nacimiento"
+                        value={form.birthPlace}
+                        onChange={(birthPlace) => setForm((prev) => ({ ...prev, birthPlace }))}
+                      />
+                    </div>
+                    <InputSelect
                       label="Género"
                       value={form.gender}
+                      options={[
+                        { value: '', label: 'Selecciona tu género' },
+                        { value: 'male', label: 'Masculino' },
+                        { value: 'female', label: 'Femenino' },
+                        { value: 'other', label: 'Otro' },
+                        { value: 'prefer_not_say', label: 'Prefiero no decir' },
+                      ]}
                       onChange={(event) => setForm((prev) => ({ ...prev, gender: event.target.value }))}
                     />
                   </div>
@@ -481,16 +484,22 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
 
                   <div className="rounded-3xl border border-border bg-bg p-5 shadow-sm sm:p-6">
                     <h3 className="text-lg font-semibold text-text">Agregar nueva tarjeta</h3>
-                    <InputNumber
+                    <InputText
                       label="Número de tarjeta"
                       value={cardForm.number}
-                      length={19}
-                      onChange={(event) => setCardForm((prev) => ({ ...prev, number: event.target.value }))}
+                      maxLength={19}
+                      inputMode="numeric"
+                      autoComplete="cc-number"
+                      hideLabelOnFocus
+                      onChange={(event) =>
+                        setCardForm((prev) => ({ ...prev, number: formatCardNumberInput(event.target.value) }))
+                      }
                     />
                     <InputText
                       label="Titular"
                       value={cardForm.cardHolder}
                       validationType="name"
+                      hideLabelOnFocus
                       onChange={(event) => setCardForm((prev) => ({ ...prev, cardHolder: event.target.value }))}
                     />
                     <InputDate
@@ -498,6 +507,7 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
                       value={cardForm.expirationDate}
                       dateValidationMode="cardExpiration"
                       datePickerMode="monthYear"
+                      hideLabelOnFocus
                       onChange={(event) => setCardForm((prev) => ({ ...prev, expirationDate: event.target.value }))}
                     />
                     <InputSelect

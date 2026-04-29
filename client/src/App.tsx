@@ -62,7 +62,7 @@ function getRoleHome(role: AppRole): string {
   if (role === 'root') return '/admin/create-admin';
   if (role === 'admin') return '/admin';
   if (role === 'client') return '/';
-  return '/catalog';
+  return '/';
 }
 
 function AccessGuard({
@@ -81,14 +81,10 @@ function AccessGuard({
   return <>{children}</>;
 }
 
-function ProtectedClientRoute() {
+function PublicHomeRoute() {
   const role = resolveAppRole();
 
-  if (role === 'visitor') {
-    return <Navigate to="/catalog" replace />;
-  }
-
-  if (role !== 'client') {
+  if (role === 'admin' || role === 'root') {
     return <Navigate to={getRoleHome(role)} replace />;
   }
 
@@ -224,7 +220,7 @@ function AppContent() {
           />
 
           {/* Cliente */}
-          <Route path="/" element={<ProtectedClientRoute />} />
+          <Route path="/" element={<PublicHomeRoute />} />
           <Route
             path="/cart"
             element={
@@ -353,7 +349,7 @@ function AppContent() {
           {/* Fallback por rol */}
           <Route
             path="*"
-            element={<Navigate to={getRoleHome(resolveAppRole())} replace />}
+            element={<PublicHomeRoute />}
           />
         </Routes>
       </main>

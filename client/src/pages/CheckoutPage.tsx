@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { InputText, InputTextarea, InputSelect } from '../Components/Inputs';
+import { InputText, InputTextarea } from '../Components/Inputs';
+import { LocationPicker } from '../Components/LocationPicker';
 import { Spinner } from '../Components/Spinner';
 import { useSnackbar } from '../Components/SnackbarProvider';
+import { getClientProfile, type ClientCard } from '../api/clients';
 import { createPurchase } from '../api/purchases';
 import { getAvailableStores, type AvailableStore } from '../api/stores';
 import { useCart } from '../hooks/useCart';
 import type { CartItem } from '../interfaces/CartInterface';
 import type { Purchase } from '../interfaces/PurchaseInterface';
+import { formatCardNumberInput, maskCardNumber, normalizeCardNumber } from '../utils/cardNumber';
 
 type CheckoutStep = 1 | 2 | 3 | 4;
 type PaymentChoice = 'registered' | 'new';
@@ -16,8 +19,7 @@ type DeliveryChoice = 'homeDelivery' | 'storePickup';
 type AddressFormState = {
   fullName: string;
   street: string;
-  city: string;
-  province: string;
+  location: string;
   postalCode: string;
   notes: string;
 };
@@ -29,7 +31,7 @@ type PaymentFormState = {
   cvv: string;
 };
 
-type FieldErrors = Partial<Record<keyof AddressFormState | keyof PaymentFormState | 'pickupStoreId', string>>;
+type FieldErrors = Partial<Record<keyof AddressFormState | keyof PaymentFormState | 'pickupStoreId' | 'registeredCardId', string>>;
 
 type PickupStoreOption = {
   storeId: number;
@@ -149,8 +151,7 @@ function buildPickupStoreOptions(
 const initialAddressState: AddressFormState = {
   fullName: '',
   street: '',
-  city: '',
-  province: '',
+  location: '',
   postalCode: '',
   notes: '',
 };
@@ -179,16 +180,6 @@ const PAYMENT_METHODS: Array<{
     },
   ];
 
-const PROVINCES = [
-  'Buenos Aires',
-  'CABA',
-  'Córdoba',
-  'Santa Fe',
-  'Mendoza',
-  'Tucumán',
-  'Otra',
-];
-
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('es-AR', {
     style: 'currency',
@@ -197,17 +188,21 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
+function formatDate(isoDate: string): string {
+  const date = new Date(isoDate);
+  if (Number.isNaN(date.getTime())) return 'Sin fecha';
+  return date.toLocaleDateString('es-CO');
+}
+
 function formatCardNumber(value: string): string {
-  const digits = value.replace(/\D/g, '').slice(0, 16);
-  return digits.replace(/(.{4})/g, '$1 ').trim();
+  return formatCardNumberInput(value);
 }
 
 function composeShippingAddress(address: AddressFormState): string {
   const segments = [
     address.fullName.trim(),
     address.street.trim(),
-    address.city.trim(),
-    address.province.trim(),
+    address.location.trim(),
     address.postalCode.trim(),
   ].filter(Boolean);
 
@@ -312,6 +307,10 @@ export function CheckoutPage() {
   const [pickupStoresLoading, setPickupStoresLoading] = useState(false);
   const [pickupStoresError, setPickupStoresError] = useState<string | null>(null);
   const [paymentChoice, setPaymentChoice] = useState<PaymentChoice>('registered');
+  const [registeredCards, setRegisteredCards] = useState<ClientCard[]>([]);
+  const [registeredCardsLoading, setRegisteredCardsLoading] = useState(false);
+  const [registeredCardsError, setRegisteredCardsError] = useState<string | null>(null);
+  const [selectedRegisteredCardId, setSelectedRegisteredCardId] = useState<number | null>(null);
   const [paymentForm, setPaymentForm] = useState<PaymentFormState>(initialPaymentState);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -323,7 +322,15 @@ export function CheckoutPage() {
   const tax = cart?.tax ?? 0;
   const hasItems = cartItems.length > 0;
   const shippingAddress = useMemo(() => composeShippingAddress(addressForm), [addressForm]);
-  const paymentMethodLabel = paymentChoice === 'registered' ? 'Tarjeta registrada' : 'Nueva tarjeta';
+  const selectedRegisteredCard = useMemo(
+    () => registeredCards.find((card) => card.cardId === selectedRegisteredCardId) ?? registeredCards[0] ?? null,
+    [registeredCards, selectedRegisteredCardId],
+  );
+  const paymentMethodLabel = paymentChoice === 'registered'
+    ? selectedRegisteredCard
+      ? `Tarjeta registrada · ${selectedRegisteredCard.maskedNumber}`
+      : 'Tarjeta registrada'
+    : 'Nueva tarjeta';
   const requiredByBook = useMemo(() => groupCartItemsByBook(cartItems), [cartItems]);
   const selectedPickupStore = useMemo(
     () => pickupStores.find((store) => store.storeId === pickupStoreId) ?? null,
@@ -333,6 +340,59 @@ export function CheckoutPage() {
     () => pickupStores.filter((store) => store.isFullyAvailable),
     [pickupStores],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadRegisteredCards = async () => {
+      setRegisteredCardsLoading(true);
+      setRegisteredCardsError(null);
+
+      try {
+        const profile = await getClientProfile();
+
+        if (cancelled) return;
+
+        setRegisteredCards(profile.cards);
+      } catch (error) {
+        if (!cancelled) {
+          const message = error instanceof Error ? error.message : 'No se pudieron cargar tus tarjetas registradas';
+          setRegisteredCardsError(message);
+          setRegisteredCards([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setRegisteredCardsLoading(false);
+        }
+      }
+    };
+
+    void loadRegisteredCards();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!registeredCards.length) {
+      setSelectedRegisteredCardId(null);
+
+      if (paymentChoice === 'registered') {
+        setPaymentChoice('new');
+      }
+
+      return;
+    }
+
+    setSelectedRegisteredCardId((current) => {
+      if (current && registeredCards.some((card) => card.cardId === current)) {
+        return current;
+      }
+
+      return registeredCards[0].cardId;
+    });
+  }, [paymentChoice, registeredCards]);
 
   useEffect(() => {
     if (deliveryMode !== 'storePickup' || requiredByBook.size === 0) {
@@ -391,14 +451,16 @@ export function CheckoutPage() {
 
   const paymentSummary = useMemo(() => {
     if (paymentChoice === 'registered') {
-      return 'Se cobrará sobre la tarjeta registrada en tu cuenta.';
+      if (!selectedRegisteredCard) {
+        return 'Selecciona una tarjeta registrada de tu perfil.';
+      }
+
+      return `${selectedRegisteredCard.maskedNumber} · ${selectedRegisteredCard.cardType === 'credit' ? 'Crédito' : 'Débito'} · Expira ${formatDate(selectedRegisteredCard.expirationDate)}`;
     }
 
-    const cardNumber = paymentForm.cardNumber.replace(/\D/g, '');
-    return cardNumber.length >= 4
-      ? `Tarjeta terminada en ${cardNumber.slice(-4)}`
-      : 'Nueva tarjeta cargada manualmente.';
-  }, [paymentChoice, paymentForm.cardNumber]);
+    const maskedNumber = maskCardNumber(paymentForm.cardNumber);
+    return maskedNumber ? `Tarjeta nueva · ${maskedNumber}` : 'Nueva tarjeta cargada manualmente.';
+  }, [paymentChoice, paymentForm.cardNumber, selectedRegisteredCard]);
 
   const deliverySummary = useMemo(() => {
     if (deliveryMode === 'homeDelivery') {
@@ -449,12 +511,8 @@ export function CheckoutPage() {
       nextErrors.street = 'La dirección debe incluir calle y altura';
     }
 
-    if (addressForm.city.trim().length < 2) {
-      nextErrors.city = 'Ingresa una ciudad válida';
-    }
-
-    if (!addressForm.province.trim()) {
-      nextErrors.province = 'Selecciona una provincia';
+    if (addressForm.location.trim().length < 3) {
+      nextErrors.location = 'Selecciona una ubicación válida';
     }
 
     if (!/^\d{4,5}$/.test(addressForm.postalCode.trim())) {
@@ -486,7 +544,7 @@ export function CheckoutPage() {
         nextErrors.cardholder = 'Ingresa el nombre como figura en la tarjeta';
       }
 
-      if (!/^\d{13,19}$/.test(paymentForm.cardNumber.replace(/\s/g, ''))) {
+      if (normalizeCardNumber(paymentForm.cardNumber).length !== 16) {
         nextErrors.cardNumber = 'El número de tarjeta no es válido';
       }
 
@@ -497,6 +555,10 @@ export function CheckoutPage() {
       if (!/^\d{3,4}$/.test(paymentForm.cvv.trim())) {
         nextErrors.cvv = 'El CVV debe tener 3 o 4 dígitos';
       }
+    }
+
+    if (paymentChoice === 'registered' && !selectedRegisteredCard) {
+      nextErrors.registeredCardId = 'Selecciona una tarjeta registrada';
     }
 
     setFieldErrors((prev) => ({ ...prev, ...nextErrors }));
@@ -523,8 +585,7 @@ export function CheckoutPage() {
       const next = { ...prev };
       delete next.fullName;
       delete next.street;
-      delete next.city;
-      delete next.province;
+      delete next.location;
       delete next.postalCode;
       return next;
     });
@@ -542,6 +603,12 @@ export function CheckoutPage() {
         delete next.cvv;
         return next;
       });
+    } else {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next.registeredCardId;
+        return next;
+      });
     }
   };
 
@@ -552,8 +619,7 @@ export function CheckoutPage() {
       delete next.pickupStoreId;
       delete next.fullName;
       delete next.street;
-      delete next.city;
-      delete next.province;
+      delete next.location;
       delete next.postalCode;
       return next;
     });
@@ -842,30 +908,13 @@ export function CheckoutPage() {
                         {fieldErrors.street && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.street}</p>}
                       </div>
 
-                      <div>
-                        <InputText
-                          label="Ciudad"
-                          value={addressForm.city}
-                          onChange={(event) => updateAddressField('city', event.target.value)}
-                          autoComplete="address-level2"
-                          maxLength={60}
-                          required
+                      <div className="sm:col-span-2">
+                        <LocationPicker
+                          label="Ubicación"
+                          value={addressForm.location}
+                          onChange={(location) => updateAddressField('location', location)}
+                          error={fieldErrors.location}
                         />
-                        {fieldErrors.city && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.city}</p>}
-                      </div>
-
-                      <div>
-                        <InputSelect
-                          label="Provincia"
-                          value={addressForm.province}
-                          onChange={(event) => updateAddressField('province', event.target.value)}
-                          options={['', ...PROVINCES].map((province) => ({
-                            label: province || 'Seleccionar provincia',
-                            value: province,
-                          }))}
-                          required
-                        />
-                        {fieldErrors.province && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.province}</p>}
                       </div>
 
                       <div>
@@ -1024,20 +1073,30 @@ export function CheckoutPage() {
                   Elige si usarás una tarjeta registrada o si vas a cargar una nueva tarjeta para este pedido.
                 </p>
 
+                {registeredCardsError && (
+                  <div className="mt-4 rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                    {registeredCardsError}
+                  </div>
+                )}
+
                 <div className="mt-6 space-y-3">
                   {PAYMENT_METHODS.map((method) => {
                     const isActive = paymentChoice === method.value;
+                    const isRegisteredMethod = method.value === 'registered';
+                    const isDisabled = isRegisteredMethod && (registeredCardsLoading || !registeredCards.length);
 
                     return (
                       <button
                         key={method.value}
                         type="button"
                         onClick={() => handlePaymentChoiceChange(method.value)}
+                        disabled={isDisabled}
                         className={[
                           'w-full rounded-3xl border p-4 text-left transition',
                           isActive
                             ? 'border-babyblue-400 bg-babyblue-50/80 shadow-sm'
                             : 'border-border bg-bg hover:border-babyblue-300',
+                          isDisabled ? 'cursor-not-allowed opacity-60' : '',
                         ].join(' ')}
                       >
                         <div className="flex items-start gap-4">
@@ -1055,6 +1114,15 @@ export function CheckoutPage() {
                           <div>
                             <p className="text-base font-bold text-text">{method.title}</p>
                             <p className="mt-1 text-sm leading-6 text-text-muted">{method.description}</p>
+                            {isRegisteredMethod && (
+                              <p className="mt-2 text-xs font-medium text-text-muted">
+                                {registeredCardsLoading
+                                  ? 'Cargando tarjetas guardadas...'
+                                  : registeredCards.length
+                                    ? `${registeredCards.length} tarjeta${registeredCards.length === 1 ? '' : 's'} disponible${registeredCards.length === 1 ? '' : 's'} en tu perfil`
+                                    : 'No tienes tarjetas registradas en tu perfil'}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </button>
@@ -1114,6 +1182,58 @@ export function CheckoutPage() {
                       />
                       {fieldErrors.cvv && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.cvv}</p>}
                     </div>
+                  </div>
+                )}
+
+                {paymentChoice === 'registered' && (
+                  <div className="mt-6 space-y-3">
+                    {registeredCardsLoading ? (
+                      <div className="rounded-3xl border border-border bg-bg p-5 text-sm text-text-muted">
+                        Cargando tarjetas registradas...
+                      </div>
+                    ) : registeredCards.length === 0 ? (
+                      <div className="rounded-3xl border border-border bg-bg p-5 text-sm text-text-muted">
+                        No tienes tarjetas registradas. Puedes agregarlas desde tu perfil.
+                      </div>
+                    ) : (
+                      registeredCards.map((card) => {
+                        const isSelected = selectedRegisteredCardId === card.cardId;
+
+                        return (
+                          <button
+                            key={card.cardId}
+                            type="button"
+                            onClick={() => setSelectedRegisteredCardId(card.cardId)}
+                            className={[
+                              'w-full rounded-3xl border p-4 text-left transition',
+                              isSelected
+                                ? 'border-emerald-400 bg-emerald-50/80 shadow-sm'
+                                : 'border-border bg-bg hover:border-babyblue-300',
+                            ].join(' ')}
+                          >
+                            <div className="flex items-start gap-4">
+                              <span
+                                className={[
+                                  'mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2',
+                                  isSelected ? 'border-emerald-600 bg-emerald-600' : 'border-border bg-bg',
+                                ].join(' ')}
+                                aria-hidden="true"
+                              >
+                                {isSelected && <span className="h-2.5 w-2.5 rounded-full bg-white" />}
+                              </span>
+                              <div className="min-w-0">
+                                <p className="text-base font-bold text-text">{card.maskedNumber}</p>
+                                <p className="mt-1 text-sm text-text-muted">
+                                  {card.cardType === 'credit' ? 'Crédito' : 'Débito'} · Expira {formatDate(card.expirationDate)}
+                                </p>
+                                <p className="mt-1 text-sm text-text-muted">{card.cardHolder}</p>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
+                    {fieldErrors.registeredCardId && <p className="text-sm text-red-600">{fieldErrors.registeredCardId}</p>}
                   </div>
                 )}
 

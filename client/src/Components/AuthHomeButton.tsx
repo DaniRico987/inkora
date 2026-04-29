@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 type AuthHomeButtonProps = {
   to?: string;
@@ -35,49 +35,10 @@ function sanitizeInternalPath(path?: string | null): string | undefined {
   return `${parsed.pathname}${parsed.search}${parsed.hash}`;
 }
 
-function getReferrerPath(): string | undefined {
-  try {
-    if (!document.referrer) {
-      return undefined;
-    }
-
-    const referrer = new URL(document.referrer);
-    if (referrer.origin !== window.location.origin) {
-      return undefined;
-    }
-
-    return `${referrer.pathname}${referrer.search}${referrer.hash}`;
-  } catch {
-    return undefined;
-  }
-}
-
 export function AuthHomeButton({ to, className = '' }: AuthHomeButtonProps) {
-  const location = useLocation();
-
-  const stateFrom =
-    typeof location.state === 'object' &&
-    location.state !== null &&
-    'from' in location.state &&
-    typeof (location.state as { from?: unknown }).from === 'string'
-      ? (location.state as { from: string }).from
-      : undefined;
-
-  const fromQuery = new URLSearchParams(location.search).get('from');
-  const referrerPath = getReferrerPath();
-
   const target = useMemo(() => {
-    const savedTarget = sessionStorage.getItem(AUTH_RETURN_TO_KEY);
-
-    return (
-      sanitizeInternalPath(to) ||
-      sanitizeInternalPath(stateFrom) ||
-      sanitizeInternalPath(fromQuery) ||
-      sanitizeInternalPath(savedTarget) ||
-      sanitizeInternalPath(referrerPath) ||
-      '/catalog'
-    );
-  }, [to, stateFrom, fromQuery, referrerPath]);
+    return sanitizeInternalPath(to) || '/';
+  }, [to]);
 
   useEffect(() => {
     sessionStorage.setItem(AUTH_RETURN_TO_KEY, target);

@@ -82,7 +82,57 @@ function asString(value: unknown, fallback = ''): string {
 export async function getClientHistory(): Promise<ClientHistoryResponse> {
   try {
     const response = await apiClient.get<unknown>('/clients/me/history');
-    const payload = (response.data ?? {}) as Record<string, unknown>;
+    const data = response.data ?? {};
+
+    // Server may return either a shaped object { purchases: [...], reservations: [...] }
+    // or a flat array of mixed entries (purchase/reservation). Handle both.
+    if (Array.isArray(data)) {
+      const purchases: HistoryPurchase[] = [];
+      const reservations: HistoryReservation[] = [];
+
+      for (const entry of data) {
+        const type = asString((entry as any).type, '');
+        const transactionDate = (entry as any).transactionDate;
+
+        if (type === 'purchase') {
+          const itemsRaw = asArray<Record<string, unknown>>((entry as any).items);
+          purchases.push({
+            purchaseId: asNumber((entry as any).transactionId),
+            purchaseDate: asString(transactionDate ? (transactionDate as any).toString() : ''),
+            totalAmount: asNumber((entry as any).totalAmount),
+            status: asString((entry as any).status, 'inPreparation'),
+            items: itemsRaw.map((item, idx) => ({
+              purchaseItemId: asNumber(item.purchaseItemId ?? idx),
+              bookId: asNumber(item.bookId),
+              title: asString(item.title, 'Libro sin titulo'),
+              quantity: asNumber(item.quantity, 1),
+              unitPrice: asNumber(item.unitPrice ?? item.unitPrice),
+              subtotal: asNumber(item.subtotal ?? (asNumber(item.unitPrice) * asNumber(item.quantity))),
+              coverUrl: item.coverUrl ? asString(item.coverUrl) : null,
+            })),
+          });
+        } else if (type === 'reservation') {
+          const itemsRaw = asArray<Record<string, unknown>>((entry as any).items);
+          reservations.push({
+            reservationId: asNumber((entry as any).transactionId),
+            reservationDate: asString(transactionDate ? (transactionDate as any).toString() : ''),
+            expirationDate: (entry as any).expirationDate ? asString((entry as any).expirationDate) : null,
+            status: asString((entry as any).status, 'active'),
+            items: itemsRaw.map((item, idx) => ({
+              reservationItemId: asNumber(item.reservationItemId ?? idx),
+              bookId: asNumber(item.bookId),
+              title: asString(item.title, 'Libro sin titulo'),
+              quantity: asNumber(item.quantity, 1),
+              coverUrl: item.coverUrl ? asString(item.coverUrl) : null,
+            })),
+          });
+        }
+      }
+
+      return { purchases, reservations };
+    }
+
+    const payload = (data ?? {}) as Record<string, unknown>;
 
     const purchasesRaw = asArray<Record<string, unknown>>(payload.purchases);
     const reservationsRaw = asArray<Record<string, unknown>>(payload.reservations);

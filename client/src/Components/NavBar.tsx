@@ -19,7 +19,7 @@ type NavBarProps = {
 function getNavItems(variant: NavBarVariant): NavBarItem[] {
     if (variant === 'visitor') {
         return [
-            { label: 'Inicio', to: '/catalog' },
+            { label: 'Inicio', to: '/' },
             { label: 'Catalogo', to: '/catalog' },
             { label: 'Tiendas', to: '/stores' },
         ];
@@ -126,10 +126,10 @@ export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
 
                         <div className="hidden md:flex items-center justify-end gap-2 lg:gap-3 min-w-28">
                             <Link
-                                to="/catalog"
-                                aria-label="Ir al catálogo"
+                                to={variant === 'visitor' ? '/' : '/catalog'}
+                                aria-label={variant === 'visitor' ? 'Ir al inicio' : 'Ir al catálogo'}
                                 className="inline-flex items-center justify-center rounded-full border border-white/25 bg-white/12 p-2 text-babyblue-50 transition hover:bg-white/18 hover:text-metallicgold-100"
-                                title="Catálogo"
+                                title={variant === 'visitor' ? 'Inicio' : 'Catálogo'}
                             >
                                 <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                                     <circle cx="11" cy="11" r="7" />
@@ -282,11 +282,11 @@ export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
                         <div className="md:hidden border-t border-white/20 px-4 pb-4 pt-3">
                             <div className="flex flex-col gap-2 text-left text-babyblue-50">
                                 <Link
-                                    to="/catalog"
+                                    to={variant === 'visitor' ? '/' : '/catalog'}
                                     onClick={handleMobileLinkClick}
                                     className="rounded-md px-2 py-2 hover:bg-white/12"
                                 >
-                                    Catálogo
+                                    {variant === 'visitor' ? 'Inicio' : 'Catálogo'}
                                 </Link>
 
                                 {navItems.map((item) => (

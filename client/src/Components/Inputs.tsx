@@ -73,7 +73,7 @@ function FloatingLabel({ label, lifted }: FloatingLabelProps) {
       className={`
           absolute left-3 pointer-events-none z-10
           transition-all duration-180 ease-in-out
-          bg-transparent px-2                            // ✅ tapa el borde al salir
+          bg-transparent px-2                            // tapa el borde al salir
         ${lifted
           ? "-top-5 text-xs text-label"           // ✅ fuera del input
           : "top-1/2 -translate-y-1/2 text-sm text-placeholder"
@@ -94,6 +94,7 @@ export function InputText({ label, value, onChange, validationType = "none", ...
   const currentVal = value !== undefined ? String(value) : internalVal;
   const isDateInput = props.type === "date";
   const lifted = isDateInput ? true : focused || currentVal.length > 0;
+  const showLabel = !(props.hideLabelOnFocus && focused);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== " " || currentVal.trim().length > 0) return;
@@ -129,7 +130,7 @@ export function InputText({ label, value, onChange, validationType = "none", ...
 
   return (
     <div className={wrapper}>
-      <FloatingLabel label={label ?? ""} lifted={lifted} />
+      {showLabel && <FloatingLabel label={label ?? ""} lifted={lifted} />}
       <input
         className={`${inputBase} ${PlaceholderBase}`}
         value={currentVal}
@@ -151,6 +152,7 @@ export function InputNumber({ label, value, onChange, length = 20, ...props }: I
 
   const currentVal = value !== undefined ? String(value) : internalVal;
   const lifted = focused || currentVal.length > 0;
+  const showLabel = !(props.hideLabelOnFocus && focused);
   const maxLength = length || 20;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -184,7 +186,7 @@ export function InputNumber({ label, value, onChange, length = 20, ...props }: I
 
   return (
     <div className={wrapper}>
-      <FloatingLabel label={label ?? ""} lifted={lifted} />
+      {showLabel && <FloatingLabel label={label ?? ""} lifted={lifted} />}
       <input
         type="text"
         className={`${inputBase} ${PlaceholderBase}`}

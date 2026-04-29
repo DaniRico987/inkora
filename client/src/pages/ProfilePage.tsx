@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '../Components/Button';
-import { InputDate, InputNumber, InputSelect, InputText } from '../Components/Inputs';
+import { InputDate, InputSelect, InputText } from '../Components/Inputs';
+import { LocationPicker } from '../Components/LocationPicker';
 import { Spinner } from '../Components/Spinner';
 import { useSnackbar } from '../Components/SnackbarProvider';
 import {
@@ -13,6 +14,7 @@ import {
 } from '../api/clients';
 import { getCategories, type Category } from '../api/categories';
 import { subscribeToCategory, unsubscribeFromCategory } from '../api/subscriptions';
+import { formatCardNumberInput, maskCardNumber, normalizeCardNumber } from '../utils/cardNumber';
 import { validateDateValue } from '../utils/dateValidation';
 
 type ProfileSection = 'personal' | 'preferences' | 'cards';
@@ -30,13 +32,6 @@ const initialCardForm: CardFormState = {
   expirationDate: '',
   cardType: 'credit',
 };
-
-function maskCardNumber(rawValue: string): string {
-  const digits = rawValue.replace(/\D/g, '');
-  if (!digits) return '';
-  const visible = digits.slice(-4);
-  return `**** **** **** ${visible}`;
-}
 
 function formatDate(isoDate: string): string {
   const date = new Date(isoDate);
@@ -112,6 +107,37 @@ export function ProfilePage() {
       return;
     }
 
+    // Client-side validations to match register page checks
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (form.firstName.trim().length === 0) {
+      snackbar.warning('Los nombres son requeridos.');
+      return;
+    }
+    if (form.lastName.trim().length === 0) {
+      snackbar.warning('Los apellidos son requeridos.');
+      return;
+    }
+    if (form.firstName.length > 100) {
+      snackbar.warning('El nombre no debe exceder 100 caracteres.');
+      return;
+    }
+    if (form.lastName.length > 100) {
+      snackbar.warning('El apellido no debe exceder 100 caracteres.');
+      return;
+    }
+    if (form.email && !emailRegex.test(form.email.trim())) {
+      snackbar.warning('Ingresa un correo electrónico válido.');
+      return;
+    }
+    if (form.username && (form.username.length < 3 || form.username.length > 50)) {
+      snackbar.warning('El nombre de usuario debe tener entre 3 y 50 caracteres.');
+      return;
+    }
+    if (form.username && !/^[a-zA-Z0-9_]+$/.test(form.username)) {
+      snackbar.warning('El nombre de usuario solo puede contener letras, números y guiones bajos.');
+      return;
+    }
+
     try {
       setSavingProfile(true);
       const updated = await updateClientProfile({
@@ -177,7 +203,7 @@ export function ProfilePage() {
   };
 
   const handleAddCard = async () => {
-    if (!cardForm.number || cardForm.number.replace(/\D/g, '').length < 12) {
+    if (normalizeCardNumber(cardForm.number).length !== 16) {
       snackbar.warning('Ingresa un número de tarjeta válido');
       return;
     }
@@ -315,15 +341,23 @@ export function ProfilePage() {
                 dateValidationMode="birthDate"
                 onChange={(event) => setForm((prev) => ({ ...prev, birthDate: event.target.value }))}
               />
-              <InputText
-                label="Lugar de nacimiento"
-                value={form.birthPlace}
-                validationType="name"
-                onChange={(event) => setForm((prev) => ({ ...prev, birthPlace: event.target.value }))}
-              />
-              <InputText
+              <div>
+                <LocationPicker
+                  label="Lugar de nacimiento"
+                  value={form.birthPlace}
+                  onChange={(birthPlace) => setForm((prev) => ({ ...prev, birthPlace }))}
+                />
+              </div>
+              <InputSelect
                 label="Género"
                 value={form.gender}
+                options={[
+                  { value: '', label: 'Selecciona tu género' },
+                  { value: 'male', label: 'Masculino' },
+                  { value: 'female', label: 'Femenino' },
+                  { value: 'other', label: 'Otro' },
+                  { value: 'prefer_not_say', label: 'Prefiero no decir' },
+                ]}
                 onChange={(event) => setForm((prev) => ({ ...prev, gender: event.target.value }))}
               />
             </div>
@@ -417,16 +451,22 @@ export function ProfilePage() {
 
             <div className="rounded-3xl border border-border bg-bg-secondary p-5 shadow-sm sm:p-6">
               <h2 className="text-lg font-semibold text-text">Agregar nueva tarjeta</h2>
-              <InputNumber
+              <InputText
                 label="Número de tarjeta"
                 value={cardForm.number}
-                length={19}
-                onChange={(event) => setCardForm((prev) => ({ ...prev, number: event.target.value }))}
+                maxLength={19}
+                inputMode="numeric"
+                autoComplete="cc-number"
+                hideLabelOnFocus
+                onChange={(event) =>
+                  setCardForm((prev) => ({ ...prev, number: formatCardNumberInput(event.target.value) }))
+                }
               />
               <InputText
                 label="Titular"
                 value={cardForm.cardHolder}
                 validationType="name"
+                hideLabelOnFocus
                 onChange={(event) => setCardForm((prev) => ({ ...prev, cardHolder: event.target.value }))}
               />
               <InputDate
@@ -434,6 +474,7 @@ export function ProfilePage() {
                 value={cardForm.expirationDate}
                 dateValidationMode="cardExpiration"
                 datePickerMode="monthYear"
+                hideLabelOnFocus
                 onChange={(event) => setCardForm((prev) => ({ ...prev, expirationDate: event.target.value }))}
               />
               <InputSelect

@@ -20,12 +20,14 @@ export interface InputTextProps
   extends BaseInputProps,
   InputHTMLAttributes<HTMLInputElement> {
   validationType?: InputValidationType;
+  hideLabelOnFocus?: boolean;
 }
 
 export interface InputNumberProps
   extends BaseInputProps,
   InputHTMLAttributes<HTMLInputElement> {
   length?: number;
+  hideLabelOnFocus?: boolean;
 }
 
 export interface InputDateProps
@@ -34,6 +36,7 @@ export interface InputDateProps
   calendarIconClassName?: string;
   dateValidationMode?: "auto" | "birthDate" | "publicationDate" | "futureDate" | "cardExpiration" | "none";
   datePickerMode?: "day" | "monthYear";
+  hideLabelOnFocus?: boolean;
 }
 
 export interface InputPasswordProps
