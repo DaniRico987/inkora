@@ -72,7 +72,7 @@ function StoresMapPanel({ stores, selectedStoreId, onSelectStore }: StoresMapPan
 
   if (validStores.length === 0) {
     return (
-      <div className="flex min-h-[420px] items-center justify-center rounded-xl border border-white/15 bg-white/5 px-4 text-center text-sm text-babyblue-50/80">
+      <div className="flex min-h-[420px] items-center justify-center rounded-xl border border-border bg-bg-secondary px-4 text-center text-sm text-text-muted">
         No hay tiendas con ubicación para mostrar en el mapa.
       </div>
     );
