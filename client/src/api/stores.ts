@@ -2,6 +2,11 @@ import axios from 'axios';
 import type { CreateStoreRequest, UpdateStoreRequest } from '../interfaces/admin';
 import { getAccessToken } from '../auth/session';
 
+/** Cliente sin JWT: rutas públicas como GET /stores/public */
+const publicStoresClient = axios.create({
+  baseURL: '/api/v1',
+});
+
 const apiClient = axios.create({
   baseURL: '/api/v1',
 });
@@ -14,6 +19,20 @@ apiClient.interceptors.request.use((config) => {
   }
   return config;
 });
+
+export type PublicStore = {
+  storeId: number;
+  name: string;
+  address: string;
+  city: string;
+  latitude: number | null;
+  longitude: number | null;
+};
+
+export async function getPublicStores(): Promise<PublicStore[]> {
+  const response = await publicStoresClient.get<PublicStore[]>('/stores/public');
+  return response.data;
+}
 
 export async function getStores(page: number = 1, limit: number = 10) {
   try {

@@ -21,6 +21,7 @@ function getNavItems(variant: NavBarVariant): NavBarItem[] {
         return [
             { label: 'Inicio', to: '/catalog' },
             { label: 'Catalogo', to: '/catalog' },
+            { label: 'Tiendas', to: '/stores' },
         ];
     }
 

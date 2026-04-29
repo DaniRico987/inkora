@@ -15,11 +15,14 @@
     "@mui/material": "^9.0.0",
     "@mui/x-date-pickers": "^9.0.3",
     "@tanstack/react-query": "^5.90.21",
+    "@types/leaflet": "^1.9.21",
     "axios": "^1.13.6",
+    "leaflet": "^1.9.4",
     "dayjs": "^1.11.20",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-hook-form": "^7.71.2",
+    "react-leaflet": "^5.0.0",
     "react-router-dom": "^7.13.1"
   },
   "devDependencies": {

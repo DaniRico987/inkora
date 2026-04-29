@@ -39,6 +39,8 @@ import { StoresManagementPage } from './pages/StoresManagementPage';
 import { AdminsManagementPage } from './pages/AdminsManagementPage';
 import { RootAdminCreationPage } from './pages/RootAdminCreationPage';
 import { NewsPage } from './pages/NewsPage';
+import { ProfilePage } from './pages/ProfilePage';
+import { StoresPage } from './pages/StoresPage';
 
 type AppRole = 'visitor' | 'client' | 'admin' | 'root';
 
@@ -210,6 +212,14 @@ function AppContent() {
             element={
               <AccessGuard allowedRoles={['visitor', 'client']}>
                 <BookDetailPage />
+              </AccessGuard>
+            }
+          />
+          <Route
+            path="/stores"
+            element={
+              <AccessGuard allowedRoles={['visitor', 'client']}>
+                <StoresPage />
               </AccessGuard>
             }
           />
