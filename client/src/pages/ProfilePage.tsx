@@ -13,6 +13,7 @@ import {
 } from '../api/clients';
 import { getCategories, type Category } from '../api/categories';
 import { subscribeToCategory, unsubscribeFromCategory } from '../api/subscriptions';
+import { validateDateValue } from '../utils/dateValidation';
 
 type ProfileSection = 'personal' | 'preferences' | 'cards';
 
@@ -41,18 +42,6 @@ function formatDate(isoDate: string): string {
   const date = new Date(isoDate);
   if (Number.isNaN(date.getTime())) return 'Sin fecha';
   return date.toLocaleDateString('es-CO');
-}
-
-function isBirthDateAllowed(birthDate: string): boolean {
-  if (!birthDate) return true;
-  const selectedDate = new Date(`${birthDate}T00:00:00`);
-  if (Number.isNaN(selectedDate.getTime())) return false;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  if (selectedDate > today) return false;
-  const minBirthDate = new Date(today);
-  minBirthDate.setFullYear(minBirthDate.getFullYear() - 120);
-  return selectedDate >= minBirthDate;
 }
 
 export function ProfilePage() {
@@ -117,8 +106,9 @@ export function ProfilePage() {
   );
 
   const handleSaveProfile = async () => {
-    if (!isBirthDateAllowed(form.birthDate)) {
-      snackbar.warning('La fecha de nacimiento debe ser válida y no superar 120 años.');
+    const birthDateError = validateDateValue(form.birthDate, 'birthDate');
+    if (birthDateError) {
+      snackbar.warning(birthDateError);
       return;
     }
 
@@ -154,14 +144,14 @@ export function ProfilePage() {
     const nextSubscriptions = isSubscribed
       ? previousSubscriptions.filter((sub) => sub.categoryId !== categoryId)
       : [
-          ...previousSubscriptions,
-          {
-            subscriptionId: -Date.now(),
-            categoryId,
-            categoryName,
-            subscribedAt: new Date().toISOString(),
-          },
-        ];
+        ...previousSubscriptions,
+        {
+          subscriptionId: -Date.now(),
+          categoryId,
+          categoryName,
+          subscribedAt: new Date().toISOString(),
+        },
+      ];
 
     setProfile({ ...profile, subscriptions: nextSubscriptions });
     setProcessingCategoryId(categoryId);
@@ -189,6 +179,12 @@ export function ProfilePage() {
   const handleAddCard = async () => {
     if (!cardForm.number || cardForm.number.replace(/\D/g, '').length < 12) {
       snackbar.warning('Ingresa un número de tarjeta válido');
+      return;
+    }
+
+    const expirationDateError = validateDateValue(cardForm.expirationDate, 'futureDate');
+    if (expirationDateError) {
+      snackbar.warning(expirationDateError);
       return;
     }
 
@@ -316,6 +312,7 @@ export function ProfilePage() {
               <InputDate
                 label="Fecha de nacimiento"
                 value={form.birthDate}
+                dateValidationMode="birthDate"
                 onChange={(event) => setForm((prev) => ({ ...prev, birthDate: event.target.value }))}
               />
               <InputText
@@ -435,6 +432,7 @@ export function ProfilePage() {
               <InputDate
                 label="Fecha de expiración"
                 value={cardForm.expirationDate}
+                dateValidationMode="futureDate"
                 onChange={(event) => setCardForm((prev) => ({ ...prev, expirationDate: event.target.value }))}
               />
               <InputSelect

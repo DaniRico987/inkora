@@ -23,6 +23,9 @@ import { MyHistoryPage } from './pages/MyHistoryPage';
 //import { ComponentsTestPage } from './pages/ComponentsTestPage';
 import { SnackbarProvider } from './Components/SnackbarProvider';
 import { NotificationsProvider } from './hooks/useNotifications';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import 'dayjs/locale/es';
 import {
   getAccessToken,
   getIsTemporaryPasswordFromToken,
@@ -354,16 +357,18 @@ function App() {
   return (
     <BrowserRouter>
       <NotificationsProvider>
-        <SnackbarProvider
-          config={{
-            position: 'top-center',
-            maxVisible: 3,
-            maxQueue: 20,
-            dedupeWindowMs: 1500,
-          }}
-        >
-          <AppContent />
-        </SnackbarProvider>
+        <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
+          <SnackbarProvider
+            config={{
+              position: 'top-center',
+              maxVisible: 3,
+              maxQueue: 20,
+              dedupeWindowMs: 1500,
+            }}
+          >
+            <AppContent />
+          </SnackbarProvider>
+        </LocalizationProvider>
       </NotificationsProvider>
     </BrowserRouter>
   );

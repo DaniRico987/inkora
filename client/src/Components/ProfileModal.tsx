@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from './Button';
-import { InputText } from './Inputs';
+import { InputDate, InputText } from './Inputs';
 import { getProfile, updateProfile } from '../api/auth';
 import { useSnackbar } from '../Components/SnackbarProvider';
 
@@ -136,17 +136,12 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                 required
               />
 
-              <div>
-                <label className="block text-sm font-medium text-text mb-2">
-                  Fecha de Nacimiento
-                </label>
-                <input
-                  type="date"
-                  value={profile.birthDate}
-                  onChange={(e) => handleInputChange('birthDate', e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-bg text-text focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
+              <InputDate
+                label="Fecha de Nacimiento"
+                value={profile.birthDate}
+                dateValidationMode="birthDate"
+                onChange={(e) => handleInputChange('birthDate', e.target.value)}
+              />
 
               <InputText
                 label="Lugar de Nacimiento"

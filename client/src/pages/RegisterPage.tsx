@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { InputText, InputPassword, InputSelect, InputDate, InputNumber } from '../Components/Inputs';
+import { InputText, InputPassword, InputSelect, InputNumber, InputDate } from '../Components/Inputs';
 import { Button } from '../Components/Button';
 import { AuthHomeButton } from '../Components/AuthHomeButton';
 import { useTheme } from '../theme/useTheme';
@@ -8,21 +8,10 @@ import { extractAuthError, login, register } from '../api/auth';
 import { getCategories, type Category } from '../api/categories';
 import { saveAccessToken } from '../auth/session';
 import { LocationPicker } from '../Components/LocationPicker';
+import { validateDateValue } from '../utils/dateValidation';
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const passwordPolicy = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/;
-
-function isBirthDateAllowed(birthDate: string): boolean {
-	if (!birthDate) return true;
-	const selectedDate = new Date(`${birthDate}T00:00:00`);
-	if (Number.isNaN(selectedDate.getTime())) return false;
-	const today = new Date();
-	today.setHours(0, 0, 0, 0);
-	if (selectedDate > today) return false;
-	const minBirthDate = new Date(today);
-	minBirthDate.setFullYear(minBirthDate.getFullYear() - 120);
-	return selectedDate >= minBirthDate;
-}
 
 type FormData = {
   dni: string;
@@ -62,8 +51,8 @@ export function RegisterPage() {
   const location = useLocation();
   const authOriginState =
     typeof location.state === 'object' &&
-    location.state !== null &&
-    'from' in location.state
+      location.state !== null &&
+      'from' in location.state
       ? { from: (location.state as { from?: string }).from }
       : undefined;
 
@@ -170,9 +159,9 @@ export function RegisterPage() {
     if (!confirmPassword.trim()) nextErrors.confirmPassword = 'Debes confirmar la contraseña.';
 
     if (birthDate) {
-      const birthDateValue = new Date(`${birthDate}T00:00:00`);
-      if (Number.isNaN(birthDateValue.getTime()) || birthDateValue > new Date()) {
-        nextErrors.birthDate = 'Ingresa una fecha de nacimiento válida.';
+      const birthDateError = validateDateValue(birthDate, 'birthDate');
+      if (birthDateError) {
+        nextErrors.birthDate = birthDateError;
       }
     }
 
@@ -304,7 +293,7 @@ export function RegisterPage() {
 
       setErrorMessage(
         message ||
-          'No se pudo crear la cuenta. Verifica la información e intenta de nuevo.',
+        'No se pudo crear la cuenta. Verifica la información e intenta de nuevo.',
       );
     } finally {
       setLoading(false);
@@ -410,6 +399,7 @@ export function RegisterPage() {
                     label="Fecha de nacimiento"
                     name="birthDate"
                     value={formData.birthDate}
+                    dateValidationMode="birthDate"
                     onChange={handleInputChange}
                   />
                   {formErrors.birthDate && <p className="text-xs text-red-300">{formErrors.birthDate}</p>}
@@ -524,7 +514,7 @@ export function RegisterPage() {
                         : passwordStrength === 'media'
                           ? 'bg-amber-500'
                           : 'bg-red-500'
-                    }`}
+                      }`}
                     style={{
                       width: !hasPassword
                         ? '0%'
@@ -556,7 +546,7 @@ export function RegisterPage() {
                           className={`rounded-full border px-3 py-1 text-xs transition-colors ${selected
                             ? 'border-primary-500 bg-primary-500/20 text-primary-500'
                             : 'border-border text-text-muted hover:border-primary-400 hover:text-text'
-                          }`}
+                            }`}
                         >
                           {category.name}
                         </button>

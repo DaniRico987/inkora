@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useLocation } from 'react-router-dom';
 import { Button } from './Button';
 import { InputDate, InputNumber, InputSelect, InputText } from './Inputs';
 import { Spinner } from './Spinner';
 import { useSnackbar } from './SnackbarProvider';
+import { MyHistoryView } from './profile/MyHistoryView';
+import { MyReservationsView } from './profile/MyReservationsView';
 import {
   createClientCard,
   deleteClientCard,
@@ -14,13 +17,14 @@ import {
 } from '../api/clients';
 import { getCategories, type Category } from '../api/categories';
 import { subscribeToCategory, unsubscribeFromCategory } from '../api/subscriptions';
+import { validateDateValue } from '../utils/dateValidation';
 
 interface UserProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-type ProfileSection = 'personal' | 'preferences' | 'cards';
+type ProfileSection = 'personal' | 'preferences' | 'cards' | 'reservations' | 'history';
 
 type CardFormState = {
   number: string;
@@ -49,20 +53,9 @@ function formatDate(isoDate: string): string {
   return date.toLocaleDateString('es-CO');
 }
 
-function isBirthDateAllowed(birthDate: string): boolean {
-  if (!birthDate) return true;
-  const selectedDate = new Date(`${birthDate}T00:00:00`);
-  if (Number.isNaN(selectedDate.getTime())) return false;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  if (selectedDate > today) return false;
-  const minBirthDate = new Date(today);
-  minBirthDate.setFullYear(minBirthDate.getFullYear() - 120);
-  return selectedDate >= minBirthDate;
-}
-
 export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
   const snackbar = useSnackbar();
+  const location = useLocation();
   const [activeSection, setActiveSection] = useState<ProfileSection>('personal');
   const [profile, setProfile] = useState<ClientProfile | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -89,6 +82,26 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
     if (isOpen) {
       void loadData();
     }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
+      onClose();
+    }
+  }, [location.pathname, location.search, location.hash]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+    };
   }, [isOpen]);
 
   const loadData = async () => {
@@ -129,8 +142,9 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
   );
 
   const handleSaveProfile = async () => {
-    if (!isBirthDateAllowed(form.birthDate)) {
-      snackbar.warning('La fecha de nacimiento debe ser válida y no superar 120 años.');
+    const birthDateError = validateDateValue(form.birthDate, 'birthDate');
+    if (birthDateError) {
+      snackbar.warning(birthDateError);
       return;
     }
 
@@ -204,6 +218,12 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
       return;
     }
 
+    const expirationDateError = validateDateValue(cardForm.expirationDate, 'futureDate');
+    if (expirationDateError) {
+      snackbar.warning(expirationDateError);
+      return;
+    }
+
     try {
       setSavingCard(true);
       const updated = await createClientCard({
@@ -245,8 +265,14 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
   if (!isOpen) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-3xl border border-border bg-bg-secondary shadow-xl">
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-hidden bg-black/50 px-4 py-20 sm:py-24"
+      onClick={onClose}
+    >
+      <div
+        className="profile-modal-scrollbar h-[min(86vh,54rem)] w-full max-w-6xl overflow-y-auto rounded-3xl border border-border bg-bg-secondary shadow-xl sm:h-[min(84vh,52rem)]"
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="p-5 sm:p-6">
           <div className="mb-5 flex items-center justify-between">
             <h2 className="text-xl font-semibold text-text">Mi Perfil</h2>
@@ -277,24 +303,36 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
           ) : (
             <div className="space-y-6">
               <section className="p-4">
-                <div className="flex flex-row">
+                <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
                   <button
-                    className={`${activeSection === 'personal' ? 'font-bold text-text border-b-2 border-primary-500' : 'text-text-muted'} w-1/3 px-5 py-2 text-base transition-all duration-150 cursor-pointer`}
+                    className={`${activeSection === 'personal' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-border bg-bg-secondary text-text-muted hover:text-text'} rounded-2xl border px-3 py-2 text-sm font-semibold transition-all duration-150 cursor-pointer`}
                     onClick={() => setActiveSection('personal')}
                   >
                     Datos personales
                   </button>
                   <button
-                    className={`${activeSection === 'preferences' ? 'font-bold text-text border-b-2 border-primary-500' : 'text-text-muted'} w-1/3 px-5 py-2 text-base transition-all duration-150 cursor-pointer`}
+                    className={`${activeSection === 'preferences' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-border bg-bg-secondary text-text-muted hover:text-text'} rounded-2xl border px-3 py-2 text-sm font-semibold transition-all duration-150 cursor-pointer`}
                     onClick={() => setActiveSection('preferences')}
                   >
                     Preferencias
                   </button>
                   <button
-                    className={`${activeSection === 'cards' ? 'font-bold text-text border-b-2 border-primary-500' : 'text-text-muted'} w-1/3 px-5 py-2 text-base transition-all duration-150 cursor-pointer`}
+                    className={`${activeSection === 'cards' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-border bg-bg-secondary text-text-muted hover:text-text'} rounded-2xl border px-3 py-2 text-sm font-semibold transition-all duration-150 cursor-pointer`}
                     onClick={() => setActiveSection('cards')}
                   >
                     Tarjetas
+                  </button>
+                  <button
+                    className={`${activeSection === 'reservations' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-border bg-bg-secondary text-text-muted hover:text-text'} rounded-2xl border px-3 py-2 text-sm font-semibold transition-all duration-150 cursor-pointer`}
+                    onClick={() => setActiveSection('reservations')}
+                  >
+                    Mis reservas
+                  </button>
+                  <button
+                    className={`${activeSection === 'history' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-border bg-bg-secondary text-text-muted hover:text-text'} rounded-2xl border px-3 py-2 text-sm font-semibold transition-all duration-150 cursor-pointer`}
+                    onClick={() => setActiveSection('history')}
+                  >
+                    Mi historial
                   </button>
                 </div>
               </section>
@@ -371,26 +409,33 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
                   <p className="mt-1 text-sm text-text-muted">
                     Activa o desactiva las categorías de las que quieres recibir novedades.
                   </p>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="mt-4 grid gap-2">
                     {categories.map((category) => {
                       const isSubscribed = subscribedCategoryIds.has(category.categoryId);
                       const isBusy = processingCategoryId === category.categoryId;
                       return (
-                        <div key={category.categoryId} className="rounded-2xl border border-border bg-bg-secondary p-3">
-                          <p className="text-sm font-semibold text-text">{category.name}</p>
-                          {category.description && (
-                            <p className="mt-1 line-clamp-2 text-xs text-text-muted">{category.description}</p>
-                          )}
-                          <div className="mt-3">
-                            <Button
-                              variant={isSubscribed ? 'primary' : 'secondary'}
-                              size="auto"
-                              loading={isBusy}
-                              className="rounded-full px-4 py-1.5 text-xs"
+                        <div key={category.categoryId} className="rounded-2xl border border-border bg-bg-secondary px-4 py-3">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-semibold text-text">{category.name}</p>
+                              {category.description && (
+                                <p className="mt-1 line-clamp-2 text-xs text-text-muted">{category.description}</p>
+                              )}
+                            </div>
+
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={isSubscribed}
+                              aria-label={`${isSubscribed ? 'Desuscribir de' : 'Suscribir a'} ${category.name}`}
+                              disabled={isBusy}
                               onClick={() => handleToggleCategory(category.categoryId)}
+                              className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-babyblue-400/40 focus:ring-offset-2 focus:ring-offset-bg disabled:cursor-wait disabled:opacity-60 ${isSubscribed ? 'border-primary-500 bg-primary-500/85' : 'border-border bg-bg'}`}
                             >
-                              {isSubscribed ? 'Suscrito' : 'Suscribirme'}
-                            </Button>
+                              <span
+                                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${isSubscribed ? 'translate-x-5' : 'translate-x-1'}`}
+                              />
+                            </button>
                           </div>
                         </div>
                       );
@@ -451,6 +496,7 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
                     <InputDate
                       label="Fecha de expiración"
                       value={cardForm.expirationDate}
+                      dateValidationMode="futureDate"
                       onChange={(event) => setCardForm((prev) => ({ ...prev, expirationDate: event.target.value }))}
                     />
                     <InputSelect
@@ -477,11 +523,10 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
                 </section>
               )}
 
-              <div className="flex justify-end pt-2">
-                <Button variant="secondary" size="auto" className="rounded-full px-6 py-2 text-sm" onClick={onClose}>
-                  Cerrar
-                </Button>
-              </div>
+              {activeSection === 'reservations' && <MyReservationsView embedded />}
+
+              {activeSection === 'history' && <MyHistoryView embedded />}
+
             </div>
           )}
         </div>

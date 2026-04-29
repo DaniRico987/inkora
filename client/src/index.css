@@ -40,3 +40,54 @@ html {
 #root {
   min-height: 100vh;
 }
+
+.profile-modal-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.34) transparent;
+}
+
+.profile-modal-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.profile-modal-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.profile-modal-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.34);
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  background-clip: content-box;
+}
+
+.profile-modal-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(148, 163, 184, 0.48);
+}
+
+/* MUI DatePicker popover and calendar styling to match Tailwind theme */
+.MuiPickersPopper-root .MuiPaper-root,
+.MuiPickerStaticWrapper-root .MuiPaper-root,
+.MuiPickersPopper-root .MuiCalendarPicker-root {
+  @apply bg-bg-secondary border border-border rounded-lg text-text shadow-sm;
+}
+
+.MuiPickersDay-root {
+  @apply rounded-md text-sm;
+}
+
+.MuiPickersDay-root.Mui-selected {
+  @apply bg-primary-500 text-white;
+}
+
+.MuiPickersCalendarHeader-root {
+  @apply text-sm text-text-muted;
+}
+
+.MuiPickersToolbar-root {
+  @apply bg-transparent;
+}
+
+.MuiPickersPopper-root .MuiIconButton-root {
+  @apply p-1 text-text-muted;
+}

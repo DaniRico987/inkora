@@ -32,7 +32,7 @@ export interface InputDateProps
   extends BaseInputProps,
   InputHTMLAttributes<HTMLInputElement> {
   calendarIconClassName?: string;
-  dateValidationMode?: "auto" | "birthDate" | "publicationDate" | "none";
+  dateValidationMode?: "auto" | "birthDate" | "publicationDate" | "futureDate" | "none";
 }
 
 export interface InputPasswordProps

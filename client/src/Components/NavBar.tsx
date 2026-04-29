@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { clearAccessToken } from '../auth/session';
 import { CartIcon } from './CartIcon';
@@ -27,13 +27,11 @@ function getNavItems(variant: NavBarVariant): NavBarItem[] {
     return [
         ...(variant === 'client'
             ? [
-                  { label: 'Inicio', to: '/' },
-                  { label: 'Catalogo', to: '/catalog' },
-                  { label: 'Mis reservas', to: '/my-reservations' },
-                  { label: 'Mi historial', to: '/my-history' },
-                  { label: 'Novedades', to: '/news' },
-                  { label: 'Tiendas', to: '/catalog' },
-              ]
+                { label: 'Inicio', to: '/' },
+                { label: 'Catalogo', to: '/catalog' },
+                { label: 'Novedades', to: '/news' },
+                { label: 'Tiendas', to: '/catalog' },
+            ]
             : []),
     ];
 }
@@ -117,7 +115,7 @@ export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
                             </Link>
                         </div>
 
-                        <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-4 lg:gap-7 text-sm sm:text-base font-medium">
+                        <div className="hidden lg:flex absolute left-1/2 -translate-x-1/2 items-center gap-4 xl:gap-7 text-sm sm:text-base font-medium">
                             {navItems.map((item) => (
                                 <Link key={item.label} to={item.to} className={navItemClass}>
                                     {item.label}
@@ -125,7 +123,19 @@ export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
                             ))}
                         </div>
 
-                        <div className="flex items-center justify-end gap-1 sm:gap-2 min-w-28">
+                        <div className="hidden md:flex items-center justify-end gap-2 lg:gap-3 min-w-28">
+                            <Link
+                                to="/catalog"
+                                aria-label="Ir al catálogo"
+                                className="inline-flex items-center justify-center rounded-full border border-white/25 bg-white/12 p-2 text-babyblue-50 transition hover:bg-white/18 hover:text-metallicgold-100"
+                                title="Catálogo"
+                            >
+                                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                                    <circle cx="11" cy="11" r="7" />
+                                    <path strokeLinecap="round" d="m20 20-3.5-3.5" />
+                                </svg>
+                            </Link>
+
                             {variant === 'visitor' && (
                                 <>
                                     <Link to="/login" state={authOriginState} className={authLinkClass}>
@@ -139,12 +149,6 @@ export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
 
                             {variant === 'client' && (
                                 <>
-                                    <Link to="/" aria-label="Buscar" className={iconButtonClass}>
-                                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                                            <circle cx="11" cy="11" r="7" />
-                                            <path strokeLinecap="round" d="m20 20-3.5-3.5" />
-                                        </svg>
-                                    </Link>
                                     <Link to="/cart" aria-label="Carrito" className={iconButtonClass}>
                                         <CartIcon />
                                     </Link>
@@ -182,13 +186,12 @@ export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
                                                         notifications.slice(0, 5).map((notification) => (
                                                             <div
                                                                 key={notification.notificationId}
-                                                                className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 ${
-                                                                    !notification.isRead ? 'bg-blue-50' : ''
-                                                                }`}
+                                                                className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 ${!notification.isRead ? 'bg-blue-50' : ''
+                                                                    }`}
                                                                 onClick={() => handleNotificationClick(notification.notificationId, notification.bookId)}
                                                             >
                                                                 <div className="flex items-start space-x-3">
-                                                                    <div className="flex-shrink-0">
+                                                                    <div className="shrink-0">
                                                                         {notification.book?.coverUrl ? (
                                                                             <img
                                                                                 src={notification.book.coverUrl}
@@ -215,7 +218,7 @@ export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
                                                                         </p>
                                                                     </div>
                                                                     {!notification.isRead && (
-                                                                        <div className="flex-shrink-0">
+                                                                        <div className="shrink-0">
                                                                             <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                                                                         </div>
                                                                     )}
@@ -253,31 +256,38 @@ export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
                                     </button>
                                 </>
                             )}
-
                             {variant === 'admin' && (
                                 <button type="button" onClick={handleLogout} className={authLinkClass}>
                                     Cerrar sesion
                                 </button>
                             )}
-
-                            {variant !== 'admin' && (
-                                <button
-                                    onClick={() => setIsOpen((prev) => !prev)}
-                                    className="md:hidden inline-flex items-center justify-center rounded-lg p-2 text-babyblue-50/95 hover:bg-white/12"
-                                    aria-expanded={isOpen}
-                                    aria-label="Abrir menu"
-                                >
-                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                                    </svg>
-                                </button>
-                            )}
                         </div>
+
+                        {variant !== 'admin' && (
+                            <button
+                                onClick={() => setIsOpen((prev) => !prev)}
+                                className="md:hidden inline-flex items-center justify-center rounded-lg p-2 text-babyblue-50/95 hover:bg-white/12"
+                                aria-expanded={isOpen}
+                                aria-label="Abrir menu"
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                </svg>
+                            </button>
+                        )}
                     </div>
 
                     {variant !== 'admin' && isOpen && (
                         <div className="md:hidden border-t border-white/20 px-4 pb-4 pt-3">
                             <div className="flex flex-col gap-2 text-left text-babyblue-50">
+                                <Link
+                                    to="/catalog"
+                                    onClick={handleMobileLinkClick}
+                                    className="rounded-md px-2 py-2 hover:bg-white/12"
+                                >
+                                    Catálogo
+                                </Link>
+
                                 {navItems.map((item) => (
                                     <Link
                                         key={`mobile-${item.label}`}
@@ -301,16 +311,24 @@ export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
                                 )}
 
                                 {variant === 'client' && (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setUserProfileModalOpen(true);
-                                            handleMobileLinkClick();
-                                        }}
-                                        className="rounded-md px-2 py-2 text-left hover:bg-white/12"
-                                    >
-                                        Mi Perfil
-                                    </button>
+                                    <>
+                                        <Link to="/cart" onClick={handleMobileLinkClick} className="rounded-md px-2 py-2 hover:bg-white/12">
+                                            Carrito
+                                        </Link>
+                                        <Link to="/news" onClick={handleMobileLinkClick} className="rounded-md px-2 py-2 hover:bg-white/12">
+                                            Notificaciones
+                                        </Link>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setUserProfileModalOpen(true);
+                                                handleMobileLinkClick();
+                                            }}
+                                            className="rounded-md px-2 py-2 text-left hover:bg-white/12"
+                                        >
+                                            Mi Perfil
+                                        </button>
+                                    </>
                                 )}
 
                                 {variant !== 'visitor' && (
@@ -327,7 +345,7 @@ export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
                     )}
                 </div>
             </nav>
-            
+
             {/* User Profile Modal */}
             <UserProfileModal
                 isOpen={userProfileModalOpen}

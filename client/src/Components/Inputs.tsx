@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs, { type Dayjs } from 'dayjs';
 import type {
   InputTextProps,
   InputNumberProps,
@@ -11,13 +13,17 @@ import type {
   FloatingLabelProps,
   InputValidationType,
 } from "../interfaces/InputsInterface";
+import {
+  getDateValidationBounds,
+  resolveDateValidationMode,
+} from '../utils/dateValidation';
 
 const wrapper = "relative mb-5 mt-2";
 
 const inputBase =
   "w-full border border-border rounded-lg px-3 py-3 text-md text-text outline-none transition duration-200 focus:border-border-focus bg-bg-input peer";
 
-const PlaceholderBase = "placeholder:text-transparent";
+const PlaceholderBase = "placeholder:text-text-muted";
 
 // -------- Validación de inputs --------
 
@@ -65,9 +71,9 @@ function FloatingLabel({ label, lifted }: FloatingLabelProps) {
   return (
     <span
       className={`
-        absolute left-3 pointer-events-none z-10
-        transition-all duration-180 ease-in-out
-        bg-transparent px-1                            // ✅ tapa el borde al salir
+          absolute left-3 pointer-events-none z-10
+          transition-all duration-180 ease-in-out
+          bg-transparent px-2                            // ✅ tapa el borde al salir
         ${lifted
           ? "-top-5 text-xs text-label"           // ✅ fuera del input
           : "top-1/2 -translate-y-1/2 text-sm text-placeholder"
@@ -89,8 +95,18 @@ export function InputText({ label, value, onChange, validationType = "none", ...
   const isDateInput = props.type === "date";
   const lifted = isDateInput ? true : focused || currentVal.length > 0;
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== " " || currentVal.trim().length > 0) return;
+
+    e.preventDefault();
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let newValue = e.target.value;
+
+    if (!currentVal.trim()) {
+      newValue = newValue.replace(/^\s+/, "");
+    }
 
     // Aplicar validación si está configurada y no es "none"
     if (validationType !== "none") {
@@ -120,6 +136,7 @@ export function InputText({ label, value, onChange, validationType = "none", ...
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         onChange={handleChange}
+        onKeyDown={handleKeyDown}
         {...props}
       />
     </div>
@@ -191,169 +208,79 @@ export function InputDate({
   label,
   value,
   onChange,
-  calendarIconClassName = "text-text-muted",
+  calendarIconClassName = `${inputBase} ${PlaceholderBase}`,
   dateValidationMode = "auto",
   ...props
 }: InputDateProps) {
   const [internalVal, setInternalVal] = useState("");
-  const [isEditing, setIsEditing] = useState(false);
-  const [draftVal, setDraftVal] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const externalVal = value !== undefined ? String(value) : internalVal;
-  const currentVal = isEditing ? draftVal : externalVal;
+  const effectiveMode = resolveDateValidationMode({
+    label: typeof label === 'string' ? label : undefined,
+    name: typeof props.name === 'string' ? props.name : undefined,
+    id: typeof props.id === 'string' ? props.id : undefined,
+    dateValidationMode,
+  });
+  const bounds = getDateValidationBounds(effectiveMode);
+  const pickerValue = externalVal ? dayjs(externalVal, 'YYYY-MM-DD', true) : null;
+  const selectedValue = pickerValue?.isValid() ? pickerValue : null;
   const lifted = true;
-
-  useEffect(() => {
-    if (!isEditing) {
-      setDraftVal(externalVal);
-    }
-  }, [externalVal, isEditing]);
-
-  const resolveDateValidationMode = () => {
-    if (dateValidationMode !== "auto") return dateValidationMode;
-
-    const context = `${String(label ?? "")} ${props.name ?? ""} ${props.id ?? ""}`.toLowerCase();
-    const normalizedContext = context
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "");
-
-    if (
-      normalizedContext.includes("nacimiento") ||
-      normalizedContext.includes("birth") ||
-      normalizedContext.includes("dob")
-    ) {
-      return "birthDate";
-    }
-
-    if (
-      normalizedContext.includes("publicacion") ||
-      normalizedContext.includes("published") ||
-      normalizedContext.includes("publication") ||
-      normalizedContext.includes("release")
-    ) {
-      return "publicationDate";
-    }
-
-    return "none";
+  const textFieldProps = {
+    label: '',
+    fullWidth: true,
+    variant: 'outlined' as const,
+    size: 'small' as const,
+    name: props.name,
+    id: props.id,
+    required: props.required,
+    disabled: props.disabled,
+    autoComplete: props.autoComplete,
+    placeholder: props.placeholder,
+    readOnly: props.readOnly,
+    tabIndex: props.tabIndex,
+    className: `${inputBase} ${PlaceholderBase} ${props.className ?? ''}`,
+    InputLabelProps: { shrink: false },
   };
 
-  const isValidCalendarDate = (rawDate: string) => {
-    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(rawDate);
-    if (!match) return false;
+  const handleChange = (nextValue: Dayjs | null) => {
+    const nextDate = nextValue && nextValue.isValid() ? nextValue.format('YYYY-MM-DD') : '';
 
-    const year = Number(match[1]);
-    const month = Number(match[2]);
-    const day = Number(match[3]);
-    const date = new Date(Date.UTC(year, month - 1, day));
-
-    return (
-      date.getUTCFullYear() === year &&
-      date.getUTCMonth() === month - 1 &&
-      date.getUTCDate() === day
-    );
-  };
-
-  const validateDateValue = (rawDate: string) => {
-    if (!rawDate) return "";
-    if (rawDate.length < 10) return "";
-    if (!isValidCalendarDate(rawDate)) return "La fecha ingresada no existe.";
-
-    const mode = resolveDateValidationMode();
-    if (mode === "none" || mode === "publicationDate") return "";
-
-    const selectedDate = new Date(`${rawDate}T00:00:00`);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (selectedDate > today) {
-      return "La fecha de nacimiento no puede ser futura.";
+    if (value === undefined) {
+      setInternalVal(nextDate);
     }
 
-    const minBirthDate = new Date(today);
-    minBirthDate.setFullYear(minBirthDate.getFullYear() - 120);
+    const syntheticEvent = {
+      target: {
+        value: nextDate,
+        name: props.name ?? '',
+        type: 'date',
+      },
+      currentTarget: {
+        value: nextDate,
+        name: props.name ?? '',
+        type: 'date',
+      },
+    } as React.ChangeEvent<HTMLInputElement>;
 
-    if (selectedDate < minBirthDate) {
-      return "La fecha de nacimiento no puede superar los 120 anos.";
-    }
-
-    return "";
-  };
-
-  const openDatePicker = () => {
-    const input = inputRef.current;
-    if (!input) return;
-
-    input.focus();
-    try {
-      (input as HTMLInputElement & { showPicker?: () => void }).showPicker?.();
-    } catch {
-      // Algunos navegadores restringen showPicker; al menos dejamos el input enfocado.
-    }
+    onChange?.(syntheticEvent);
   };
 
   return (
     <div className={wrapper}>
       <FloatingLabel label={label ?? ""} lifted={lifted} />
-      <div className="relative">
-        <input
-          ref={inputRef}
-          type="date"
-          className={`${inputBase} pr-10 appearance-none ${PlaceholderBase} [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer`}
-          value={currentVal}
-          onFocus={(e) => {
-            setIsEditing(true);
-            setDraftVal(e.target.value);
-          }}
-          onChange={(e) => {
-            // Nunca bloqueamos la escritura del usuario mientras edita manualmente.
-            setDraftVal(e.target.value);
-            const isCompleteDate = e.target.value.length === 10;
-            const errorMessage = isCompleteDate ? validateDateValue(e.target.value) : "";
-            e.target.setCustomValidity(errorMessage);
-            if (isCompleteDate || e.target.value === "") {
-              if (value === undefined) setInternalVal(e.target.value);
-              onChange?.(e);
-            }
-          }}
-          onBlur={(e) => {
-            const errorMessage = validateDateValue(e.target.value);
-            e.target.setCustomValidity(errorMessage);
-            if (errorMessage) {
-              e.target.reportValidity();
-            }
-            setIsEditing(false);
-            if (value === undefined) {
-              setInternalVal(e.target.value);
-            } else if (e.target.value !== externalVal && (e.target.value.length === 10 || e.target.value === "")) {
-              onChange?.(e);
-            }
-          }}
-          {...props}
-        />
-        <button
-          type="button"
-          onClick={openDatePicker}
-          className={`absolute right-3 top-1/2 -translate-y-1/2 ${calendarIconClassName}`}
-          aria-label="Abrir calendario"
-        >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-            <line x1="16" y1="2" x2="16" y2="6" />
-            <line x1="8" y1="2" x2="8" y2="6" />
-            <line x1="3" y1="10" x2="21" y2="10" />
-          </svg>
-        </button>
-      </div>
+      <DatePicker
+        value={selectedValue}
+        onChange={handleChange}
+        format="DD/MM/YYYY"
+        minDate={bounds.minDate ? dayjs(bounds.minDate) : undefined}
+        maxDate={bounds.maxDate ? dayjs(bounds.maxDate) : undefined}
+        slotProps={{
+          textField: textFieldProps as never,
+          openPickerButton: {
+            className: `p-1 ${inputBase} ${PlaceholderBase} ${calendarIconClassName}`,
+          },
+        }}
+      />
     </div>
   );
 }
