@@ -5,6 +5,8 @@ import { AddToCartButton } from '../Components/AddToCartButton';
 import { Spinner } from '../Components/Spinner';
 import { useSnackbar } from '../Components/SnackbarProvider';
 import { createReservation } from '../api/reservations';
+import { addToCart } from '../api/cart';
+import { addMapping as addReservationCartMapping } from '../utils/reservationCart';
 import { getAccessToken, getRoleFromToken } from '../auth/session';
 import { useBookDetail } from '../hooks/useBooks';
 
@@ -68,6 +70,29 @@ export function BookDetailPage() {
       });
       setReservationExpiration(response.expirationDate);
       setIsConfirmOpen(false);
+
+      // Intentar agregar los items reservados al carrito del cliente
+      try {
+        const cartItemIds: number[] = [];
+        for (const item of response.items) {
+          try {
+            const added = await addToCart(item.bookId, item.quantity);
+            cartItemIds.push(added.cartItemId);
+          } catch (cartErr) {
+            console.error('No se pudo agregar item reservado al carrito:', cartErr);
+          }
+        }
+
+        if (cartItemIds.length > 0) {
+          addReservationCartMapping({
+            reservationId: response.reservationId,
+            cartItemIds,
+            expirationDate: response.expirationDate,
+          });
+        }
+      } catch (mapErr) {
+        console.error('Error mapeando reserva a carrito:', mapErr);
+      }
 
       snackbar.success('Reserva creada correctamente');
     } catch (submitError) {

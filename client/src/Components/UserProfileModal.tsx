@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from './Button';
 import { InputDate, InputSelect, InputText } from './Inputs';
 import { LocationPicker } from './LocationPicker';
@@ -51,6 +51,7 @@ function formatDate(isoDate: string): string {
 export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
   const snackbar = useSnackbar();
   const location = useLocation();
+  const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<ProfileSection>('personal');
   const [profile, setProfile] = useState<ClientProfile | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -534,7 +535,15 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
                 </section>
               )}
 
-              {activeSection === 'reservations' && <MyReservationsView embedded />}
+              {activeSection === 'reservations' && (
+                <MyReservationsView
+                  embedded
+                  onGoToCart={() => {
+                    onClose();
+                    navigate('/cart');
+                  }}
+                />
+              )}
 
               {activeSection === 'history' && <MyHistoryView embedded showReservations={false} />}
 

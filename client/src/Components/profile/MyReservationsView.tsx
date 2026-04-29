@@ -5,6 +5,10 @@ import { Button } from '../Button';
 import { Spinner } from '../Spinner';
 import { useSnackbar } from '../SnackbarProvider';
 import { cancelReservation, getReservations, type ReservationResponse } from '../../api/reservations';
+import { getMapping, addMapping, removeMapping } from '../../utils/reservationCart';
+import { useCart } from '../../hooks/useCart';
+import { addToCart } from '../../api/cart';
+import { useNavigate } from 'react-router-dom';
 import { getBookDetail } from '../../api/books';
 
 type CountdownTone = 'normal' | 'warning' | 'danger' | 'expired';
@@ -88,9 +92,10 @@ function statusChip(status: ReservationResponse['status']): { label: string; cla
 
 type MyReservationsViewProps = {
     embedded?: boolean;
+    onGoToCart?: () => void;
 };
 
-export function MyReservationsView({ embedded = false }: MyReservationsViewProps) {
+export function MyReservationsView({ embedded = false, onGoToCart }: MyReservationsViewProps) {
     const snackbar = useSnackbar();
     const [reservations, setReservations] = useState<ReservationResponse[]>([]);
     const [loading, setLoading] = useState(true);
@@ -100,6 +105,53 @@ export function MyReservationsView({ embedded = false }: MyReservationsViewProps
     const [isCancelling, setIsCancelling] = useState(false);
     const [recentlyCancelledIds, setRecentlyCancelledIds] = useState<number[]>([]);
     const [bookCoverById, setBookCoverById] = useState<Record<number, string | null>>({});
+    const { addItem, loadCart, removeItem } = useCart();
+    const navigate = useNavigate();
+
+    function AddReservationToCartButton({
+        reservationId,
+        bookId,
+        quantity,
+        expirationDate,
+        onAdded,
+        onError,
+    }: {
+        reservationId: number;
+        bookId: number;
+        quantity: number;
+        expirationDate: string;
+        onAdded?: () => void;
+        onError?: (msg: string) => void;
+    }) {
+        const [loading, setLoading] = useState(false);
+
+        const handleAdd = async () => {
+            try {
+                setLoading(true);
+                const added = await addToCart(bookId, quantity);
+                // refresh cart state
+                await loadCart();
+                addMapping({ reservationId, cartItemIds: [added.cartItemId], expirationDate });
+                onAdded?.();
+            } catch (err) {
+                const message = err instanceof Error ? err.message : 'No se pudo agregar al carrito';
+                onError?.(message);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        return (
+            <button
+                type="button"
+                disabled={loading}
+                onClick={handleAdd}
+                className="inline-flex items-center justify-center rounded-full border border-babyblue-300/70 bg-babyblue-50 px-4 py-2 text-sm font-semibold text-babyblue-700 transition hover:bg-babyblue-100"
+            >
+                {loading ? 'Agregando...' : 'Agregar al carrito'}
+            </button>
+        );
+    }
 
     const loadReservations = async () => {
         try {
@@ -189,21 +241,40 @@ export function MyReservationsView({ embedded = false }: MyReservationsViewProps
 
     const confirmCancelReservation = async () => {
         if (!pendingCancelId) return;
+        const reservationId = pendingCancelId;
 
         setIsCancelling(true);
         try {
-            const updatedReservation = await cancelReservation(pendingCancelId);
+            const updatedReservation = await cancelReservation(reservationId);
 
             setReservations((prev) =>
                 prev.map((reservation) =>
-                    reservation.reservationId === pendingCancelId ? updatedReservation : reservation,
+                    reservation.reservationId === reservationId ? updatedReservation : reservation,
                 ),
             );
 
             setRecentlyCancelledIds((prev) => {
-                const next = [pendingCancelId, ...prev];
+                const next = [reservationId, ...prev];
                 return next.slice(0, 4);
             });
+
+            // limpiar mapeo carrito -> reserva si existe
+            try {
+                const mapping = getMapping(reservationId);
+                if (mapping && mapping.cartItemIds.length > 0) {
+                    for (const cartItemId of mapping.cartItemIds) {
+                        try {
+                            await removeItem(cartItemId);
+                        } catch (remErr) {
+                            console.error('Error removing cart item linked to cancelled reservation:', remErr);
+                        }
+                    }
+                    removeMapping(reservationId);
+                    await loadCart();
+                }
+            } catch (cleanupErr) {
+                console.error('Error cleaning up cart mapping after cancel:', cleanupErr);
+            }
 
             setPendingCancelId(null);
             snackbar.success('Reserva cancelada exitosamente');
@@ -327,7 +398,32 @@ export function MyReservationsView({ embedded = false }: MyReservationsViewProps
                                             </div>
                                         </div>
 
-                                        <div className="mt-4 flex justify-end">
+                                        <div className="mt-4 flex justify-end gap-3">
+                                            {getMapping(card.reservationId) ? (
+                                                <button
+                                                    type="button"
+                                                    className="inline-flex items-center justify-center rounded-full border border-babyblue-300/70 bg-babyblue-50 px-4 py-2 text-sm font-semibold text-babyblue-700 transition hover:bg-babyblue-100"
+                                                    onClick={() => {
+                                                        if (typeof onGoToCart === 'function') {
+                                                            onGoToCart();
+                                                        } else {
+                                                            navigate('/cart');
+                                                        }
+                                                    }}
+                                                >
+                                                    Ir al carrito
+                                                </button>
+                                            ) : (
+                                                <AddReservationToCartButton
+                                                    reservationId={card.reservationId}
+                                                    bookId={card.bookId}
+                                                    quantity={card.quantity}
+                                                    expirationDate={card.expirationDate}
+                                                    onAdded={() => snackbar.success('Reserva agregada al carrito')}
+                                                    onError={(msg) => snackbar.error(msg)}
+                                                />
+                                            )}
+
                                             <button
                                                 type="button"
                                                 className="inline-flex items-center justify-center rounded-full border border-danger-300/70 bg-danger-50 px-4 py-2 text-sm font-semibold text-danger-700 transition hover:bg-danger-100"
