@@ -31,7 +31,7 @@ function getNavItems(variant: NavBarVariant): NavBarItem[] {
                 { label: 'Inicio', to: '/' },
                 { label: 'Catalogo', to: '/catalog' },
                 { label: 'Novedades', to: '/news' },
-                { label: 'Tiendas', to: '/catalog' },
+                { label: 'Tiendas', to: '/stores' },
             ]
             : []),
     ];
