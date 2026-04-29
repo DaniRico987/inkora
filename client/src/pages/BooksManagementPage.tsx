@@ -16,6 +16,43 @@ import {
 } from '../api/books';
 import { getCategories } from '../api/categories';
 import type { Book } from '../interfaces/admin';
+const BOOK_LANGUAGE_OPTIONS = [
+  { label: 'Inglés', value: 'Inglés' },
+  { label: 'Español', value: 'Español' },
+  { label: 'Portugués', value: 'Portugués' },
+  { label: 'Francés', value: 'Francés' },
+  { label: 'Alemán', value: 'Alemán' },
+  { label: 'Italiano', value: 'Italiano' },
+  { label: 'Neerlandés', value: 'Neerlandés' },
+  { label: 'Sueco', value: 'Sueco' },
+  { label: 'Polaco', value: 'Polaco' },
+  { label: 'Griego', value: 'Griego' },
+  { label: 'Chino', value: 'Chino' },
+  { label: 'Japonés', value: 'Japonés' },
+  { label: 'Ruso', value: 'Ruso' },
+];
+
+const CURRENT_YEAR = new Date().getFullYear();
+
+const normalizeBookText = (value: string) =>
+  value
+    .replace(/[^\p{L}\p{N}\s]/gu, '')
+    .replace(/\s+/g, ' ')
+    .replace(/^\s+/, '');
+
+const normalizeIsbnValue = (value: string) => value.replace(/\D/g, '');
+
+const normalizeLanguageValue = (value: string) => {
+  const normalized = value.trim();
+  if (normalized === 'Ingles') return 'Inglés';
+  if (normalized === 'Espanol') return 'Español';
+  if (normalized === 'Portugues') return 'Portugués';
+  if (normalized === 'Frances') return 'Francés';
+  if (normalized === 'Aleman') return 'Alemán';
+  if (normalized === 'Neerlandes') return 'Neerlandés';
+  if (normalized === 'Japones') return 'Japonés';
+  return normalized;
+};
 
 export function BooksManagementPage() {
   const navigate = useNavigate();
@@ -181,6 +218,7 @@ export function BooksManagementPage() {
       success('Libro eliminado exitosamente');
       setCurrentPage(1);
       setDeleteConfirm({ isOpen: false });
+      window.location.reload();
     } catch (err) {
       error('Error al eliminar libro');
       console.error(err);
@@ -216,9 +254,21 @@ export function BooksManagementPage() {
         initialInventoryQuantity: inventoryQuantity,
       };
 
+      const isbnValue = normalizeIsbnValue((formData.get('isbn') as string) || '');
+      const descriptionValue = ((formData.get('description') as string) || '').trim();
+
       if (inventoryQuantity < 1) {
         throw new Error('La cantidad de inventario inicial debe ser mayor a 0');
       }
+      if (!descriptionValue) {
+        throw new Error('La descripción es obligatoria');
+      }
+      if (isbnValue.length !== 13) {
+        throw new Error('El ISBN debe tener exactamente 13 dígitos');
+      }
+
+      data.isbn = isbnValue;
+      data.description = descriptionValue;
 
       if (editingBook) {
         await updateBook(editingBook.bookId, data);
@@ -226,6 +276,8 @@ export function BooksManagementPage() {
       } else {
         await createBook(data);
         success('Libro creado exitosamente');
+        window.location.reload();
+        return;
       }
 
       setIsFormOpen(false);
@@ -348,6 +400,10 @@ export function BooksManagementPage() {
               required
               defaultValue={editingBook?.title || ''}
               placeholder="Nombre del libro"
+              onInput={(event) => {
+                event.currentTarget.value = normalizeBookText(event.currentTarget.value);
+              }}
+              title="Solo letras, números y espacios"
               className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
             />
           </div>
@@ -360,6 +416,10 @@ export function BooksManagementPage() {
               required
               defaultValue={editingBook?.author || ''}
               placeholder="Nombre del autor"
+              onInput={(event) => {
+                event.currentTarget.value = normalizeBookText(event.currentTarget.value);
+              }}
+              title="Solo letras, números y espacios"
               className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
             />
           </div>
@@ -385,7 +445,7 @@ export function BooksManagementPage() {
                 type="number"
                 name="publicationYear"
                 min="1000"
-                max="2100"
+                max={CURRENT_YEAR}
                 defaultValue={editingBook?.publicationYear ?? ''}
                 placeholder="e.g. 2023"
                 className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
@@ -401,6 +461,10 @@ export function BooksManagementPage() {
                 name="publisher"
                 defaultValue={editingBook?.publisher || ''}
                 placeholder="Editorial"
+                onInput={(event) => {
+                  event.currentTarget.value = normalizeBookText(event.currentTarget.value);
+                }}
+                title="Solo letras, números y espacios"
                 className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
               />
             </div>
@@ -412,6 +476,15 @@ export function BooksManagementPage() {
                 name="isbn"
                 defaultValue={editingBook?.isbn || ''}
                 placeholder="ISBN"
+                required
+                inputMode="numeric"
+                maxLength={13}
+                minLength={13}
+                pattern="[0-9]{13}"
+                onInput={(event) => {
+                  event.currentTarget.value = normalizeIsbnValue(event.currentTarget.value).slice(0, 13);
+                }}
+                title="Debe tener exactamente 13 dígitos"
                 className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
               />
             </div>
@@ -420,13 +493,21 @@ export function BooksManagementPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-text mb-2">Idioma</label>
-              <input
-                type="text"
+              <select
                 name="language"
-                defaultValue={editingBook?.language || ''}
-                placeholder="Español"
+                defaultValue={normalizeLanguageValue(editingBook?.language || '')}
+                required
                 className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
-              />
+              >
+                <option value="" disabled>
+                  Seleccionar idioma
+                </option>
+                {BOOK_LANGUAGE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
@@ -476,6 +557,8 @@ export function BooksManagementPage() {
               rows={3}
               defaultValue={editingBook?.description || ''}
               placeholder="Resumen del libro"
+              required
+              title="La descripción es obligatoria"
               className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors resize-none"
             />
           </div>

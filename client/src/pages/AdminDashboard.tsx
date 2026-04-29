@@ -6,11 +6,59 @@ import { getRoleFromToken, getAccessToken } from '../auth/session';
 import { Spinner } from '../Components/Spinner';
 import { Link } from 'react-router-dom';
 import { FormModal } from '../Components/FormModal';
+import { LocationPicker } from '../Components/LocationPicker';
 import { useSnackbar } from '../Components/SnackbarProvider';
 import { createBook } from '../api/books';
 import { createStore } from '../api/stores';
 import type { AdminStats } from '../interfaces/admin';
 
+const BOOK_LANGUAGE_OPTIONS = [
+  { label: 'Inglés', value: 'Inglés' },
+  { label: 'Español', value: 'Español' },
+  { label: 'Portugués', value: 'Portugués' },
+  { label: 'Francés', value: 'Francés' },
+  { label: 'Alemán', value: 'Alemán' },
+  { label: 'Italiano', value: 'Italiano' },
+  { label: 'Neerlandés', value: 'Neerlandés' },
+  { label: 'Sueco', value: 'Sueco' },
+  { label: 'Polaco', value: 'Polaco' },
+  { label: 'Griego', value: 'Griego' },
+  { label: 'Chino', value: 'Chino' },
+  { label: 'Japonés', value: 'Japonés' },
+  { label: 'Ruso', value: 'Ruso' },
+];
+
+const CURRENT_YEAR = new Date().getFullYear();
+
+const normalizeBookText = (value: string) =>
+  value
+    .replace(/[^\p{L}\p{N}\s]/gu, '')
+    .replace(/\s+/g, ' ')
+    .replace(/^\s+/, '');
+
+const normalizeStoreName = (value: string) => normalizeBookText(value);
+
+const normalizeStoreAddress = (value: string) =>
+  value
+    .replace(/[^\p{L}\p{N}\s#.,\-/]/gu, '')
+    .replace(/\s+/g, ' ')
+    .replace(/^\s+/, '');
+
+const extractCityName = (value: string) => value.split(',')[0]?.trim() || '';
+
+const normalizeIsbnValue = (value: string) => value.replace(/\D/g, '');
+
+const normalizeLanguageValue = (value: string) => {
+  const normalized = value.trim();
+  if (normalized === 'Ingles') return 'Inglés';
+  if (normalized === 'Espanol') return 'Español';
+  if (normalized === 'Portugues') return 'Portugués';
+  if (normalized === 'Frances') return 'Francés';
+  if (normalized === 'Aleman') return 'Alemán';
+  if (normalized === 'Neerlandes') return 'Neerlandés';
+  if (normalized === 'Japones') return 'Japonés';
+  return normalized;
+};
 export function AdminDashboard() {
   const navigate = useNavigate();
   const token = getAccessToken();
@@ -22,6 +70,7 @@ export function AdminDashboard() {
   const [dashboardError, setDashboardError] = useState<string | null>(null);
   const [isFormOpenBooks, setIsFormOpenBooks] = useState(false);
   const [isFormOpenStores, setIsFormOpenStores] = useState(false);
+  const [storeLocation, setStoreLocation] = useState('');
   const [inventoryQuantity, setInventoryQuantity] = useState<number>(1);
 
   // Redirect root users
@@ -77,13 +126,25 @@ export function AdminDashboard() {
         initialInventoryQuantity: inventoryQuantity,
       };
 
+      const isbnValue = normalizeIsbnValue((formData.get('isbn') as string) || '');
+      const descriptionValue = ((formData.get('description') as string) || '').trim();
+
       if (inventoryQuantity < 1) {
         throw new Error('La cantidad de inventario inicial debe ser mayor a 0');
       }
+      if (!descriptionValue) {
+        throw new Error('La descripción es obligatoria');
+      }
+      if (isbnValue.length !== 13) {
+        throw new Error('El ISBN debe tener exactamente 13 dígitos');
+      }
+      data.isbn = isbnValue;
+      data.description = descriptionValue;
       await createBook(data);
       success('Libro creado exitosamente');
       setIsFormOpenBooks(false);
       setInventoryQuantity(1);
+      window.location.reload();
     } catch (err) {
       error('Error al guardar libro');
       console.error(err);
@@ -98,20 +159,37 @@ export function AdminDashboard() {
       const latitudeValue = formData.get('latitude') as string;
       const longitudeValue = formData.get('longitude') as string;
       const capacityValue = formData.get('capacity') as string;
+      const locationValue = extractCityName((formData.get('city') as string) || '');
 
       const data = {
         name: (formData.get('name') as string) || '',
         address: (formData.get('address') as string) || '',
-        city: (formData.get('city') as string) || '',
+        city: locationValue,
         latitude: latitudeValue ? parseFloat(latitudeValue) : undefined,
         longitude: longitudeValue ? parseFloat(longitudeValue) : undefined,
         capacity: capacityValue ? parseInt(capacityValue, 10) : undefined,
         status: (formData.get('status') as string) as 'active' | 'inactive' | undefined,
       };
 
+      const nameValue = ((formData.get('name') as string) || '').trim();
+      const addressValue = ((formData.get('address') as string) || '').trim();
+
+      if (!nameValue) {
+        throw new Error('El nombre de la tienda es obligatorio');
+      }
+      if (!addressValue) {
+        throw new Error('La dirección es obligatoria');
+      }
+      if (!locationValue) {
+        throw new Error('Debes seleccionar un lugar');
+      }
+
+      data.name = normalizeStoreName(nameValue);
+      data.address = normalizeStoreAddress(addressValue);
       await createStore(data);
       success('Tienda creada exitosamente');
       setIsFormOpenStores(false);
+      setStoreLocation('');
     } catch (err) {
       error('Error al guardar tienda');
       console.error(err);
@@ -262,6 +340,10 @@ export function AdminDashboard() {
               name="title"
               required
               placeholder="Nombre del libro"
+              onInput={(event) => {
+                event.currentTarget.value = normalizeBookText(event.currentTarget.value);
+              }}
+              title="Solo letras, números y espacios"
               className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
             />
           </div>
@@ -273,6 +355,10 @@ export function AdminDashboard() {
               name="author"
               required
               placeholder="Nombre del autor"
+              onInput={(event) => {
+                event.currentTarget.value = normalizeBookText(event.currentTarget.value);
+              }}
+              title="Solo letras, números y espacios"
               className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
             />
           </div>
@@ -335,6 +421,15 @@ export function AdminDashboard() {
                 type="text"
                 name="isbn"
                 placeholder="ISBN"
+                required
+                inputMode="numeric"
+                maxLength={13}
+                minLength={13}
+                pattern="[0-9]{13}"
+                onInput={(event) => {
+                  event.currentTarget.value = normalizeIsbnValue(event.currentTarget.value).slice(0, 13);
+                }}
+                title="Debe tener exactamente 13 dígitos"
                 className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
               />
             </div>
@@ -347,18 +442,31 @@ export function AdminDashboard() {
                 type="text"
                 name="publisher"
                 placeholder="Editorial"
+                onInput={(event) => {
+                  event.currentTarget.value = normalizeBookText(event.currentTarget.value);
+                }}
+                title="Solo letras, números y espacios"
                 className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-text mb-2">Idioma</label>
-              <input
-                type="text"
+              <select
                 name="language"
-                placeholder="Español"
+                required
+                defaultValue=""
                 className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
-              />
+              >
+                <option value="" disabled>
+                  Seleccionar idioma
+                </option>
+                {BOOK_LANGUAGE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -399,6 +507,8 @@ export function AdminDashboard() {
               name="description"
               placeholder="Descripción del libro..."
               rows={4}
+              required
+              title="La descripción es obligatoria"
               className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
             />
           </div>
@@ -432,7 +542,10 @@ export function AdminDashboard() {
       <FormModal
         isOpen={isFormOpenStores}
         title="Crear Tienda"
-        onClose={() => setIsFormOpenStores(false)}
+        onClose={() => {
+          setIsFormOpenStores(false);
+          setStoreLocation('');
+        }}
         onSubmit={handleFormSubmitStore}
         isLoading={isLoading}
         submitText="Crear"
@@ -446,6 +559,10 @@ export function AdminDashboard() {
               name="name"
               required
               placeholder="Nombre de la tienda"
+              onInput={(event) => {
+                event.currentTarget.value = normalizeStoreName(event.currentTarget.value);
+              }}
+              title="Solo letras, números y espacios"
               className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
             />
           </div>
@@ -457,19 +574,21 @@ export function AdminDashboard() {
               name="address"
               required
               placeholder="Dirección completa"
+              onInput={(event) => {
+                event.currentTarget.value = normalizeStoreAddress(event.currentTarget.value);
+              }}
+              title="Solo letras, números, espacios y signos de dirección básicos"
               className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-text mb-2">Ciudad</label>
-            <input
-              type="text"
-              name="city"
-              required
-              placeholder="Ciudad"
-              className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
+            <LocationPicker
+              label="Lugar"
+              value={storeLocation}
+              onChange={(value) => setStoreLocation(extractCityName(value))}
             />
+            <input type="hidden" name="city" value={storeLocation} readOnly />
           </div>
 
           <div className="grid grid-cols-2 gap-4">

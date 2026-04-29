@@ -478,9 +478,59 @@ export class BooksService {
 
   async adminDelete(id: number) {
     await this.assertBookExists(id);
-    await this.prisma.book.delete({
-      where: { bookId: id },
-      select: { bookId: true },
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.notificationLog.deleteMany({
+        where: {
+          notification: {
+            bookId: id,
+          },
+        },
+      });
+
+      await tx.notification.deleteMany({
+        where: { bookId: id },
+      });
+
+      await tx.newsCategory.deleteMany({
+        where: {
+          news: {
+            bookId: id,
+          },
+        },
+      });
+
+      await tx.news.deleteMany({
+        where: { bookId: id },
+      });
+
+      await tx.cartItem.deleteMany({
+        where: { bookId: id },
+      });
+
+      await tx.purchaseItem.deleteMany({
+        where: { bookId: id },
+      });
+
+      await tx.reservationItem.deleteMany({
+        where: { bookId: id },
+      });
+
+      await tx.bookImage.deleteMany({
+        where: { bookId: id },
+      });
+
+      await tx.bookCategory.deleteMany({
+        where: { bookId: id },
+      });
+
+      await tx.inventory.deleteMany({
+        where: { bookId: id },
+      });
+
+      await tx.book.delete({
+        where: { bookId: id },
+      });
     });
     return { id };
   }

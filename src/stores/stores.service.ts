@@ -153,6 +153,31 @@ export class StoresService {
     });
   }
 
+  async delete(storeId: number) {
+    await this.assertExists(storeId);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.reservationItem.deleteMany({
+        where: { storeId },
+      });
+
+      await tx.inventory.deleteMany({
+        where: { storeId },
+      });
+
+      await tx.purchase.updateMany({
+        where: { pickupStoreId: storeId },
+        data: { pickupStoreId: null },
+      });
+
+      await tx.store.delete({
+        where: { storeId },
+      });
+    });
+
+    return { id: storeId };
+  }
+
   async findActiveById(storeId: number): Promise<StoreReferenceDto | null> {
     return this.prisma.store
       .findFirst({

@@ -89,6 +89,7 @@ export default function ItemGallery({ items, title }: ItemGalleryProps) {
 
   const normalizedQuery = normalizeText(searchValue);
   const queryTokens = normalizedQuery.length > 0 ? normalizedQuery.split(" ") : [];
+  const hasInvalidSearchOnly = searchValue.trim().length > 0 && queryTokens.length === 0;
 
   const getLevenshteinDistance = (a: string, b: string): number => {
     if (a === b) return 0;
@@ -121,6 +122,8 @@ export default function ItemGallery({ items, title }: ItemGalleryProps) {
   };
 
   const filteredItems = useMemo(() => {
+    if (hasInvalidSearchOnly) return [];
+    
     return items.filter((item) => {
       if (selectedTag && item.tag !== selectedTag) return false;
       if (selectedAuthor && item.author !== selectedAuthor) return false;
@@ -140,7 +143,7 @@ export default function ItemGallery({ items, title }: ItemGalleryProps) {
 
       return queryTokens.every((token) => matchesTokenWithTolerance(token, searchableWords));
     });
-  }, [items, selectedTag, selectedAuthor, publicationYearFrom, publicationYearTo, selectedGenre, selectedStatus, selectedLanguage, queryTokens]);
+  }, [items, selectedTag, selectedAuthor, publicationYearFrom, publicationYearTo, selectedGenre, selectedStatus, selectedLanguage, queryTokens, hasInvalidSearchOnly]);
 
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
 
@@ -245,7 +248,9 @@ export default function ItemGallery({ items, title }: ItemGalleryProps) {
           <div className="max-w-full mx-auto">
             {filteredItems.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border p-8 text-center text-text-muted">
-                No hay resultados para los filtros seleccionados.
+                {searchValue 
+                  ? "No hay libros que coincidan con tu búsqueda."
+                  : "No hay resultados para los filtros seleccionados."}
               </div>
             ) : isGrid ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">

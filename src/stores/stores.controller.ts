@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseIntPipe,
@@ -116,5 +117,20 @@ export class StoresController {
     @Body() dto: UpdateStoreDto,
   ) {
     return this.storesService.update(id, dto);
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth('JWT')
+  @ApiOperation({ summary: 'Eliminar tienda (admin)' })
+  @ApiResponse({ status: 200, description: 'Tienda eliminada' })
+  @ApiResponse({ status: 404, description: 'Tienda no encontrada' })
+  @ApiUnauthorizedResponse({ description: 'Token inválido o ausente' })
+  @ApiForbiddenResponse({
+    description: 'No tienes permisos para eliminar tiendas',
+  })
+  async delete(@Param('id', ParseIntPipe) id: number) {
+    return this.storesService.delete(id);
   }
 }

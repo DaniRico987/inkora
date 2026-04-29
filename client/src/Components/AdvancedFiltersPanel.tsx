@@ -69,7 +69,7 @@ export default function AdvancedFiltersPanel({
 }: AdvancedFiltersPanelProps) {
   const panelClassName = isDesktop
     ? "w-72 shrink-0 bg-bg-secondary border border-border rounded-2xl p-4 h-fit sticky top-6"
-    : "fixed top-16 sm:top-18 left-0 h-[calc(100%-4rem)] sm:h-[calc(100%-4.5rem)] w-[78vw] sm:w-[60vw] md:w-[50vw] max-w-md bg-bg z-50 border-r border-border p-4 overflow-y-auto";
+    : "fixed left-1/2 top-3 sm:top-4 h-[calc(100vh-1.5rem)] sm:h-[calc(100vh-2rem)] w-[calc(100vw-1.5rem)] sm:w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 rounded-2xl bg-bg z-[70] border border-border p-4 overflow-y-auto shadow-2xl";
 
   if (!open) {
     return null;
@@ -80,7 +80,7 @@ export default function AdvancedFiltersPanel({
       {!isDesktop && (
         <button
           type="button"
-          className="fixed inset-0 z-40 bg-black/40"
+          className="fixed inset-0 z-60 bg-black/55 backdrop-blur-[1px]"
           aria-label="Cerrar filtros"
           onClick={onClose}
         />
@@ -103,7 +103,7 @@ export default function AdvancedFiltersPanel({
 
         <div className="flex flex-col gap-1">
           <SelectField label="Autor" value={selectedAuthor} options={authors} onChange={onAuthorChange} />
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 text-left">
             <InputNumber
               label="Publicación desde"
               length={4}

@@ -4,9 +4,11 @@ import {
   IsEnum,
   IsInt,
   IsNotEmpty,
+  IsIn,
   IsNumber,
   IsOptional,
   IsPositive,
+  Matches,
   IsString,
   IsUrl,
   Length,
@@ -17,6 +19,31 @@ import {
 } from 'class-validator';
 import { BookCondition } from '@prisma/client';
 
+const CURRENT_YEAR = new Date().getFullYear();
+
+export const BOOK_LANGUAGE_OPTIONS = [
+  'Inglés',
+  'Español',
+  'Portugués',
+  'Francés',
+  'Alemán',
+  'Italiano',
+  'Neerlandés',
+  'Sueco',
+  'Polaco',
+  'Griego',
+  'Chino',
+  'Japonés',
+  'Ruso',
+  'Ingles',
+  'Espanol',
+  'Portugues',
+  'Frances',
+  'Aleman',
+  'Neerlandes',
+  'Japones',
+] as const;
+
 export class CreateBookDto {
   @ApiProperty({
     description: 'Título del libro',
@@ -25,6 +52,7 @@ export class CreateBookDto {
   @IsString()
   @IsNotEmpty()
   @Length(1, 255)
+  @Matches(/^(?=.*[\p{L}\p{N}])[\p{L}\p{N}\s]+$/u)
   title: string;
 
   @ApiProperty({
@@ -34,6 +62,7 @@ export class CreateBookDto {
   @IsString()
   @IsNotEmpty()
   @Length(1, 150)
+  @Matches(/^(?=.*[\p{L}\p{N}])[\p{L}\p{N}\s]+$/u)
   author: string;
 
   @ApiPropertyOptional({
@@ -44,7 +73,7 @@ export class CreateBookDto {
   @IsOptional()
   @IsInt()
   @Min(1000)
-  @Max(2100)
+  @Max(CURRENT_YEAR)
   publicationYear?: number | null;
 
   @ApiPropertyOptional({
@@ -55,6 +84,7 @@ export class CreateBookDto {
   @IsOptional()
   @IsString()
   @Length(1, 150)
+  @Matches(/^(?=.*[\p{L}\p{N}])[\p{L}\p{N}\s]+$/u)
   publisher?: string | null;
 
   @ApiPropertyOptional({
@@ -62,9 +92,10 @@ export class CreateBookDto {
     example: '9780307474728',
     nullable: true,
   })
-  @IsOptional()
   @IsString()
-  @Length(10, 20)
+  @IsNotEmpty()
+  @Length(13, 13)
+  @Matches(/^\d{13}$/)
   isbn?: string | null;
 
   @ApiPropertyOptional({
@@ -75,6 +106,7 @@ export class CreateBookDto {
   @IsOptional()
   @IsString()
   @Length(1, 50)
+  @IsIn(BOOK_LANGUAGE_OPTIONS)
   language?: string | null;
 
   @ApiPropertyOptional({
@@ -113,14 +145,14 @@ export class CreateBookDto {
   @IsBoolean()
   isAvailable?: boolean;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     description: 'Descripción del libro',
     example:
       'La historia de la familia Buendía a lo largo de varias generaciones.',
-    nullable: true,
   })
-  @IsOptional()
   @IsString()
+  @IsNotEmpty()
+  @Length(1, 2000)
   description?: string | null;
 
   @ApiPropertyOptional({

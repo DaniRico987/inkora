@@ -116,7 +116,7 @@ export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
                             </Link>
                         </div>
 
-                        <div className="hidden lg:flex absolute left-1/2 -translate-x-1/2 items-center gap-4 xl:gap-7 text-sm sm:text-base font-medium">
+                        <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-4 xl:gap-7 text-sm sm:text-base font-medium">
                             {navItems.map((item) => (
                                 <Link key={item.label} to={item.to} className={navItemClass}>
                                     {item.label}
@@ -124,7 +124,7 @@ export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
                             ))}
                         </div>
 
-                        <div className="hidden md:flex items-center justify-end gap-2 lg:gap-3 min-w-28">
+                        <div className="hidden lg:flex items-center justify-end gap-2 lg:gap-3 min-w-28">
                             <Link
                                 to={variant === 'visitor' ? '/' : '/catalog'}
                                 aria-label={variant === 'visitor' ? 'Ir al inicio' : 'Ir al catálogo'}
@@ -267,7 +267,7 @@ export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
                         {variant !== 'admin' && (
                             <button
                                 onClick={() => setIsOpen((prev) => !prev)}
-                                className="md:hidden inline-flex items-center justify-center rounded-lg p-2 text-babyblue-50/95 hover:bg-white/12"
+                                className="lg:hidden inline-flex items-center justify-center rounded-lg p-2 text-babyblue-50/95 hover:bg-white/12"
                                 aria-expanded={isOpen}
                                 aria-label="Abrir menu"
                             >
@@ -279,16 +279,8 @@ export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
                     </div>
 
                     {variant !== 'admin' && isOpen && (
-                        <div className="md:hidden border-t border-white/20 px-4 pb-4 pt-3">
+                        <div className="lg:hidden border-t border-white/20 px-4 pb-4 pt-3">
                             <div className="flex flex-col gap-2 text-left text-babyblue-50">
-                                <Link
-                                    to={variant === 'visitor' ? '/' : '/catalog'}
-                                    onClick={handleMobileLinkClick}
-                                    className="rounded-md px-2 py-2 hover:bg-white/12"
-                                >
-                                    {variant === 'visitor' ? 'Inicio' : 'Catálogo'}
-                                </Link>
-
                                 {navItems.map((item) => (
                                     <Link
                                         key={`mobile-${item.label}`}

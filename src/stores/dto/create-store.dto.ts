@@ -6,6 +6,7 @@ import {
   IsNumber,
   IsOptional,
   IsPositive,
+  Matches,
   IsString,
   Length,
   Max,
@@ -21,6 +22,7 @@ export class CreateStoreDto {
   @IsString()
   @IsNotEmpty()
   @Length(1, 150)
+  @Matches(/^(?=.*[\p{L}\p{N}])[\p{L}\p{N}\s]+$/u)
   name: string;
 
   @ApiProperty({
@@ -30,6 +32,7 @@ export class CreateStoreDto {
   @IsString()
   @IsNotEmpty()
   @Length(1, 255)
+  @Matches(/^(?=.*[\p{L}\p{N}])[\p{L}\p{N}\s#.,\-/]+$/u)
   address: string;
 
   @ApiProperty({
@@ -39,6 +42,7 @@ export class CreateStoreDto {
   @IsString()
   @IsNotEmpty()
   @Length(1, 100)
+  @Matches(/^(?=.*[\p{L}\p{N}])[\p{L}\p{N}\s#.,\-/]+$/u)
   city: string;
 
   @ApiPropertyOptional({

@@ -72,6 +72,7 @@ function FloatingLabel({ label, lifted }: FloatingLabelProps) {
     <span
       className={`
           absolute left-3 pointer-events-none z-10
+          whitespace-nowrap
           transition-all duration-180 ease-in-out
           bg-transparent px-2                            // tapa el borde al salir
         ${lifted
@@ -151,7 +152,7 @@ export function InputNumber({ label, value, onChange, length = 20, ...props }: I
   const [internalVal, setInternalVal] = useState("");
 
   const currentVal = value !== undefined ? String(value) : internalVal;
-  const lifted = focused || currentVal.length > 0;
+  const lifted = true;
   const showLabel = !(props.hideLabelOnFocus && focused);
   const maxLength = length || 20;
 

@@ -4,6 +4,7 @@ import { AdminLayout } from '../Components/AdminLayout';
 import { DataTable, type DataTableColumn, type DataTableAction } from '../Components/DataTable';
 import { FormModal } from '../Components/FormModal';
 import { ConfirmationModal } from '../Components/ConfirmationModal';
+import { LocationPicker } from '../Components/LocationPicker';
 import { useSnackbar } from '../Components/SnackbarProvider';
 import { getRoleFromToken, getAccessToken } from '../auth/session';
 import {
@@ -13,6 +14,26 @@ import {
   updateStore,
 } from '../api/stores';
 import type { Store } from '../interfaces/admin';
+
+const normalizeStoreName = (value: string) =>
+  value
+    .replace(/[^\p{L}\p{N}\s]/gu, '')
+    .replace(/\s+/g, ' ')
+    .replace(/^\s+/, '');
+
+const normalizeStoreAddress = (value: string) =>
+  value
+    .replace(/[^\p{L}\p{N}\s#.,\-/]/gu, '')
+    .replace(/\s+/g, ' ')
+    .replace(/^\s+/, '');
+
+const normalizeStoreLocation = (value: string) =>
+  value
+    .replace(/[^\p{L}\p{N}\s#.,\-/]/gu, '')
+    .replace(/\s+/g, ' ')
+    .replace(/^\s+/, '');
+
+const extractCityName = (value: string) => value.split(',')[0]?.trim() || '';
 
 export function StoresManagementPage() {
   const navigate = useNavigate();
@@ -26,6 +47,7 @@ export function StoresManagementPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingStore, setEditingStore] = useState<Store | null>(null);
+  const [storeLocation, setStoreLocation] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{
     isOpen: boolean;
     storeId?: string;
@@ -85,11 +107,13 @@ export function StoresManagementPage() {
 
   const handleAddStore = () => {
     setEditingStore(null);
+    setStoreLocation('');
     setIsFormOpen(true);
   };
 
   const handleEditStore = (store: Store) => {
     setEditingStore(store);
+    setStoreLocation('');
     setIsFormOpen(true);
   };
 
@@ -106,6 +130,7 @@ export function StoresManagementPage() {
       success('Tienda eliminada exitosamente');
       setCurrentPage(1);
       setDeleteConfirm({ isOpen: false });
+      window.location.reload();
     } catch (err) {
       error('Error al eliminar tienda');
       console.error(err);
@@ -120,16 +145,33 @@ export function StoresManagementPage() {
       const latitudeValue = formData.get('latitude') as string;
       const longitudeValue = formData.get('longitude') as string;
       const capacityValue = formData.get('capacity') as string;
+      const locationValue = extractCityName((formData.get('city') as string) || '');
 
       const data = {
         name: (formData.get('name') as string) || '',
         address: (formData.get('address') as string) || '',
-        city: (formData.get('city') as string) || '',
+        city: locationValue,
         latitude: latitudeValue ? parseFloat(latitudeValue) : undefined,
         longitude: longitudeValue ? parseFloat(longitudeValue) : undefined,
         capacity: capacityValue ? parseInt(capacityValue, 10) : undefined,
         status: (formData.get('status') as string) as 'active' | 'inactive' | undefined,
       };
+
+      const nameValue = ((formData.get('name') as string) || '').trim();
+      const addressValue = ((formData.get('address') as string) || '').trim();
+
+      if (!nameValue) {
+        throw new Error('El nombre de la tienda es obligatorio');
+      }
+      if (!addressValue) {
+        throw new Error('La dirección es obligatoria');
+      }
+      if (!locationValue) {
+        throw new Error('Debes seleccionar un lugar');
+      }
+
+      data.name = normalizeStoreName(nameValue);
+      data.address = normalizeStoreAddress(addressValue);
 
       if (editingStore) {
         await updateStore(editingStore.storeId, data);
@@ -137,10 +179,13 @@ export function StoresManagementPage() {
       } else {
         await createStore(data);
         success('Tienda creada exitosamente');
+        window.location.reload();
       }
 
       setIsFormOpen(false);
       setCurrentPage(1);
+      setStoreLocation('');
+      setEditingStore(null);
     } catch (err) {
       error('Error al guardar tienda');
       console.error(err);
@@ -239,6 +284,7 @@ export function StoresManagementPage() {
         onClose={() => {
           setIsFormOpen(false);
           setEditingStore(null);
+          setStoreLocation('');
         }}
         onSubmit={handleFormSubmit}
         isLoading={isLoading}
@@ -254,6 +300,10 @@ export function StoresManagementPage() {
               required
               defaultValue={editingStore?.name || ''}
               placeholder="Nombre de la tienda"
+              onInput={(event) => {
+                event.currentTarget.value = normalizeStoreName(event.currentTarget.value);
+              }}
+              title="Solo letras, números y espacios"
               className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
             />
           </div>
@@ -266,20 +316,41 @@ export function StoresManagementPage() {
               required
               defaultValue={editingStore?.address || ''}
               placeholder="Dirección completa"
+              onInput={(event) => {
+                event.currentTarget.value = normalizeStoreAddress(event.currentTarget.value);
+              }}
+              title="Solo letras, números, espacios y signos de dirección básicos"
               className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-text mb-2">Ciudad</label>
-            <input
-              type="text"
-              name="city"
-              required
-              defaultValue={editingStore?.city || ''}
-              placeholder="Ciudad"
-              className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
-            />
+            {editingStore ? (
+              <>
+                <label className="block text-sm font-medium text-text mb-2">Ciudad</label>
+                <input
+                  type="text"
+                  name="city"
+                  required
+                  defaultValue={editingStore?.city || ''}
+                  placeholder="Ciudad"
+                  onInput={(event) => {
+                    event.currentTarget.value = normalizeStoreLocation(event.currentTarget.value);
+                  }}
+                  title="Solo letras, números y espacios"
+                  className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
+                />
+              </>
+            ) : (
+              <>
+                <LocationPicker
+                  label="Lugar"
+                  value={storeLocation}
+                  onChange={(value) => setStoreLocation(extractCityName(value))}
+                />
+                <input type="hidden" name="city" value={storeLocation} readOnly />
+              </>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
