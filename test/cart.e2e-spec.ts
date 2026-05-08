@@ -66,6 +66,9 @@ describe('Cart (e2e)', () => {
       book: {
         findUnique: jest.fn(),
       },
+      inventory: {
+        aggregate: jest.fn().mockResolvedValue({ _sum: { availableQuantity: 100 } }),
+      },
     };
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -274,17 +277,17 @@ describe('Cart (e2e)', () => {
       });
       prismaMock.cartItem.update.mockResolvedValueOnce({
         ...mockCartItem,
-        quantity: 5,
+        quantity: 3,
       });
 
       const response = await request(app.getHttpServer())
         .patch('/cart/items/1')
         .send({
-          quantity: 5,
+          quantity: 3,
         })
         .expect(200);
 
-      expect(response.body.quantity).toBe(5);
+      expect(response.body.quantity).toBe(3);
     });
 
     it('debe retornar 404 si el item no existe', async () => {
@@ -293,7 +296,7 @@ describe('Cart (e2e)', () => {
       const response = await request(app.getHttpServer())
         .patch('/cart/items/999')
         .send({
-          quantity: 5,
+          quantity: 3,
         })
         .expect(404);
 
@@ -310,21 +313,30 @@ describe('Cart (e2e)', () => {
       const response = await request(app.getHttpServer())
         .patch('/cart/items/1')
         .send({
-          quantity: 5,
+          quantity: 3,
         })
         .expect(403);
 
       expect(response.body.message).toContain('No tienes permiso');
     });
 
-    it('debe retornar 400 si quantity es 0', async () => {
-      prismaMock.cartItem.findUnique.mockResolvedValueOnce({
-        ...mockCartItem,
-        cart: { clientId: 10 },
-        book: { title: mockBook.title, author: mockBook.author },
-      });
-      prismaMock.cartItem.delete.mockResolvedValueOnce(mockCartItem);
+    it('debe retornar 400 si quantity supera el maximo permitido', async () => {
+      const response = await request(app.getHttpServer())
+        .patch('/cart/items/1')
+        .send({
+          quantity: 5,
+        })
+        .expect(400);
 
+      const messages = Array.isArray(response.body.message)
+        ? response.body.message
+        : [response.body.message];
+      expect(
+        messages.some((m: string) => typeof m === 'string' && m.includes('3 ejemplares')),
+      ).toBe(true);
+    });
+
+    it('debe retornar 400 si quantity es 0', async () => {
       const response = await request(app.getHttpServer())
         .patch('/cart/items/1')
         .send({
@@ -332,7 +344,16 @@ describe('Cart (e2e)', () => {
         })
         .expect(400);
 
-      expect(response.body.message).toContain('DELETE');
+      const messages = Array.isArray(response.body.message)
+        ? response.body.message
+        : [response.body.message];
+      expect(
+        messages.some(
+          (m: string) =>
+            typeof m === 'string' &&
+            (m.includes('DELETE /cart/items') || m.includes('al menos')),
+        ),
+      ).toBe(true);
     });
   });
 

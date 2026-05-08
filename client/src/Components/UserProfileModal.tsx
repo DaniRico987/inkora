@@ -538,6 +538,7 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
               {activeSection === 'reservations' && (
                 <MyReservationsView
                   embedded
+                  historyOnly
                   onGoToCart={() => {
                     onClose();
                     navigate('/cart');

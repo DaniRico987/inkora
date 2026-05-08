@@ -16,6 +16,9 @@ const convertToNumber = (value: any): number => {
   return parseFloat(value.toString());
 };
 
+/** Misma regla que reservas: máximo de ejemplares del mismo libro por línea */
+const MAX_COPIES_PER_BOOK_IN_CART = 3;
+
 @Injectable()
 export class CartService {
   constructor(private prisma: PrismaService) {}
@@ -130,6 +133,15 @@ export class CartService {
       );
     }
 
+    const totalAvailableUnits = await this.sumAvailableQuantityAcrossStores(
+      dto.bookId,
+    );
+    if (totalAvailableUnits < 1) {
+      throw new BadRequestException(
+        `No hay existencias de "${book.title}" en ninguna tienda`,
+      );
+    }
+
     // Asegurar que existe carrito activo
     const cartId = await this.ensureActiveCart(clientId);
 
@@ -143,6 +155,21 @@ export class CartService {
       },
     });
 
+    const nextQuantity =
+      (existingItem?.quantity ?? 0) + dto.quantity;
+
+    if (nextQuantity > MAX_COPIES_PER_BOOK_IN_CART) {
+      throw new BadRequestException(
+        `No puedes tener mas de ${MAX_COPIES_PER_BOOK_IN_CART} ejemplares del mismo libro en el carrito ("${book.title}")`,
+      );
+    }
+
+    if (nextQuantity > totalAvailableUnits) {
+      throw new BadRequestException(
+        `Stock insuficiente para "${book.title}": solicitado ${nextQuantity}, disponible ${totalAvailableUnits}`,
+      );
+    }
+
     let cartItem;
 
     if (existingItem) {
@@ -150,7 +177,7 @@ export class CartService {
       cartItem = await this.prisma.cartItem.update({
         where: { cartItemId: existingItem.cartItemId },
         data: {
-          quantity: existingItem.quantity + dto.quantity,
+          quantity: nextQuantity,
         },
       });
     } else {
@@ -219,18 +246,32 @@ export class CartService {
       );
     }
 
-    // Si cantidad es 0, eliminar el item
-    if (dto.quantity === 0) {
-      await this.prisma.cartItem.delete({
-        where: { cartItemId },
-      });
+    if (dto.quantity < 1) {
       throw new BadRequestException(
-        'Usa DELETE para eliminar el item del carrito',
+        'Para eliminar un libro del carrito usa DELETE /cart/items/:cartItemId',
       );
     }
 
-    if (dto.quantity < 1) {
-      throw new BadRequestException('La cantidad debe ser al menos 1');
+    if (dto.quantity > MAX_COPIES_PER_BOOK_IN_CART) {
+      throw new BadRequestException(
+        `No puedes tener mas de ${MAX_COPIES_PER_BOOK_IN_CART} ejemplares del mismo libro en el carrito`,
+      );
+    }
+
+    const totalAvailableUnits = await this.sumAvailableQuantityAcrossStores(
+      cartItem.bookId,
+    );
+
+    if (totalAvailableUnits < 1) {
+      throw new BadRequestException(
+        `No hay existencias del libro "${cartItem.book.title}" en ninguna tienda`,
+      );
+    }
+
+    if (dto.quantity > totalAvailableUnits) {
+      throw new BadRequestException(
+        `Stock insuficiente para "${cartItem.book.title}": solicitado ${dto.quantity}, disponible ${totalAvailableUnits}`,
+      );
     }
 
     // Actualizar cantidad
@@ -361,5 +402,14 @@ export class CartService {
         'El usuario autenticado no tiene un perfil de cliente valido para usar el carrito',
       );
     }
+  }
+
+  private async sumAvailableQuantityAcrossStores(bookId: number): Promise<number> {
+    const result = await this.prisma.inventory.aggregate({
+      where: { bookId },
+      _sum: { availableQuantity: true },
+    });
+    const sum = result._sum.availableQuantity;
+    return typeof sum === 'number' ? sum : 0;
   }
 }

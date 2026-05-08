@@ -4,6 +4,7 @@ import { useCart } from '../hooks/useCart';
 import { CartItem } from './CartItem';
 import { CartSummary } from './CartSummary';
 import { Spinner } from './Spinner';
+import { listMappings } from '../utils/reservationCart';
 
 /**
  * CartView - Página principal del carrito
@@ -12,6 +13,33 @@ import { Spinner } from './Spinner';
 export const CartView: React.FC = () => {
   const { cart, loading, error, updateItem, removeItem, resetError } =
     useCart();
+  const [nowMs, setNowMs] = React.useState<number>(Date.now());
+
+  React.useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
+  const reservationByCartItemId = React.useMemo(() => {
+    const mappings = listMappings();
+    const map = new Map<number, { reservationId: number; expirationDate: string }>();
+
+    for (const mapping of mappings) {
+      for (const cartItemId of mapping.cartItemIds) {
+        map.set(cartItemId, {
+          reservationId: mapping.reservationId,
+          expirationDate: mapping.expirationDate,
+        });
+      }
+    }
+
+    return map;
+  }, [cart?.updatedAt]);
 
   if (loading) {
     return (
@@ -203,15 +231,30 @@ export const CartView: React.FC = () => {
             </div>
 
             <div className="space-y-4">
-              {cart.items.map((item, index) => (
+              {cart.items.map((item, index) => {
+                const reservation = reservationByCartItemId.get(item.cartItemId);
+                const remainingMs = reservation
+                  ? new Date(reservation.expirationDate).getTime() - nowMs
+                  : null;
+
+                return (
                 <CartItem
                   key={item.cartItemId}
                   item={item}
                   onUpdate={updateItem}
                   onRemove={removeItem}
                   index={index}
+                  reservationCountdown={
+                    remainingMs !== null
+                      ? {
+                          reservationId: reservation.reservationId,
+                          remainingMs,
+                        }
+                      : undefined
+                  }
                 />
-              ))}
+                );
+              })}
             </div>
           </div>
 

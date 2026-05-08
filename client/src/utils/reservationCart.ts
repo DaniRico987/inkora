@@ -41,6 +41,11 @@ export function getMapping(reservationId: number): ReservationCartMapping | unde
     return mappings.find((m) => m.reservationId === reservationId);
 }
 
+export function getMappingByCartItemId(cartItemId: number): ReservationCartMapping | undefined {
+    const mappings = readMappings();
+    return mappings.find((m) => m.cartItemIds.includes(cartItemId));
+}
+
 export function removeMapping(reservationId: number) {
     const mappings = readMappings().filter((m) => m.reservationId !== reservationId);
     writeMappings(mappings);
@@ -53,6 +58,7 @@ export function listMappings(): ReservationCartMapping[] {
 export default {
     addMapping,
     getMapping,
+    getMappingByCartItemId,
     removeMapping,
     listMappings,
 };

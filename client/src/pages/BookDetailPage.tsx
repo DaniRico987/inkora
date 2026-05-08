@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ConfirmationModal } from '../Components/ConfirmationModal';
-import { AddToCartButton } from '../Components/AddToCartButton';
 import { Spinner } from '../Components/Spinner';
 import { useSnackbar } from '../Components/SnackbarProvider';
 import { createReservation } from '../api/reservations';
@@ -48,7 +47,7 @@ export function BookDetailPage() {
     );
   }, [book]);
 
-  const reservationDisabled =
+  const addToCartDisabled =
     !book || !book.isAvailable || totalAvailable <= 0 || isSubmittingReservation;
 
   useEffect(() => {
@@ -89,12 +88,14 @@ export function BookDetailPage() {
             cartItemIds,
             expirationDate: response.expirationDate,
           });
+          window.dispatchEvent(new Event('cart:refresh'));
+          window.dispatchEvent(new Event('reservations:refresh'));
         }
       } catch (mapErr) {
         console.error('Error mapeando reserva a carrito:', mapErr);
       }
 
-      snackbar.success('Reserva creada correctamente');
+      snackbar.success('Libro agregado al carrito y reserva creada correctamente');
     } catch (submitError) {
       const message =
         submitError instanceof Error
@@ -206,23 +207,15 @@ export function BookDetailPage() {
                   type="button"
                   className="inline-flex w-full items-center justify-center rounded-full bg-babyblue-600 px-5 py-3 font-semibold text-white transition hover:bg-babyblue-700 disabled:cursor-not-allowed disabled:opacity-60"
                   onClick={() => setIsConfirmOpen(true)}
-                  disabled={reservationDisabled}
+                  disabled={addToCartDisabled}
                 >
-                  {isSubmittingReservation ? 'Reservando...' : 'Reservar'}
+                  {isSubmittingReservation ? 'Agregando al carrito...' : 'Agregar al carrito'}
                 </button>
                 {(!book.isAvailable || totalAvailable <= 0) && (
                   <p className="text-sm text-danger-700">
                     Este libro no se encuentra disponible para reserva en este momento.
                   </p>
                 )}
-
-                <div className="pt-3">
-                  <AddToCartButton
-                    bookId={book.id}
-                    quantity={1}
-                    className="inline-flex w-full items-center justify-center rounded-full border border-border bg-bg px-5 py-3 font-semibold text-text transition hover:border-babyblue-300 hover:text-babyblue-700 disabled:cursor-not-allowed disabled:opacity-60"
-                  />
-                </div>
               </div>
             )}
           </div>
@@ -263,9 +256,9 @@ export function BookDetailPage() {
 
       <ConfirmationModal
         isOpen={isConfirmOpen}
-        title="Confirmar reserva"
-        message="Esta reserva tendra una duracion maxima de 24 horas. Tras ese tiempo, el libro se liberara automaticamente."
-        confirmText="Confirmar reserva"
+        title="Confirmar agregado al carrito"
+        message="Este libro se agregará al carrito y se reservará por un maximo de 24 horas. Tras ese tiempo, si no compras, se liberará automaticamente."
+        confirmText="Agregar y reservar"
         cancelText="Cancelar"
         onCancel={closeConfirmModal}
         onConfirm={() => {

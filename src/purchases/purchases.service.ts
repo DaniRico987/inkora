@@ -94,6 +94,8 @@ const toNumber = (value: unknown): number => {
   return Number.parseFloat(String(value));
 };
 
+const MAX_COPIES_PER_BOOK_PURCHASE = 3;
+
 @Injectable()
 export class PurchasesService {
   private readonly logger = new Logger(PurchasesService.name);
@@ -552,6 +554,15 @@ export class PurchasesService {
       throw new BadRequestException(
         `El libro "${unavailableBook.title}" no esta disponible para compra`,
       );
+    }
+
+    for (const [bookId, quantity] of requestedItems.entries()) {
+      if (quantity > MAX_COPIES_PER_BOOK_PURCHASE) {
+        const bookTitle = books.find((book) => book.bookId === bookId)?.title;
+        throw new BadRequestException(
+          `No puedes comprar mas de ${MAX_COPIES_PER_BOOK_PURCHASE} ejemplares del mismo libro (${bookTitle ?? `libro ${bookId}`})`,
+        );
+      }
     }
 
     if (deliveryMode === DeliveryMode.storePickup) {

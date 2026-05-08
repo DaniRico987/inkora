@@ -8,6 +8,8 @@ import {
   type GetCartResponse,
   type CartItemResponse,
 } from '../api/cart';
+import { cancelReservation } from '../api/reservations';
+import { getMappingByCartItemId, removeMapping } from '../utils/reservationCart';
 
 export interface UseCartState {
   cart: GetCartResponse | null;
@@ -110,7 +112,20 @@ export function useCart(): UseCartReturn {
     async (cartItemId: number) => {
       try {
         setError(null);
+
+        const mapping = getMappingByCartItemId(cartItemId);
         await removeCartItem(cartItemId);
+
+        if (mapping) {
+          try {
+            await cancelReservation(mapping.reservationId);
+            removeMapping(mapping.reservationId);
+            window.dispatchEvent(new Event('reservations:refresh'));
+          } catch (reservationErr) {
+            console.error('Error cancelling linked reservation:', reservationErr);
+          }
+        }
+
         // Actualizar estado local sin refrescar
         setCart((prevCart) => {
           if (!prevCart) return null;

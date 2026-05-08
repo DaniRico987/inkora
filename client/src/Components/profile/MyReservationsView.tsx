@@ -93,9 +93,10 @@ function statusChip(status: ReservationResponse['status']): { label: string; cla
 type MyReservationsViewProps = {
     embedded?: boolean;
     onGoToCart?: () => void;
+    historyOnly?: boolean;
 };
 
-export function MyReservationsView({ embedded = false, onGoToCart }: MyReservationsViewProps) {
+export function MyReservationsView({ embedded = false, onGoToCart, historyOnly = false }: MyReservationsViewProps) {
     const snackbar = useSnackbar();
     const [reservations, setReservations] = useState<ReservationResponse[]>([]);
     const [loading, setLoading] = useState(true);
@@ -184,6 +185,17 @@ export function MyReservationsView({ embedded = false, onGoToCart }: MyReservati
 
     useEffect(() => {
         void loadReservations();
+    }, []);
+
+    useEffect(() => {
+        const handleRefresh = () => {
+            void loadReservations();
+        };
+
+        window.addEventListener('reservations:refresh', handleRefresh);
+        return () => {
+            window.removeEventListener('reservations:refresh', handleRefresh);
+        };
     }, []);
 
     useEffect(() => {
@@ -323,14 +335,19 @@ export function MyReservationsView({ embedded = false, onGoToCart }: MyReservati
         <div className={embedded ? 'space-y-4' : 'w-full px-4 py-8 sm:py-10'}>
             <div className={embedded ? 'space-y-6' : 'mx-auto max-w-7xl space-y-8'}>
                 <header className="rounded-3xl border border-border bg-bg-secondary p-5 shadow-sm sm:p-6">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Mis reservas</p>
-                    <h1 className="mt-2 text-3xl font-bold text-text">Tus libros reservados</h1>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">
+                        {historyOnly ? 'Historial de reservas' : 'Mis reservas'}
+                    </p>
+                    <h1 className="mt-2 text-3xl font-bold text-text">
+                        {historyOnly ? 'Historial de tus reservas' : 'Tus libros reservados'}
+                    </h1>
                     <p className="mt-2 text-sm leading-6 text-text-muted sm:text-base">
                         Cada reserva tiene una vigencia maxima de 24 horas. Si no completas la compra, el libro vuelve al inventario automaticamente.
                     </p>
                 </header>
 
-                <section className="space-y-4">
+                {!historyOnly && (
+                    <section className="space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <h2 className="text-xl font-bold text-text">Reservas activas</h2>
                         <span className="rounded-full border border-skyblue-300/60 bg-skyblue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-skyblue-700">
@@ -437,7 +454,8 @@ export function MyReservationsView({ embedded = false, onGoToCart }: MyReservati
                             })}
                         </div>
                     )}
-                </section>
+                    </section>
+                )}
 
                 <section className="space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -493,7 +511,7 @@ export function MyReservationsView({ embedded = false, onGoToCart }: MyReservati
             </div>
 
             <ConfirmationModal
-                isOpen={pendingCancelId !== null}
+                isOpen={!historyOnly && pendingCancelId !== null}
                 title="Cancelar reserva"
                 message="La reserva se eliminará de tus reservas activas. Esta acción no se puede deshacer."
                 confirmText="Cancelar reserva"

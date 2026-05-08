@@ -54,6 +54,11 @@ describe('CartService', () => {
       book: {
         findUnique: jest.fn(),
       },
+      inventory: {
+        aggregate: jest
+          .fn()
+          .mockResolvedValue({ _sum: { availableQuantity: 100 } }),
+      },
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -164,23 +169,23 @@ describe('CartService', () => {
       });
     });
 
-    it('debe sumar cantidad si item ya existe en el carrito', async () => {
-      const dto: CreateCartItemDto = { bookId: 5, quantity: 3 };
+    it('debe sumar cantidad si item ya existe en el carrito sin superar limite ni stock', async () => {
+      const dto: CreateCartItemDto = { bookId: 5, quantity: 1 };
 
       prismaService.book.findUnique.mockResolvedValueOnce(mockBook);
       prismaService.cart.findUnique.mockResolvedValueOnce(mockCart);
-      prismaService.cartItem.findUnique.mockResolvedValueOnce(mockCartItem); // Ya existe
+      prismaService.cartItem.findUnique.mockResolvedValueOnce(mockCartItem); // quantity 2
       prismaService.cartItem.update.mockResolvedValueOnce({
         ...mockCartItem,
-        quantity: 5, // 2 + 3
+        quantity: 3,
       });
 
       const result = await service.addItem(10, dto);
 
-      expect(result.quantity).toBe(5);
+      expect(result.quantity).toBe(3);
       expect(prismaService.cartItem.update).toHaveBeenCalledWith({
         where: { cartItemId: 1 },
-        data: { quantity: 5 },
+        data: { quantity: 3 },
       });
     });
 
@@ -208,7 +213,7 @@ describe('CartService', () => {
 
   describe('updateItem', () => {
     it('debe actualizar cantidad del item', async () => {
-      const dto: UpdateCartItemDto = { quantity: 5 };
+      const dto: UpdateCartItemDto = { quantity: 3 };
 
       prismaService.cartItem.findUnique.mockResolvedValueOnce({
         ...mockCartItem,
@@ -218,20 +223,20 @@ describe('CartService', () => {
 
       prismaService.cartItem.update.mockResolvedValueOnce({
         ...mockCartItem,
-        quantity: 5,
+        quantity: 3,
       });
 
       const result = await service.updateItem(10, 1, dto);
 
-      expect(result.quantity).toBe(5);
+      expect(result.quantity).toBe(3);
       expect(prismaService.cartItem.update).toHaveBeenCalledWith({
         where: { cartItemId: 1 },
-        data: { quantity: 5 },
+        data: { quantity: 3 },
       });
     });
 
     it('debe lanzar error si item no existe', async () => {
-      const dto: UpdateCartItemDto = { quantity: 5 };
+      const dto: UpdateCartItemDto = { quantity: 3 };
 
       prismaService.cartItem.findUnique.mockResolvedValueOnce(null);
 
@@ -241,7 +246,7 @@ describe('CartService', () => {
     });
 
     it('debe lanzar error si cliente no posee el item', async () => {
-      const dto: UpdateCartItemDto = { quantity: 5 };
+      const dto: UpdateCartItemDto = { quantity: 3 };
 
       prismaService.cartItem.findUnique.mockResolvedValueOnce({
         ...mockCartItem,
@@ -263,11 +268,10 @@ describe('CartService', () => {
         book: { title: mockBook.title, author: mockBook.author },
       });
 
-      prismaService.cartItem.delete.mockResolvedValueOnce(mockCartItem);
-
       await expect(service.updateItem(10, 1, dto)).rejects.toThrow(
         BadRequestException,
       );
+      expect(prismaService.cartItem.delete).not.toHaveBeenCalled();
     });
   });
 

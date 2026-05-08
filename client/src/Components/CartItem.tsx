@@ -1,12 +1,29 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Spinner } from './Spinner';
 import type { CartItem as CartItemType } from '../interfaces/CartInterface';
+
+/** Mismo limite que reservas / API carrito */
+const MAX_BOOK_QUANTITY = 3;
 
 interface CartItemProps {
   item: CartItemType;
   onUpdate: (cartItemId: number, quantity: number) => Promise<void>;
   onRemove: (cartItemId: number) => Promise<void>;
   index?: number;
+  reservationCountdown?: {
+    reservationId: number;
+    remainingMs: number;
+  };
+}
+
+function formatCountdown(totalMs: number): string {
+  const safeMs = Math.max(0, totalMs);
+  const totalSeconds = Math.floor(safeMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
 /**
@@ -18,17 +35,23 @@ export const CartItem: React.FC<CartItemProps> = ({
   onUpdate,
   onRemove,
   index = 0,
+  reservationCountdown,
 }) => {
   const [quantity, setQuantity] = useState(item.quantity);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
   const [isConfirmingRemove, setIsConfirmingRemove] = useState(false);
 
-  const handleQuantityChange = async (newQuantity: number) => {
-    if (newQuantity < 1) {
+  useEffect(() => {
+    setQuantity(item.quantity);
+  }, [item.quantity]);
+
+  const handleQuantityChange = async (raw: number) => {
+    if (!Number.isFinite(raw) || raw < 1) {
       return;
     }
 
+    const newQuantity = Math.min(MAX_BOOK_QUANTITY, Math.floor(raw));
     setQuantity(newQuantity);
     setIsUpdating(true);
 
@@ -93,6 +116,11 @@ export const CartItem: React.FC<CartItemProps> = ({
                 <span className="rounded-full bg-bg px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted">
                   Actualizable
                 </span>
+                {reservationCountdown && (
+                  <span className="rounded-full bg-amber-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">
+                    Reserva #{reservationCountdown.reservationId} · {formatCountdown(reservationCountdown.remainingMs)}
+                  </span>
+                )}
               </div>
 
               <div>
@@ -138,16 +166,20 @@ export const CartItem: React.FC<CartItemProps> = ({
               <input
                 type="number"
                 min="1"
+                max={MAX_BOOK_QUANTITY}
                 value={quantity}
                 onChange={(e) => handleQuantityChange(Number(e.target.value))}
                 disabled={isUpdating}
                 className="mt-1 w-full border-0 bg-transparent text-center text-lg font-black text-text outline-none ring-0 [appearance:textfield] focus:ring-0 sm:text-xl [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               />
+              <span className="mt-1 text-[10px] text-text-muted">
+                Max. {MAX_BOOK_QUANTITY} por titulo
+              </span>
             </div>
 
             <button
               onClick={() => handleQuantityChange(quantity + 1)}
-              disabled={isUpdating}
+              disabled={isUpdating || quantity >= MAX_BOOK_QUANTITY}
               className="flex h-10 w-10 min-w-10 items-center justify-center rounded-xl bg-babyblue-600 text-lg font-semibold text-white transition hover:bg-babyblue-700 disabled:cursor-not-allowed disabled:opacity-50"
               aria-label="Aumentar cantidad"
             >

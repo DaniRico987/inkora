@@ -1,4 +1,4 @@
-import { IsInt, Min, IsPositive } from 'class-validator';
+import { IsInt, Min, Max, IsPositive } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateCartItemDto {
@@ -14,5 +14,8 @@ export class CreateCartItemDto {
   })
   @IsInt({ message: 'quantity debe ser un entero' })
   @Min(1, { message: 'quantity debe ser al menos 1' })
+  @Max(3, {
+    message: 'quantity no puede ser mayor a 3 para el mismo libro',
+  })
   quantity: number = 1;
 }
