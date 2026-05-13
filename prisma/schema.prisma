@@ -148,6 +148,7 @@ model Client {
   clientId Int  @id @default(autoincrement())
   userId   Int  @unique
   user     User @relation(fields: [userId], references: [userId])
+  walletBalance Decimal @default(0) @db.Decimal(10, 2)
 
   // Relations
   userPreferences  UserPreference[]
@@ -472,12 +473,18 @@ model Transaction {
   refundId         Int?
   transactionType  TransactionType
   amount           Decimal         @db.Decimal(10, 2)
+  balanceAfter     Decimal         @default(0) @db.Decimal(10, 2)
   transactionDate  DateTime        @default(now())
   gatewayReference String?         @db.VarChar(255)
 
   client   Client    @relation(fields: [clientId], references: [clientId])
   purchase Purchase? @relation(fields: [purchaseId], references: [purchaseId])
   refund   Refund?   @relation(fields: [refundId], references: [refundId])
+
+  @@index([clientId, transactionDate], map: "idx_transaction_client_date")
+  @@index([clientId, transactionType, transactionDate], map: "idx_transaction_client_type_date")
+  @@index([purchaseId], map: "idx_transaction_purchase")
+  @@index([refundId], map: "idx_transaction_refund")
 
   @@map("transaction")
 }

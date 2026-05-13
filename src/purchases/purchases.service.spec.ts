@@ -9,6 +9,7 @@ import { PrismaService } from 'prisma/prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { StoresService } from '../stores/stores.service';
 import { PurchasesService } from './purchases.service';
+import { WalletService } from '../wallet/wallet.service';
 
 describe('PurchasesService', () => {
   let service: PurchasesService;
@@ -30,6 +31,9 @@ describe('PurchasesService', () => {
   };
   let storesService: {
     findActiveById: jest.Mock;
+  };
+  let walletService: {
+    recordPurchaseTransaction: jest.Mock;
   };
 
   const basePurchase = {
@@ -92,6 +96,10 @@ describe('PurchasesService', () => {
       findActiveById: jest.fn(),
     };
 
+    walletService = {
+      recordPurchaseTransaction: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PurchasesService,
@@ -106,6 +114,10 @@ describe('PurchasesService', () => {
         {
           provide: StoresService,
           useValue: storesService,
+        },
+        {
+          provide: WalletService,
+          useValue: walletService,
         },
       ],
     }).compile();
@@ -235,6 +247,14 @@ describe('PurchasesService', () => {
       expect(tx.cartItem.deleteMany).toHaveBeenCalledWith({
         where: { cartId: 1 },
       });
+      expect(walletService.recordPurchaseTransaction).toHaveBeenCalledWith(
+        tx,
+        expect.objectContaining({
+          clientId: 10,
+          amount: 21490,
+          purchaseId: 15,
+        }),
+      );
       expect(mailService.sendPurchaseInvoice).toHaveBeenCalledTimes(1);
       expect(result.status).toBe(PurchaseStatus.inPreparation);
       expect(result.items).toHaveLength(1);

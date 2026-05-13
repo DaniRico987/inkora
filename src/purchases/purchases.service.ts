@@ -15,6 +15,7 @@ import {
   StoresService,
   type StoreReferenceDto,
 } from '../stores/stores.service';
+import { WalletService } from '../wallet/wallet.service';
 
 type PurchaseCartItem = {
   bookId: number;
@@ -104,6 +105,7 @@ export class PurchasesService {
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
     private readonly storesService: StoresService,
+    private readonly walletService: WalletService,
   ) {}
 
   async createPurchase(
@@ -225,6 +227,13 @@ export class PurchasesService {
               },
             },
           },
+        });
+
+        await this.walletService.recordPurchaseTransaction(tx, {
+          clientId,
+          amount: totalAmount,
+          purchaseId: createdPurchase.purchaseId,
+          gatewayReference: dto.paymentMethod ?? null,
         });
 
         await tx.cart.update({
