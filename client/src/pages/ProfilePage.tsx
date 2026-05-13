@@ -16,6 +16,7 @@ import { getCategories, type Category } from '../api/categories';
 import { subscribeToCategory, unsubscribeFromCategory } from '../api/subscriptions';
 import { formatCardNumberInput, maskCardNumber, normalizeCardNumber } from '../utils/cardNumber';
 import { validateDateValue } from '../utils/dateValidation';
+import { suggestAddresses, validateAddress } from '../services/addressValidation';
 
 type ProfileSection = 'personal' | 'preferences' | 'cards';
 
@@ -105,6 +106,18 @@ export function ProfilePage() {
     if (birthDateError) {
       snackbar.warning(birthDateError);
       return;
+    }
+
+    if (form.address.trim()) {
+      const isAddressValid = await validateAddress(form.address, '');
+      if (!isAddressValid) {
+        const suggestions = await suggestAddresses(form.address, '');
+        const suggestionText = suggestions.length > 0
+          ? ` Sugerencias: ${suggestions.slice(0, 3).map((suggestion) => suggestion.label).join(' · ')}`
+          : '';
+        snackbar.warning(`No pudimos verificar la dirección ingresada.${suggestionText}`);
+        return;
+      }
     }
 
     // Client-side validations to match register page checks

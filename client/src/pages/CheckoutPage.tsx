@@ -11,6 +11,7 @@ import { useCart } from '../hooks/useCart';
 import type { CartItem } from '../interfaces/CartInterface';
 import type { Purchase } from '../interfaces/PurchaseInterface';
 import { formatCardNumberInput, maskCardNumber, normalizeCardNumber } from '../utils/cardNumber';
+import { suggestAddresses, validateAddress } from '../services/addressValidation';
 
 type CheckoutStep = 1 | 2 | 3 | 4;
 type PaymentChoice = 'registered' | 'new';
@@ -374,14 +375,6 @@ export function CheckoutPage() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
     if (!registeredCards.length) {
       setSelectedRegisteredCardId(null);
 
@@ -507,7 +500,7 @@ export function CheckoutPage() {
     setPaymentForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const validateAddressStep = (): boolean => {
+  const validateAddressStep = async (): Promise<boolean> => {
     const nextErrors: FieldErrors = {};
 
     if (addressForm.fullName.trim().length < 3) {
@@ -524,6 +517,17 @@ export function CheckoutPage() {
 
     if (!/^\d{4,5}$/.test(addressForm.postalCode.trim())) {
       nextErrors.postalCode = 'El código postal debe tener 4 o 5 dígitos';
+    }
+
+    if (Object.keys(nextErrors).length === 0) {
+      const isAddressValid = await validateAddress(addressForm.street, addressForm.location);
+      if (!isAddressValid) {
+        const suggestions = await suggestAddresses(addressForm.street, addressForm.location);
+        const suggestionText = suggestions.length > 0
+          ? ` Sugerencias: ${suggestions.slice(0, 3).map((suggestion) => suggestion.label).join(' · ')}`
+          : '';
+        nextErrors.street = `No pudimos verificar la dirección ingresada.${suggestionText}`;
+      }
     }
 
     setFieldErrors((prev) => ({ ...prev, ...nextErrors }));
@@ -577,9 +581,9 @@ export function CheckoutPage() {
     setCurrentStep(2);
   };
 
-  const goToPaymentStep = () => {
+  const goToPaymentStep = async () => {
     if (deliveryMode === 'homeDelivery') {
-      if (!validateAddressStep()) {
+      if (!(await validateAddressStep())) {
         snackbar.error('Corrige la dirección de envío para continuar');
         return;
       }
@@ -1068,7 +1072,7 @@ export function CheckoutPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={goToPaymentStep}
+                    onClick={() => void goToPaymentStep()}
                     className="inline-flex items-center justify-center rounded-full bg-babyblue-600 px-5 py-3 font-semibold text-white transition hover:bg-babyblue-700"
                   >
                     Continuar al pago
