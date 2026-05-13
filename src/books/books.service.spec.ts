@@ -1,7 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from 'prisma/prisma/prisma.service';
-import { S3Service } from '../storage/s3.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { BooksService } from './books.service';
 
@@ -14,9 +13,6 @@ describe('BooksService', () => {
       findUnique: jest.Mock;
       update: jest.Mock;
     };
-  };
-  let s3Service: {
-    uploadCover: jest.Mock;
   };
   let notificationsService: {
     sendNewBookNotification: jest.Mock;
@@ -32,10 +28,6 @@ describe('BooksService', () => {
       },
     };
 
-    s3Service = {
-      uploadCover: jest.fn(),
-    };
-
     notificationsService = {
       sendNewBookNotification: jest.fn(),
     };
@@ -46,10 +38,6 @@ describe('BooksService', () => {
         {
           provide: PrismaService,
           useValue: prismaService,
-        },
-        {
-          provide: S3Service,
-          useValue: s3Service,
         },
         {
           provide: NotificationsService,
@@ -398,33 +386,32 @@ describe('BooksService', () => {
     await expect(service.findOne(999)).rejects.toThrow(NotFoundException);
   });
 
-  it('stores uploaded cover URL and returns the mapped response', async () => {
+  it('stores uploaded cover and returns the mapped response', async () => {
     prismaService.book.findUnique.mockResolvedValue({ bookId: 15 });
-    s3Service.uploadCover.mockResolvedValue({
-      url: 'https://bucket.s3.us-east-1.amazonaws.com/books/15/covers/test.webp',
-    });
     prismaService.book.update.mockResolvedValue({
       bookId: 15,
-      coverUrl:
-        'https://bucket.s3.us-east-1.amazonaws.com/books/15/covers/test.webp',
+      coverUrl: 'data:image/webp;base64,aW1hZ2U=',
     });
 
-    const result = await service.uploadCover(15, {
+    const file: Express.Multer.File = {
       buffer: Buffer.from('image'),
       originalname: 'cover.webp',
       mimetype: 'image/webp',
       size: 5,
-    });
+      fieldname: 'file',
+      encoding: '7bit',
+      destination: '',
+      filename: 'cover.webp',
+      path: '',
+      stream: null,
+    };
 
-    expect(s3Service.uploadCover).toHaveBeenCalledWith(
-      expect.objectContaining({ originalname: 'cover.webp' }),
-      15,
-    );
+    const result = await service.uploadCover(15, file);
+
     expect(prismaService.book.update).toHaveBeenCalledWith({
       where: { bookId: 15 },
       data: {
-        coverUrl:
-          'https://bucket.s3.us-east-1.amazonaws.com/books/15/covers/test.webp',
+        coverUrl: 'data:image/webp;base64,aW1hZ2U=',
       },
       select: {
         bookId: true,
@@ -433,21 +420,27 @@ describe('BooksService', () => {
     });
     expect(result).toEqual({
       id: 15,
-      coverUrl:
-        'https://bucket.s3.us-east-1.amazonaws.com/books/15/covers/test.webp',
+      coverUrl: 'data:image/webp;base64,aW1hZ2U=',
     });
   });
 
   it('throws not found when uploading cover for a missing book', async () => {
     prismaService.book.findUnique.mockResolvedValue(null);
+    const file: Express.Multer.File = {
+      buffer: Buffer.from('image'),
+      originalname: 'cover.webp',
+      mimetype: 'image/webp',
+      size: 5,
+      fieldname: 'file',
+      encoding: '7bit',
+      destination: '',
+      filename: 'cover.webp',
+      path: '',
+      stream: null,
+    };
 
-    await expect(
-      service.uploadCover(404, {
-        buffer: Buffer.from('image'),
-        originalname: 'cover.webp',
-        mimetype: 'image/webp',
-        size: 5,
-      }),
-    ).rejects.toThrow(NotFoundException);
+    await expect(service.uploadCover(404, file)).rejects.toThrow(
+      NotFoundException,
+    );
   });
 });

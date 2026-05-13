@@ -36,7 +36,7 @@ import { GetBooksQueryDto } from './dto/get-books-query.dto';
 import { PaginatedBooksResponseDto } from './dto/paginated-books-response.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
 import { UploadBookCoverResponseDto } from './dto/upload-book-cover-response.dto';
-import { UploadedFile as UploadedFileType } from '../storage/interfaces/uploaded-file.interface';
+import { Express } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -231,7 +231,7 @@ export class BooksController {
   @UseInterceptors(FileInterceptor('file'))
   @ApiBearerAuth('JWT')
   @ApiOperation({
-    summary: 'Subir portada de un libro a AWS S3 (admin/root)',
+    summary: 'Subir portada de un libro (admin/root)',
   })
   @ApiParam({
     name: 'id',
@@ -278,7 +278,7 @@ export class BooksController {
           errorHttpStatusCode: 400,
         }),
     )
-    file: UploadedFileType,
+    file: Express.Multer.File,
   ) {
     const fileName = (file.originalname ?? '').toLowerCase();
     const mimeType = (file.mimetype ?? '').toLowerCase();
