@@ -24,6 +24,12 @@ export interface ClientCard {
   cardType: ClientCardType;
   expirationDate: string;
   cardHolder: string;
+  /* Debit card: current balance available */
+  balance?: number;
+  /* Credit card: max credit limit */
+  creditLimit?: number;
+  /* Credit card: current balance used (total debt) */
+  creditUsed?: number;
 }
 
 export interface ClientSubscription {
@@ -67,6 +73,20 @@ export type CreateClientCardPayload = {
   cardHolder: string;
 };
 
+export type UpdateCardBalancePayload = {
+  amount: number; /* Amount to add to balance (debit cards only) */
+};
+
+export type UpdateCardCreditLimitPayload = {
+  creditLimit: number; /* New credit limit (credit cards only) */
+};
+
+export interface CardPaymentVerification {
+  isAuthorized: boolean;
+  availableAmount: number;
+  message?: string;
+}
+
 export async function getClientProfile(): Promise<ClientProfile> {
   const { data } = await api.get<ClientProfile>('/clients/me');
   return data;
@@ -84,4 +104,42 @@ export async function createClientCard(payload: CreateClientCardPayload): Promis
 
 export async function deleteClientCard(cardId: number): Promise<void> {
   await api.delete(`/clients/me/cards/${cardId}`);
+}
+
+export async function updateCardBalance(
+  cardId: number,
+  payload: UpdateCardBalancePayload,
+): Promise<ClientCard> {
+  const { data } = await api.patch<ClientCard>(`/clients/me/cards/${cardId}/balance`, payload);
+  return data;
+}
+
+export async function updateCardCreditLimit(
+  cardId: number,
+  payload: UpdateCardCreditLimitPayload,
+): Promise<ClientCard> {
+  const { data } = await api.patch<ClientCard>(`/clients/me/cards/${cardId}/credit-limit`, payload);
+  return data;
+}
+
+export async function verifyCardPayment(
+  cardId: number,
+  amount: number,
+): Promise<CardPaymentVerification> {
+  const { data } = await api.post<CardPaymentVerification>(
+    `/clients/me/cards/${cardId}/verify-payment`,
+    { amount },
+  );
+  return data;
+}
+
+export async function processCardPayment(
+  cardId: number,
+  amount: number,
+): Promise<{ success: boolean; message: string }> {
+  const { data } = await api.post<{ success: boolean; message: string }>(
+    `/clients/me/cards/${cardId}/process-payment`,
+    { amount },
+  );
+  return data;
 }

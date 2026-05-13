@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { CardFormInput, type CardFormData } from '../Components/CardFormInput';
 import { InputText, InputTextarea } from '../Components/Inputs';
 import { LocationPicker } from '../Components/LocationPicker';
 import { Spinner } from '../Components/Spinner';
 import { useSnackbar } from '../Components/SnackbarProvider';
-import { getClientProfile, type ClientCard } from '../api/clients';
+import { getClientProfile, processCardPayment, verifyCardPayment, type ClientCard } from '../api/clients';
 import { createPurchase } from '../api/purchases';
 import { getAvailableStores, type AvailableStore } from '../api/stores';
 import { useCart } from '../hooks/useCart';
 import type { CartItem } from '../interfaces/CartInterface';
 import type { Purchase } from '../interfaces/PurchaseInterface';
-import { formatCardNumberInput, maskCardNumber, normalizeCardNumber } from '../utils/cardNumber';
+import { maskCardNumber } from '../utils/cardNumber';
+import { validateCard } from '../utils/cardValidation';
 import { suggestAddresses, validateAddress } from '../services/addressValidation';
 
 type CheckoutStep = 1 | 2 | 3 | 4;
@@ -25,12 +27,7 @@ type AddressFormState = {
   notes: string;
 };
 
-type PaymentFormState = {
-  cardholder: string;
-  cardNumber: string;
-  expiry: string;
-  cvv: string;
-};
+type PaymentFormState = CardFormData;
 
 type FieldErrors = Partial<Record<keyof AddressFormState | keyof PaymentFormState | 'pickupStoreId' | 'registeredCardId', string>>;
 
@@ -158,10 +155,11 @@ const initialAddressState: AddressFormState = {
 };
 
 const initialPaymentState: PaymentFormState = {
-  cardholder: '',
   cardNumber: '',
-  expiry: '',
+  cardholder: '',
+  expiryDate: '',
   cvv: '',
+  cardType: 'credit',
 };
 
 const PAYMENT_METHODS: Array<{
@@ -193,10 +191,6 @@ function formatDate(isoDate: string): string {
   const date = new Date(isoDate);
   if (Number.isNaN(date.getTime())) return 'Sin fecha';
   return date.toLocaleDateString('es-CO');
-}
-
-function formatCardNumber(value: string): string {
-  return formatCardNumberInput(value);
 }
 
 function composeShippingAddress(address: AddressFormState): string {
@@ -478,26 +472,17 @@ export function CheckoutPage() {
     setAddressForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const updatePaymentField = (field: keyof PaymentFormState, value: string) => {
-    if (field === 'cardNumber') {
-      setPaymentForm((prev) => ({ ...prev, cardNumber: formatCardNumber(value) }));
-      return;
-    }
-
-    if (field === 'cvv') {
-      const sanitized = value.replace(/\D/g, '').slice(0, 4);
-      setPaymentForm((prev) => ({ ...prev, cvv: sanitized }));
-      return;
-    }
-
-    if (field === 'expiry') {
-      const digits = value.replace(/\D/g, '').slice(0, 4);
-      const formatted = digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits;
-      setPaymentForm((prev) => ({ ...prev, expiry: formatted }));
-      return;
-    }
-
-    setPaymentForm((prev) => ({ ...prev, [field]: value }));
+  const updatePaymentField = (data: PaymentFormState) => {
+    setPaymentForm(data);
+    // Clear errors as user updates the form
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      delete next.cardNumber;
+      delete next.cardholder;
+      delete next.expiryDate;
+      delete next.cvv;
+      return next;
+    });
   };
 
   const validateAddressStep = async (): Promise<boolean> => {
@@ -551,20 +536,18 @@ export function CheckoutPage() {
     const nextErrors: FieldErrors = {};
 
     if (paymentChoice === 'new') {
-      if (paymentForm.cardholder.trim().length < 3) {
-        nextErrors.cardholder = 'Ingresa el nombre como figura en la tarjeta';
-      }
+      const validation = validateCard(
+        paymentForm.cardNumber,
+        paymentForm.expiryDate,
+        paymentForm.cvv,
+        paymentForm.cardholder,
+      );
 
-      if (normalizeCardNumber(paymentForm.cardNumber).length !== 16) {
-        nextErrors.cardNumber = 'El número de tarjeta no es válido';
-      }
-
-      if (!/^\d{2}\/\d{2}$/.test(paymentForm.expiry.trim())) {
-        nextErrors.expiry = 'Usa formato MM/AA';
-      }
-
-      if (!/^\d{3,4}$/.test(paymentForm.cvv.trim())) {
-        nextErrors.cvv = 'El CVV debe tener 3 o 4 dígitos';
+      if (!validation.isValid) {
+        if (validation.errors.cardNumber) nextErrors.cardNumber = validation.errors.cardNumber;
+        if (validation.errors.cardholder) nextErrors.cardholder = validation.errors.cardholder;
+        if (validation.errors.expiryDate) nextErrors.expiryDate = validation.errors.expiryDate;
+        if (validation.errors.cvv) nextErrors.cvv = validation.errors.cvv;
       }
     }
 
@@ -610,7 +593,7 @@ export function CheckoutPage() {
         const next = { ...prev };
         delete next.cardholder;
         delete next.cardNumber;
-        delete next.expiry;
+        delete next.expiryDate;
         delete next.cvv;
         return next;
       });
@@ -650,6 +633,29 @@ export function CheckoutPage() {
 
     setIsSubmitting(true);
     try {
+      // Process payment based on payment choice
+      if (paymentChoice === 'registered' && selectedRegisteredCard) {
+        // Verify and process registered card
+        const verification = await verifyCardPayment(selectedRegisteredCard.cardId, total);
+        if (!verification.isAuthorized) {
+          snackbar.error(
+            verification.message ||
+            (selectedRegisteredCard.cardType === 'debit'
+              ? 'Saldo insuficiente en tu tarjeta de débito'
+              : 'Límite de crédito insuficiente'),
+          );
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Process the payment
+        await processCardPayment(selectedRegisteredCard.cardId, total);
+      } else if (paymentChoice === 'new') {
+        // For one-time cards, assume credit card and authorize automatically
+        // No need to verify balance, just use it
+      }
+
+      // Create the purchase
       const createdPurchase = await createPurchase({
         deliveryMode,
         pickupStoreId: deliveryMode === 'storePickup' ? pickupStoreId ?? undefined : undefined,
@@ -1147,57 +1153,20 @@ export function CheckoutPage() {
                 </div>
 
                 {paymentChoice === 'new' && (
-                  <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                    <div className="sm:col-span-2">
-                      <InputText
-                        label="Titular de la tarjeta"
-                        value={paymentForm.cardholder}
-                        onChange={(event) => updatePaymentField('cardholder', event.target.value)}
-                        autoComplete="cc-name"
-                        maxLength={80}
-                        required
-                      />
-                      {fieldErrors.cardholder && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.cardholder}</p>}
-                    </div>
-
-                    <div className="sm:col-span-2">
-                      <InputText
-                        label="Número de tarjeta"
-                        value={paymentForm.cardNumber}
-                        onChange={(event) => updatePaymentField('cardNumber', event.target.value)}
-                        autoComplete="cc-number"
-                        maxLength={19}
-                        inputMode="numeric"
-                        required
-                      />
-                      {fieldErrors.cardNumber && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.cardNumber}</p>}
-                    </div>
-
-                    <div>
-                      <InputText
-                        label="Vencimiento"
-                        value={paymentForm.expiry}
-                        onChange={(event) => updatePaymentField('expiry', event.target.value)}
-                        placeholder="MM/AA"
-                        autoComplete="cc-exp"
-                        maxLength={5}
-                        required
-                      />
-                      {fieldErrors.expiry && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.expiry}</p>}
-                    </div>
-
-                    <div>
-                      <InputText
-                        label="CVV"
-                        value={paymentForm.cvv}
-                        onChange={(event) => updatePaymentField('cvv', event.target.value)}
-                        autoComplete="cc-csc"
-                        maxLength={4}
-                        inputMode="numeric"
-                        required
-                      />
-                      {fieldErrors.cvv && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.cvv}</p>}
-                    </div>
+                  <div className="mt-6">
+                    <CardFormInput
+                      data={paymentForm}
+                      onChange={updatePaymentField}
+                      errors={{
+                        cardNumber: fieldErrors.cardNumber as string | undefined,
+                        cardholder: fieldErrors.cardholder as string | undefined,
+                        expiryDate: fieldErrors.expiryDate as string | undefined,
+                        cvv: fieldErrors.cvv as string | undefined,
+                      }}
+                      cardholderLabel="Titular de la tarjeta"
+                      showCardProvider
+                      hideLabelOnFocus={false}
+                    />
                   </div>
                 )}
 

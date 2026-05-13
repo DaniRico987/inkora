@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from './Button';
+import { CardFormInput, type CardFormData } from './CardFormInput';
 import { InputDate, InputSelect, InputText } from './Inputs';
 import { LocationPicker } from './LocationPicker';
 import { Spinner } from './Spinner';
@@ -18,7 +19,8 @@ import {
 } from '../api/clients';
 import { getCategories, type Category } from '../api/categories';
 import { subscribeToCategory, unsubscribeFromCategory } from '../api/subscriptions';
-import { formatCardNumberInput, maskCardNumber, normalizeCardNumber } from '../utils/cardNumber';
+import { maskCardNumber, normalizeCardNumber } from '../utils/cardNumber';
+import { validateCard } from '../utils/cardValidation';
 import { validateDateValue } from '../utils/dateValidation';
 import { suggestAddresses, validateAddress } from '../services/addressValidation';
 
@@ -29,17 +31,11 @@ interface UserProfileModalProps {
 
 type ProfileSection = 'personal' | 'preferences' | 'cards' | 'reservations' | 'history';
 
-type CardFormState = {
-  number: string;
-  cardHolder: string;
-  expirationDate: string;
-  cardType: ClientCardType;
-};
-
-const initialCardForm: CardFormState = {
-  number: '',
-  cardHolder: '',
-  expirationDate: '',
+const initialCardForm: CardFormData = {
+  cardNumber: '',
+  cardholder: '',
+  expiryDate: '',
+  cvv: '',
   cardType: 'credit',
 };
 
@@ -72,7 +68,11 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
     address: '',
     gender: '',
   });
-  const [cardForm, setCardForm] = useState<CardFormState>(initialCardForm);
+  const [cardForm, setCardForm] = useState<CardFormData>(initialCardForm);
+  const [cardFormErrors, setCardFormErrors] = useState<Record<string, string | undefined>>({});
+  const [editingCardId, setEditingCardId] = useState<number | null>(null);
+  const [editingCardValue, setEditingCardValue] = useState<number>(0);
+  const [updatingCardId, setUpdatingCardId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -222,27 +222,32 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
   };
 
   const handleAddCard = async () => {
-    if (normalizeCardNumber(cardForm.number).length !== 16) {
-      snackbar.warning('Ingresa un número de tarjeta válido');
-      return;
-    }
+    // Validate card
+    const validation = validateCard(
+      cardForm.cardNumber,
+      cardForm.expiryDate,
+      cardForm.cvv,
+      cardForm.cardholder,
+    );
 
-    const expirationDateError = validateDateValue(cardForm.expirationDate, 'cardExpiration');
-    if (expirationDateError) {
-      snackbar.warning(expirationDateError);
+    setCardFormErrors(validation.errors);
+
+    if (!validation.isValid) {
+      snackbar.warning('Por favor, corrige los errores en la tarjeta');
       return;
     }
 
     try {
       setSavingCard(true);
       const updated = await createClientCard({
-        maskedNumber: maskCardNumber(cardForm.number),
-        cardType: cardForm.cardType,
-        expirationDate: cardForm.expirationDate,
-        cardHolder: cardForm.cardHolder.trim(),
+        maskedNumber: maskCardNumber(cardForm.cardNumber),
+        cardType: cardForm.cardType || 'credit',
+        expirationDate: cardForm.expiryDate,
+        cardHolder: cardForm.cardholder.trim(),
       });
       setProfile(updated);
       setCardForm(initialCardForm);
+      setCardFormErrors({});
       snackbar.success('Tarjeta agregada correctamente');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'No se pudo agregar la tarjeta';
@@ -268,6 +273,52 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
       snackbar.error(message);
     } finally {
       setDeletingCardId(null);
+    }
+  };
+
+  const handleUpdateCardBalance = async (cardId: number, amount: number) => {
+    if (!profile || amount <= 0) return;
+
+    setUpdatingCardId(cardId);
+    try {
+      const { updateCardBalance } = await import('../api/clients');
+      const updated = await updateCardBalance(cardId, { amount });
+
+      const updatedCards = profile.cards.map((card) =>
+        card.cardId === cardId ? updated : card,
+      );
+      setProfile({ ...profile, cards: updatedCards });
+      setEditingCardId(null);
+      setEditingCardValue(0);
+      snackbar.success(`Saldo agregado correctamente. Nuevo saldo: $${updated.balance}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'No se pudo actualizar el saldo';
+      snackbar.error(message);
+    } finally {
+      setUpdatingCardId(null);
+    }
+  };
+
+  const handleUpdateCardCreditLimit = async (cardId: number, creditLimit: number) => {
+    if (!profile || creditLimit < 0) return;
+
+    setUpdatingCardId(cardId);
+    try {
+      const { updateCardCreditLimit } = await import('../api/clients');
+      const updated = await updateCardCreditLimit(cardId, { creditLimit });
+
+      const updatedCards = profile.cards.map((card) =>
+        card.cardId === cardId ? updated : card,
+      );
+      setProfile({ ...profile, cards: updatedCards });
+      setEditingCardId(null);
+      setEditingCardValue(0);
+      snackbar.success(`Límite de crédito actualizado a: $${creditLimit}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'No se pudo actualizar el límite';
+      snackbar.error(message);
+    } finally {
+      setUpdatingCardId(null);
     }
   };
 
@@ -468,78 +519,189 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
                     {profile.cards.length === 0 ? (
                       <p className="mt-3 text-sm text-text-muted">No tienes tarjetas registradas.</p>
                     ) : (
-                      <div className="mt-4 space-y-3">
-                        {profile.cards.map((card) => (
-                          <article key={card.cardId} className="rounded-2xl border border-border bg-bg-secondary p-4">
-                            <div className="flex items-center justify-between gap-3">
-                              <div>
-                                <p className="text-sm font-semibold text-text">{card.maskedNumber}</p>
-                                <p className="mt-1 text-xs text-text-muted">
-                                  {card.cardType === 'credit' ? 'Crédito' : 'Débito'} · Expira{' '}
-                                  {formatDate(card.expirationDate)}
-                                </p>
-                                <p className="mt-1 text-xs text-text-muted">{card.cardHolder}</p>
+                      <div className="mt-4 space-y-4">
+                        {profile.cards.map((card) => {
+                          const isEditing = editingCardId === card.cardId;
+                          const isUpdating = updatingCardId === card.cardId;
+                          const isDebit = card.cardType === 'debit';
+
+                          return (
+                            <article key={card.cardId} className="rounded-2xl border border-border bg-bg-secondary p-4">
+                              <div className="space-y-3">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex-1">
+                                    <p className="text-sm font-semibold text-text">{card.maskedNumber}</p>
+                                    <p className="mt-1 text-xs text-text-muted">
+                                      {card.cardType === 'credit' ? 'Crédito' : 'Débito'} · Expira{' '}
+                                      {formatDate(card.expirationDate)}
+                                    </p>
+                                    <p className="mt-1 text-xs text-text-muted">{card.cardHolder}</p>
+                                  </div>
+                                  <Button
+                                    variant="destructive"
+                                    size="auto"
+                                    loading={deletingCardId === card.cardId}
+                                    className="rounded-full px-3 py-1 text-xs"
+                                    onClick={() => handleDeleteCard(card.cardId)}
+                                  >
+                                    Eliminar
+                                  </Button>
+                                </div>
+
+                                {/* Debit Card: Show Balance */}
+                                {isDebit && (
+                                  <div className="space-y-2 border-t border-border pt-3">
+                                    <div className="flex items-center justify-between">
+                                      <p className="text-xs font-semibold text-text-muted">Saldo disponible</p>
+                                      <p className="text-sm font-bold text-emerald-600">${card.balance ?? 0}</p>
+                                    </div>
+
+                                    {!isEditing ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setEditingCardId(card.cardId);
+                                          setEditingCardValue(0);
+                                        }}
+                                        className="w-full rounded-lg bg-babyblue-50 px-3 py-2 text-xs font-semibold text-babyblue-700 transition hover:bg-babyblue-100"
+                                      >
+                                        Agregar saldo
+                                      </button>
+                                    ) : (
+                                      <div className="flex gap-2">
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          step="0.01"
+                                          value={editingCardValue || ''}
+                                          onChange={(e) => setEditingCardValue(parseFloat(e.target.value) || 0)}
+                                          placeholder="Cantidad"
+                                          className="flex-1 rounded-lg border border-border bg-bg px-3 py-2 text-xs text-text focus:border-babyblue-400 focus:outline-none"
+                                        />
+                                        <button
+                                          type="button"
+                                          disabled={isUpdating || editingCardValue <= 0}
+                                          onClick={() =>
+                                            handleUpdateCardBalance(card.cardId, editingCardValue)
+                                          }
+                                          className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                          {isUpdating ? 'Agregando...' : 'Agregar'}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={isUpdating}
+                                          onClick={() => setEditingCardId(null)}
+                                          className="rounded-lg border border-border bg-bg px-3 py-2 text-xs font-semibold text-text transition hover:border-border-dark disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                          Cancelar
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Credit Card: Show Limit and Usage */}
+                                {!isDebit && (
+                                  <div className="space-y-2 border-t border-border pt-3">
+                                    <div className="flex items-center justify-between">
+                                      <p className="text-xs font-semibold text-text-muted">Límite de crédito</p>
+                                      <p className="text-sm font-bold text-text">${card.creditLimit ?? 0}</p>
+                                    </div>
+
+                                    <div className="flex items-center justify-between">
+                                      <p className="text-xs font-semibold text-text-muted">Saldo usado</p>
+                                      <p className="text-sm font-bold text-red-600">${card.creditUsed ?? 0}</p>
+                                    </div>
+
+                                    <div className="flex items-center justify-between">
+                                      <p className="text-xs font-semibold text-text-muted">Disponible</p>
+                                      <p className="text-sm font-bold text-emerald-600">
+                                        ${Math.max(0, (card.creditLimit ?? 0) - (card.creditUsed ?? 0))}
+                                      </p>
+                                    </div>
+
+                                    {!isEditing ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setEditingCardId(card.cardId);
+                                          setEditingCardValue(card.creditLimit ?? 0);
+                                        }}
+                                        className="w-full rounded-lg bg-babyblue-50 px-3 py-2 text-xs font-semibold text-babyblue-700 transition hover:bg-babyblue-100"
+                                      >
+                                        Editar límite
+                                      </button>
+                                    ) : (
+                                      <div className="flex gap-2">
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          step="0.01"
+                                          value={editingCardValue || ''}
+                                          onChange={(e) => setEditingCardValue(parseFloat(e.target.value) || 0)}
+                                          placeholder="Nuevo límite"
+                                          className="flex-1 rounded-lg border border-border bg-bg px-3 py-2 text-xs text-text focus:border-babyblue-400 focus:outline-none"
+                                        />
+                                        <button
+                                          type="button"
+                                          disabled={isUpdating || editingCardValue < 0}
+                                          onClick={() =>
+                                            handleUpdateCardCreditLimit(card.cardId, editingCardValue)
+                                          }
+                                          className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                          {isUpdating ? 'Actualizando...' : 'Guardar'}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={isUpdating}
+                                          onClick={() => setEditingCardId(null)}
+                                          className="rounded-lg border border-border bg-bg px-3 py-2 text-xs font-semibold text-text transition hover:border-border-dark disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                          Cancelar
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
                               </div>
-                              <Button
-                                variant="destructive"
-                                size="auto"
-                                loading={deletingCardId === card.cardId}
-                                className="rounded-full px-3 py-1 text-xs"
-                                onClick={() => handleDeleteCard(card.cardId)}
-                              >
-                                Eliminar
-                              </Button>
-                            </div>
-                          </article>
-                        ))}
+                            </article>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
 
                   <div className="rounded-3xl border border-border bg-bg p-5 shadow-sm sm:p-6">
                     <h3 className="text-lg font-semibold text-text">Agregar nueva tarjeta</h3>
-                    <InputText
-                      label="Número de tarjeta"
-                      value={cardForm.number}
-                      maxLength={19}
-                      inputMode="numeric"
-                      autoComplete="cc-number"
-                      hideLabelOnFocus
-                      onChange={(event) =>
-                        setCardForm((prev) => ({ ...prev, number: formatCardNumberInput(event.target.value) }))
-                      }
-                    />
-                    <InputText
-                      label="Titular"
-                      value={cardForm.cardHolder}
-                      validationType="name"
-                      hideLabelOnFocus
-                      onChange={(event) => setCardForm((prev) => ({ ...prev, cardHolder: event.target.value }))}
-                    />
-                    <InputDate
-                      label="Fecha de expiración"
-                      value={cardForm.expirationDate}
-                      dateValidationMode="cardExpiration"
-                      datePickerMode="monthYear"
-                      hideLabelOnFocus
-                      onChange={(event) => setCardForm((prev) => ({ ...prev, expirationDate: event.target.value }))}
-                    />
-                    <InputSelect
-                      label="Tipo de tarjeta"
-                      value={cardForm.cardType}
-                      options={[
-                        { label: 'Crédito', value: 'credit' },
-                        { label: 'Débito', value: 'debit' },
-                      ]}
-                      onChange={(event) =>
-                        setCardForm((prev) => ({ ...prev, cardType: event.target.value as ClientCardType }))
-                      }
-                    />
+                    <div className="mt-4">
+                      <CardFormInput
+                        data={cardForm}
+                        onChange={(data) => {
+                          setCardForm(data);
+                          // Clear errors as user corrects them
+                          if (cardFormErrors) {
+                            const newErrors = { ...cardFormErrors };
+                            if (data.cardNumber) delete newErrors.cardNumber;
+                            if (data.cardholder) delete newErrors.cardholder;
+                            if (data.expiryDate) delete newErrors.expiryDate;
+                            if (data.cvv) delete newErrors.cvv;
+                            setCardFormErrors(newErrors);
+                          }
+                        }}
+                        errors={cardFormErrors}
+                        showCardType
+                        disabled={savingCard}
+                        hideLabelOnFocus
+                        showCardProvider
+                      />
+                    </div>
                     <Button
                       variant="primary"
                       size="full"
                       loading={savingCard}
-                      className="rounded-full py-2 text-sm"
+                      className="mt-6 rounded-full py-2 text-sm"
                       onClick={handleAddCard}
                     >
                       Guardar tarjeta
