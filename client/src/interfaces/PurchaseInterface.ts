@@ -31,6 +31,19 @@ export interface Purchase {
   dispatchDate?: string | null;
   status: PurchaseStatus;
   items: PurchaseItem[];
+  returnBook?: {
+    returnBookId: number;
+    purchaseId: number;
+    clientId: number;
+    reason: 'badCondition' | 'didNotMeetExpectations' | 'lateDelivery' | null;
+    additionalDescription: string | null;
+    requestDate: string;
+    status: 'pending' | 'approved' | 'rejected';
+    qrCodeUrl: string | null;
+    approvalDate: string | null;
+    adminNote?: string | null;
+    decisionDate?: string | null;
+  } | null;
 }
 
 export interface PurchaseStatusMeta {

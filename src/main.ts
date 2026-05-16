@@ -81,6 +81,10 @@ async function bootstrap() {
       'Flujo de compras, seguimiento y actualización de estados',
     )
     .addTag(
+      'Returns',
+      'Solicitud y gestion de devoluciones de compras entregadas',
+    )
+    .addTag(
       'Wallet',
       'Saldo, historial y movimientos financieros del cliente. Requiere HTTPS',
     )

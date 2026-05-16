@@ -424,6 +424,8 @@ model ReturnBook {
   additionalDescription String?       @db.Text
   requestDate           DateTime      @default(now())
   status                ReturnStatus
+  adminNote             String?       @db.Text
+  decisionDate          DateTime?
   qrCodeUrl             String?       @db.Text
   approvalDate          DateTime?
 

@@ -273,6 +273,7 @@ export class PurchasesService {
             },
           },
         },
+        returnBook: true,
       },
     });
 
@@ -502,6 +503,19 @@ export class PurchasesService {
         author: string;
       };
     }>;
+    returnBook?: {
+      returnBookId: number;
+      purchaseId: number;
+      clientId: number;
+      reason?: string | null;
+      additionalDescription?: string | null;
+      requestDate: Date;
+      status: any;
+      qrCodeUrl?: string | null;
+      approvalDate?: Date | null;
+      adminNote?: string | null;
+      decisionDate?: Date | null;
+    } | null;
   }): PurchaseResponseDto {
     return {
       purchaseId: purchase.purchaseId,
@@ -527,6 +541,21 @@ export class PurchasesService {
           subtotal: item.quantity * unitPrice,
         };
       }),
+      returnBook: purchase.returnBook
+        ? {
+            returnBookId: purchase.returnBook.returnBookId,
+            purchaseId: purchase.returnBook.purchaseId,
+            clientId: purchase.returnBook.clientId,
+            reason: (purchase.returnBook.reason as any) ?? null,
+            additionalDescription: purchase.returnBook.additionalDescription,
+            requestDate: purchase.returnBook.requestDate,
+            status: purchase.returnBook.status,
+            qrCodeUrl: purchase.returnBook.qrCodeUrl,
+            approvalDate: purchase.returnBook.approvalDate ?? null,
+            adminNote: purchase.returnBook.adminNote ?? null,
+            decisionDate: purchase.returnBook.decisionDate ?? null,
+          }
+        : null,
     };
   }
 

@@ -36,6 +36,7 @@ import { AdminDashboard } from './pages/AdminDashboard';
 import { AdminChangePasswordPage } from './pages/AdminChangePasswordPage.tsx';
 import { BooksManagementPage } from './pages/BooksManagementPage';
 import { StoresManagementPage } from './pages/StoresManagementPage';
+import { ReturnsManagementPage } from './pages/ReturnsManagementPage';
 import { AdminsManagementPage } from './pages/AdminsManagementPage';
 import { RootAdminCreationPage } from './pages/RootAdminCreationPage';
 import { NewsPage } from './pages/NewsPage';
@@ -334,6 +335,14 @@ function AppContent() {
             element={
               <AdminRouteGuard>
                 <StoresManagementPage />
+              </AdminRouteGuard>
+            }
+          />
+          <Route
+            path="/admin/returns"
+            element={
+              <AdminRouteGuard>
+                <ReturnsManagementPage />
               </AdminRouteGuard>
             }
           />

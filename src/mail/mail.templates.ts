@@ -32,6 +32,15 @@ type NewBookNotificationParams = {
   categories: string[];
 };
 
+type ReturnApprovedParams = {
+  firstName: string;
+  returnBookId: number;
+  purchaseId: number;
+  reasonLabel: string;
+  additionalDescription?: string;
+  validationCode: string;
+};
+
 export type MailBrandingOptions = {
   logoUrl?: string;
   logoCid?: string;
@@ -420,5 +429,139 @@ export function buildNewBookNotificationTemplate(
       `Autor: ${params.bookAuthor}\n` +
       `Categorías: ${categoriesText}\n\n` +
       'Recibes esta notificación porque estás suscrito a las categorías mencionadas.',
+  };
+}
+
+export function buildReturnApprovedTemplate(
+  params: ReturnApprovedParams,
+  branding?: MailBrandingOptions,
+): MailTemplate {
+  const safeFirstName = escapeHtml(params.firstName);
+  const safeReasonLabel = escapeHtml(params.reasonLabel);
+  const safeValidationCode = escapeHtml(params.validationCode);
+  const safeAdditionalDescription = escapeHtml(
+    params.additionalDescription || 'Sin descripcion adicional',
+  );
+
+  const bodyHtml = `
+    <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#334155;">
+      Hola ${safeFirstName}, aprobamos tu solicitud de devolucion.
+    </p>
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;margin:0 0 16px 0;">
+      <tr>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-size:14px;color:#0f172a;"><strong>Solicitud</strong></td>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;font-size:14px;color:#0f172a;">#${params.returnBookId}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-size:14px;color:#0f172a;"><strong>Compra</strong></td>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;font-size:14px;color:#0f172a;">#${params.purchaseId}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-size:14px;color:#0f172a;"><strong>Motivo</strong></td>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;font-size:14px;color:#0f172a;">${safeReasonLabel}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-size:14px;color:#0f172a;"><strong>Descripcion</strong></td>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;font-size:14px;color:#0f172a;">${safeAdditionalDescription}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-size:14px;color:#0f172a;"><strong>Codigo de validacion</strong></td>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;font-size:14px;color:#0f172a;"><strong>${safeValidationCode}</strong></td>
+      </tr>
+    </table>
+    <p style="margin:0 0 12px 0;font-size:14px;line-height:1.6;color:#334155;">
+      Adjuntamos tu codigo QR en formato PNG. Presentalo en tienda fisica para validar la devolucion.
+    </p>
+    <p style="margin:0;font-size:13px;line-height:1.6;color:#64748b;">
+      Si no puedes visualizar el adjunto, responde este correo para asistencia.
+    </p>
+  `;
+
+  return {
+    subject: `Devolucion aprobada #${params.returnBookId} - INKORA`,
+    html: buildLayout({
+      preheader: `Tu devolucion #${params.returnBookId} fue aprobada y ya tiene QR de validacion.`,
+      title: 'Devolucion aprobada',
+      intro: 'Tu solicitud esta lista para validacion en tienda.',
+      bodyHtml,
+      footer:
+        'Este correo contiene un codigo QR unico para validar la devolucion en tienda fisica.',
+      branding,
+    }),
+    text:
+      `Tu devolucion #${params.returnBookId} fue aprobada.\n` +
+      `Compra asociada: #${params.purchaseId}\n` +
+      `Motivo: ${params.reasonLabel}\n` +
+      `Descripcion: ${params.additionalDescription || 'Sin descripcion adicional'}\n` +
+      `Codigo de validacion: ${params.validationCode}\n` +
+      'Adjuntamos el codigo QR para validarlo en tienda fisica.',
+  };
+}
+
+type ReturnRejectedParams = {
+  firstName: string;
+  returnBookId: number;
+  purchaseId: number;
+  reasonLabel: string;
+  additionalDescription?: string;
+  adminNote?: string;
+};
+
+export function buildReturnRejectedTemplate(
+  params: ReturnRejectedParams,
+  branding?: MailBrandingOptions,
+): MailTemplate {
+  const safeFirstName = escapeHtml(params.firstName);
+  const safeReasonLabel = escapeHtml(params.reasonLabel);
+  const safeAdditionalDescription = escapeHtml(
+    params.additionalDescription || 'Sin descripcion adicional',
+  );
+
+  const safeAdminNote = params.adminNote ? escapeHtml(params.adminNote) : null;
+
+  const bodyHtml = `
+    <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#334155;">
+      Hola ${safeFirstName}, hemos revisado tu solicitud de devolucion y no fue aprobada.
+    </p>
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;margin:0 0 16px 0;">
+      <tr>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-size:14px;color:#0f172a;"><strong>Solicitud</strong></td>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;font-size:14px;color:#0f172a;">#${params.returnBookId}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-size:14px;color:#0f172a;"><strong>Compra</strong></td>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;font-size:14px;color:#0f172a;">#${params.purchaseId}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-size:14px;color:#0f172a;"><strong>Motivo</strong></td>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;font-size:14px;color:#0f172a;">${safeReasonLabel}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-size:14px;color:#0f172a;"><strong>Descripcion</strong></td>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;font-size:14px;color:#0f172a;">${safeAdditionalDescription}</td>
+      </tr>
+    </table>
+    <p style="margin:0 0 12px 0;font-size:14px;line-height:1.6;color:#334155;">
+      Si consideras que hubo un error, por favor responde este correo indicando informacion adicional para que podamos revisarlo nuevamente.
+    </p>
+    ${safeAdminNote ? `<div style="margin-top:12px;padding:12px;border-left:4px solid #ef4444;background:#fff7f7;border-radius:6px;color:#7f1d1d;"><strong>Comentario del administrador:</strong><div style="margin-top:8px;font-size:14px;color:#4b1f1f;">${safeAdminNote}</div></div>` : ''}
+  `;
+
+  return {
+    subject: `Solicitud de devolucion no aprobada #${params.returnBookId} - INKORA`,
+    html: buildLayout({
+      preheader: `Tu devolucion #${params.returnBookId} no fue aprobada.`,
+      title: 'Solicitud no aprobada',
+      intro: 'Resultado de la revision de tu solicitud',
+      bodyHtml,
+      footer:
+        'Si necesitas asistencia, responde este correo y el equipo de soporte te ayudara.',
+      branding,
+    }),
+    text:
+      `Tu devolucion #${params.returnBookId} no fue aprobada.\n` +
+      `Compra asociada: #${params.purchaseId}\n` +
+      `Motivo: ${params.reasonLabel}\n` +
+      `Descripcion: ${params.additionalDescription || 'Sin descripcion adicional'}\n`,
   };
 }

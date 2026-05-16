@@ -61,6 +61,12 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           icon: '🏪',
           roles: ['admin', 'root'],
         },
+        {
+          label: 'Devoluciones',
+          path: '/admin/returns',
+          icon: '↩️',
+          roles: ['admin', 'root'],
+        },
       ];
 
   const visibleMenuItems = menuItems.filter(
