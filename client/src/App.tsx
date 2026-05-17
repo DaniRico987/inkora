@@ -20,7 +20,6 @@ import { CheckoutPage } from './pages/CheckoutPage';
 import { OrderTrackingPage } from './pages/OrderTrackingPage';
 import { MyReservationsPage } from './pages/MyReservationsPage';
 import { MyHistoryPage } from './pages/MyHistoryPage';
-//import { ComponentsTestPage } from './pages/ComponentsTestPage';
 import { SnackbarProvider } from './Components/SnackbarProvider';
 import { NotificationsProvider } from './hooks/useNotifications';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -41,6 +40,7 @@ import { AdminsManagementPage } from './pages/AdminsManagementPage';
 import { RootAdminCreationPage } from './pages/RootAdminCreationPage';
 import { NewsPage } from './pages/NewsPage';
 import { StoresPage } from './pages/StoresPage';
+import WalletPage from './pages/Wallet/WalletPage';
 
 type AppRole = 'visitor' | 'client' | 'admin' | 'root';
 
@@ -271,10 +271,18 @@ function AppContent() {
             }
           />
           <Route
-            path="/profile"
+            path="/stores"
             element={
               <AccessGuard allowedRoles={['client']}>
-                <Navigate to="/" replace />
+                <StoresPage />
+              </AccessGuard>
+            }
+          />
+          <Route
+            path="/wallet"
+            element={
+              <AccessGuard allowedRoles={['client']}>
+                <WalletPage />
               </AccessGuard>
             }
           />
