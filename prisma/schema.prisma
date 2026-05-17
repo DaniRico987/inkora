@@ -140,6 +140,7 @@ model User {
   messages            Message[]
   auditLogs           AuditLog[]
   passwordResetTokens PasswordResetToken[]
+  vouchers            Voucher[]
 
   @@map("user")
 }
@@ -163,6 +164,22 @@ model Client {
   birthdayVouchers BirthdayVoucher[]
 
   @@map("client")
+}
+
+model Voucher {
+  id                   Int      @id @default(autoincrement())
+  code                 String   @unique
+  discountPercentage   Int
+  expiresAt            DateTime
+  isUsed               Boolean  @default(false)
+  pdfBase64            String
+  usedAt               DateTime?
+  appliedToPurchaseId  Int?
+  userId               Int
+  user                 User     @relation(fields: [userId], references: [userId])
+  createdAt            DateTime @default(now())
+
+  @@map("voucher")
 }
 
 model Admin {

@@ -10,6 +10,7 @@ import {
   buildNewBookNotificationTemplate,
   buildPasswordResetTemplate,
   buildPurchaseInvoiceTemplate,
+  buildBirthdayVoucherTemplate,
   buildReturnApprovedTemplate,
   buildReturnRejectedTemplate,
 } from './mail.templates';
@@ -249,6 +250,25 @@ export class MailService {
         logoUrl: this.logoUrl,
         logoCid: this.logoCid,
       },
+    );
+
+    await this.sendEmail({
+      to: email,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
+    });
+  }
+
+  async sendBirthdayVoucher(
+    email: string,
+    firstName: string,
+    voucherUrl: string,
+    voucherCode: string,
+  ) {
+    const template = buildBirthdayVoucherTemplate(
+      { firstName, voucherUrl, voucherCode },
+      { logoUrl: this.logoUrl, logoCid: this.logoCid },
     );
 
     await this.sendEmail({

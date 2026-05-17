@@ -432,6 +432,39 @@ export function buildNewBookNotificationTemplate(
   };
 }
 
+export function buildBirthdayVoucherTemplate(
+  params: { firstName: string; voucherUrl: string; voucherCode: string },
+  branding?: MailBrandingOptions,
+): MailTemplate {
+  const safeFirstName = escapeHtml(params.firstName);
+  const safeVoucherUrl = escapeHtml(params.voucherUrl);
+  const safeVoucherCode = escapeHtml(params.voucherCode);
+
+  const bodyHtml = `
+    <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#334155;">
+      ¡Feliz cumpleaños ${safeFirstName}! Para celebrarlo te regalamos un bono de descuento válido por 24 horas.
+    </p>
+    <div style="margin:16px 0;padding:16px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;">
+      <h3 style="margin:0 0 8px 0;font-size:18px;font-weight:700;color:#1e293b;">Tu bono</h3>
+      <p style="margin:0 0 8px 0;font-size:16px;color:#0f172a;"><strong>Código:</strong> ${safeVoucherCode}</p>
+      <p style="margin:0 0 8px 0;font-size:14px;color:#64748b;">Descarga tu bono aquí: <a href="${safeVoucherUrl}">Descargar PDF</a></p>
+    </div>
+  `;
+
+  return {
+    subject: `Feliz cumpleanos de parte de INKORA`,
+    html: buildLayout({
+      preheader: 'Tu bono de cumpleanos te espera',
+      title: 'Feliz cumpleanos',
+      intro: `Hola ${safeFirstName},`,
+      bodyHtml,
+      footer: 'Tu bono es valido por 24 horas. ¡Disfrutalo!',
+      branding,
+    }),
+    text: `Feliz cumpleanos ${params.firstName}! Descarga tu bono: ${params.voucherUrl}`,
+  };
+}
+
 export function buildReturnApprovedTemplate(
   params: ReturnApprovedParams,
   branding?: MailBrandingOptions,

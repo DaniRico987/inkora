@@ -175,10 +175,35 @@ export class PurchasesService {
           pickupStoreName,
         );
 
+        // Apply voucher if provided
+        let finalTotal = totalAmount;
+        let appliedVoucherId: number | null = null;
+        if (dto.voucherCode) {
+          const clientInfo = await tx.client.findUnique({ where: { clientId }, select: { userId: true } });
+          const voucher = await tx.voucher.findUnique({ where: { code: dto.voucherCode } });
+          if (!voucher) {
+            throw new BadRequestException('Voucher invalido');
+          }
+          if (voucher.userId !== clientInfo?.userId) {
+            throw new BadRequestException('Voucher no pertenece a este cliente');
+          }
+          if (voucher.isUsed) {
+            throw new BadRequestException('Voucher ya fue usado');
+          }
+          const nowUtc = new Date();
+          if (voucher.expiresAt < nowUtc) {
+            throw new BadRequestException('Voucher expirado');
+          }
+
+          const discount = (Number(voucher.discountPercentage) / 100) * finalTotal;
+          finalTotal = finalTotal - discount;
+          appliedVoucherId = voucher.id;
+        }
+
         const createdPurchase = await tx.purchase.create({
           data: {
             clientId,
-            totalAmount,
+            totalAmount: finalTotal,
             paymentMethod: dto.paymentMethod,
             shippingAddress: dto.shippingAddress,
             deliveryMode: dto.deliveryMode,
@@ -231,7 +256,7 @@ export class PurchasesService {
 
         await this.walletService.recordPurchaseTransaction(tx, {
           clientId,
-          amount: totalAmount,
+          amount: finalTotal,
           purchaseId: createdPurchase.purchaseId,
           gatewayReference: dto.paymentMethod ?? null,
         });
@@ -240,6 +265,14 @@ export class PurchasesService {
           where: { cartId: cart.cartId },
           data: { status: 'processed' },
         });
+
+        // mark voucher as used if applied (with audit fields)
+        if (appliedVoucherId) {
+          await tx.voucher.update({
+            where: { id: appliedVoucherId },
+            data: { isUsed: true, usedAt: new Date(), appliedToPurchaseId: createdPurchase.purchaseId },
+          });
+        }
 
         await tx.cartItem.deleteMany({ where: { cartId: cart.cartId } });
 

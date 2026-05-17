@@ -92,6 +92,7 @@ async function bootstrap() {
       'Reservations',
       'Reservas de libros con expiración automática de 24 horas',
     )
+    .addTag('Vouchers', 'Gestión y acceso a vouchers y bonos promocionales')
     .addTag(
       'Clients',
       'Operaciones del cliente autenticado, incluyendo historial consolidado de transacciones',
