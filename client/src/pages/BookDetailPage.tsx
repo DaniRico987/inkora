@@ -24,6 +24,8 @@ function formatExpiration(dateIso: string): string {
   });
 }
 
+const MAX_BOOK_QUANTITY = 3;
+
 export function BookDetailPage() {
   const params = useParams<{ id: string }>();
   const bookId = Number(params.id);
@@ -33,6 +35,8 @@ export function BookDetailPage() {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isSubmittingReservation, setIsSubmittingReservation] = useState(false);
   const [reservationExpiration, setReservationExpiration] = useState<string | null>(null);
+  const [selectedQuantity, setSelectedQuantity] = useState(1);
+  const [quantityError, setQuantityError] = useState<string | null>(null);
   const [imageFailed, setImageFailed] = useState(false);
 
   const token = getAccessToken();
@@ -48,7 +52,15 @@ export function BookDetailPage() {
   }, [book]);
 
   const addToCartDisabled =
-    !book || !book.isAvailable || totalAvailable <= 0 || isSubmittingReservation;
+    !book ||
+    !book.isAvailable ||
+    totalAvailable <= 0 ||
+    isSubmittingReservation ||
+    selectedQuantity < 1 ||
+    selectedQuantity > totalAvailable ||
+    Boolean(quantityError);
+
+  const remainingAvailable = Math.max(0, totalAvailable - selectedQuantity);
 
   useEffect(() => {
     setImageFailed(false);
@@ -59,13 +71,46 @@ export function BookDetailPage() {
     setIsConfirmOpen(false);
   };
 
+  const handleQuantityChange = (rawValue: number) => {
+    if (!Number.isFinite(rawValue)) return;
+
+    let quantity = Math.max(1, Math.floor(rawValue));
+    const maxAllowed = Math.min(MAX_BOOK_QUANTITY, Math.max(totalAvailable, 1));
+
+    if (quantity > maxAllowed) {
+      quantity = maxAllowed;
+    }
+
+    if (quantity > MAX_BOOK_QUANTITY) {
+      setQuantityError(`Máximo ${MAX_BOOK_QUANTITY} unidades por libro.`);
+    } else if (quantity > totalAvailable) {
+      setQuantityError('No hay suficientes unidades disponibles para esa cantidad.');
+    } else {
+      setQuantityError(null);
+    }
+
+    setSelectedQuantity(quantity);
+  };
+
+  useEffect(() => {
+    if (!book) {
+      setSelectedQuantity(1);
+      setQuantityError(null);
+      return;
+    }
+
+    if (selectedQuantity > totalAvailable) {
+      setSelectedQuantity(Math.max(1, totalAvailable));
+    }
+  }, [book, selectedQuantity, totalAvailable]);
+
   const handleConfirmReservation = async () => {
     if (!book) return;
 
     setIsSubmittingReservation(true);
     try {
       const response = await createReservation({
-        items: [{ bookId: book.id, quantity: 1 }],
+        items: [{ bookId: book.id, quantity: selectedQuantity }],
       });
       setReservationExpiration(response.expirationDate);
       setIsConfirmOpen(false);
@@ -194,6 +239,9 @@ export function BookDetailPage() {
               <div className="rounded-xl border border-border bg-bg p-3">
                 <p className="text-xs text-text-muted">Disponibilidad total</p>
                 <p className="text-xl font-semibold text-text">{totalAvailable} ejemplares</p>
+                <p className="mt-2 text-sm text-text-muted">
+                  Quedarán {remainingAvailable} unidades tras agregar {selectedQuantity}.
+                </p>
               </div>
             </div>
 
@@ -202,15 +250,65 @@ export function BookDetailPage() {
             )}
 
             {isClientAuthenticated && (
-              <div className="space-y-2">
+              <div className="space-y-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <div className="flex items-center gap-3 rounded-2xl border border-border bg-bg p-3">
+                    <button
+                      type="button"
+                      onClick={() => handleQuantityChange(selectedQuantity - 1)}
+                      disabled={selectedQuantity <= 1 || isSubmittingReservation}
+                      className="h-10 w-10 rounded-xl bg-bg text-lg font-semibold text-text transition hover:bg-border disabled:cursor-not-allowed disabled:opacity-40"
+                      aria-label="Disminuir cantidad"
+                    >
+                      −
+                    </button>
+                    <div className="min-w-[5rem] text-center">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted">
+                        Cantidad
+                      </p>
+                      <input
+                        type="number"
+                        min={1}
+                        max={Math.max(1, Math.min(MAX_BOOK_QUANTITY, totalAvailable))}
+                        value={selectedQuantity}
+                        onChange={(e) => handleQuantityChange(Number(e.target.value))}
+                        disabled={isSubmittingReservation}
+                        className="mt-1 w-full border-0 bg-transparent text-center text-lg font-black text-text outline-none ring-0 [appearance:textfield] focus:ring-0"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleQuantityChange(selectedQuantity + 1)}
+                      disabled={
+                        selectedQuantity >= Math.min(MAX_BOOK_QUANTITY, totalAvailable) ||
+                        isSubmittingReservation
+                      }
+                      className="h-10 w-10 rounded-xl bg-babyblue-600 text-lg font-semibold text-white transition hover:bg-babyblue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      aria-label="Aumentar cantidad"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  <div className="rounded-2xl border border-border bg-bg p-3 text-sm text-text-muted">
+                    <p>Máximo {MAX_BOOK_QUANTITY} unidades por libro.</p>
+                    <p>{Math.min(MAX_BOOK_QUANTITY, totalAvailable)} disponibles para agregar.</p>
+                  </div>
+                </div>
+
                 <button
                   type="button"
                   className="inline-flex w-full items-center justify-center rounded-full bg-babyblue-600 px-5 py-3 font-semibold text-white transition hover:bg-babyblue-700 disabled:cursor-not-allowed disabled:opacity-60"
                   onClick={() => setIsConfirmOpen(true)}
                   disabled={addToCartDisabled}
                 >
-                  {isSubmittingReservation ? 'Agregando al carrito...' : 'Agregar al carrito'}
+                  {isSubmittingReservation ? 'Agregando al carrito...' : `Agregar ${selectedQuantity} al carrito`}
                 </button>
+
+                {quantityError && (
+                  <p className="text-sm text-danger-700">{quantityError}</p>
+                )}
+
                 {(!book.isAvailable || totalAvailable <= 0) && (
                   <p className="text-sm text-danger-700">
                     Este libro no se encuentra disponible para reserva en este momento.

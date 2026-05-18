@@ -204,6 +204,12 @@ describe('PurchasesService', () => {
           ]),
           update: jest.fn().mockResolvedValue({}),
         },
+        reservationItem: {
+          findMany: jest.fn().mockResolvedValue([]),
+          update: jest.fn().mockResolvedValue({}),
+          deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+          count: jest.fn().mockResolvedValue(0),
+        },
         purchase: {
           create: jest.fn().mockResolvedValue(createdPurchase),
         },
@@ -316,6 +322,12 @@ describe('PurchasesService', () => {
           ]),
           update: jest.fn().mockResolvedValue({}),
         },
+        reservationItem: {
+          findMany: jest.fn().mockResolvedValue([]),
+          update: jest.fn().mockResolvedValue({}),
+          deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+          count: jest.fn().mockResolvedValue(0),
+        },
         purchase: {
           create: jest.fn().mockResolvedValue(createdPurchase),
         },
@@ -347,6 +359,119 @@ describe('PurchasesService', () => {
       });
       expect(result.deliveryMode).toBe(DeliveryMode.storePickup);
       expect(result.pickupStoreId).toBe(2);
+    });
+
+    it('debe usar inventario reservado del cliente y no decrementar stock disponible otra vez', async () => {
+      const cart = {
+        cartId: 1,
+        clientId: 10,
+        status: 'active',
+        cartItems: [
+          {
+            bookId: 5,
+            quantity: 1,
+            unitPrice: '21490',
+            book: {
+              bookId: 5,
+              title: 'El Quijote',
+              author: 'Miguel de Cervantes',
+            },
+          },
+        ],
+      };
+
+      const createdPurchase = {
+        ...basePurchase,
+        purchaseItems: [
+          {
+            purchaseItemId: 1,
+            bookId: 5,
+            quantity: 1,
+            unitPrice: '21490',
+            book: {
+              title: 'El Quijote',
+              author: 'Miguel de Cervantes',
+            },
+          },
+        ],
+      };
+
+      const tx = {
+        book: {
+          findMany: jest.fn().mockResolvedValue([
+            {
+              bookId: 5,
+              title: 'El Quijote',
+              isAvailable: true,
+            },
+          ]),
+        },
+        inventory: {
+          findMany: jest.fn().mockResolvedValue([]),
+          update: jest.fn().mockResolvedValue({}),
+        },
+        reservationItem: {
+          findMany: jest.fn().mockResolvedValue([
+            {
+              reservationItemId: 70,
+              reservationId: 11,
+              bookId: 5,
+              storeId: 1,
+              quantity: 1,
+            },
+          ]),
+          update: jest.fn().mockResolvedValue({}),
+          deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+          count: jest.fn().mockResolvedValue(0),
+        },
+        purchase: {
+          create: jest.fn().mockResolvedValue(createdPurchase),
+        },
+        cart: {
+          update: jest.fn().mockResolvedValue({}),
+        },
+        cartItem: {
+          deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+        reservation: {
+          update: jest.fn().mockResolvedValue({}),
+        },
+      };
+
+      prisma.cart.findUnique.mockResolvedValueOnce(cart);
+      prisma.$transaction.mockImplementation(async (callback: any) =>
+        callback(tx),
+      );
+
+      const result = await service.createPurchase(10, {
+        deliveryMode: DeliveryMode.homeDelivery,
+        shippingAddress: 'Av. Corrientes 1234, Buenos Aires',
+        paymentMethod: 'Tarjeta de credito',
+      });
+
+      expect(tx.reservationItem.findMany).toHaveBeenCalled();
+      expect(tx.inventory.update).toHaveBeenCalledWith({
+        where: {
+          bookId_storeId: {
+            bookId: 5,
+            storeId: 1,
+          },
+        },
+        data: { reservedQuantity: { decrement: 1 } },
+      });
+      expect(tx.inventory.update).not.toHaveBeenCalledWith({
+        where: { inventoryId: expect.any(Number) },
+        data: { availableQuantity: expect.any(Object) },
+      });
+      expect(tx.reservationItem.deleteMany).toHaveBeenCalledWith({
+        where: { reservationItemId: { in: [70] } },
+      });
+      expect(tx.reservation.update).toHaveBeenCalledWith({
+        where: { reservationId: 11 },
+        data: { status: 'converted' },
+      });
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].bookId).toBe(5);
     });
 
     it('debe rechazar la compra si el stock es insuficiente', async () => {
@@ -388,6 +513,12 @@ describe('PurchasesService', () => {
             },
           ]),
           update: jest.fn(),
+        },
+        reservationItem: {
+          findMany: jest.fn().mockResolvedValue([]),
+          update: jest.fn().mockResolvedValue({}),
+          deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+          count: jest.fn().mockResolvedValue(0),
         },
         purchase: {
           create: jest.fn(),
