@@ -5,7 +5,6 @@ import {
     formatCardNumber,
     formatExpiryDate,
     getCardProviderDisplayName,
-    validateCard,
 } from '../utils/cardValidation';
 
 export interface CardFormData {
@@ -98,6 +97,7 @@ export function CardFormInput({
                     </label>
                 </div>
                 <InputText
+                    label="Número de tarjeta"
                     value={data.cardNumber}
                     onChange={(e) => handleCardNumberChange(e.target.value)}
                     placeholder="1234 5678 9012 3456"

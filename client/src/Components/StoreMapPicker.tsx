@@ -15,7 +15,6 @@ export interface StoreMapPickerProps {
     latitude: number | null;
     longitude: number | null;
     onCoordinatesChange: (coordinates: Coordinates | null) => void;
-    onSuggestionPick?: (value: string) => void;
 }
 
 const DEFAULT_CENTER: [number, number] = [4.8133, -75.6961];
@@ -89,10 +88,9 @@ export function StoreMapPicker({
     latitude,
     longitude,
     onCoordinatesChange,
-    onSuggestionPick,
 }: StoreMapPickerProps) {
     const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
-    const [message, setMessage] = useState('Escribe una dirección para obtener coordenadas.');
+    const [message, setMessage] = useState('Selecciona primero la ciudad para restringir la búsqueda.');
     const [suggestions, setSuggestions] = useState<string[]>([]);
     const onCoordinatesChangeRef = useRef(onCoordinatesChange);
     const currentCoordinatesRef = useRef<Coordinates | null>(
@@ -107,11 +105,9 @@ export function StoreMapPicker({
         return null;
     }, [latitude, longitude]);
 
-    const query = useMemo(() => {
-        const cleanAddress = address.trim();
-        const cleanCity = city.trim();
-        return [cleanAddress, cleanCity].filter(Boolean).join(', ');
-    }, [address, city]);
+    const cleanAddress = address.trim();
+    const cleanCity = city.trim();
+    const query = useMemo(() => [cleanAddress, cleanCity].filter(Boolean).join(', '), [cleanAddress, cleanCity]);
 
     useEffect(() => {
         onCoordinatesChangeRef.current = onCoordinatesChange;
@@ -124,9 +120,17 @@ export function StoreMapPicker({
     }, [position]);
 
     useEffect(() => {
-        if (!query) {
+        if (!cleanCity) {
             setStatus('idle');
-            setMessage('Escribe una dirección para obtener coordenadas.');
+            setMessage('Selecciona primero la ciudad para restringir la búsqueda.');
+            setSuggestions([]);
+            onCoordinatesChangeRef.current(null);
+            return;
+        }
+
+        if (!cleanAddress) {
+            setStatus('idle');
+            setMessage('Ahora ingresa la dirección dentro de la ciudad seleccionada.');
             setSuggestions([]);
             onCoordinatesChangeRef.current(null);
             return;
@@ -135,7 +139,7 @@ export function StoreMapPicker({
         const controller = new AbortController();
         const timeoutId = window.setTimeout(async () => {
             setStatus('loading');
-            setMessage('Buscando la ubicación en Photon…');
+            setMessage('Buscando la ubicación en Nominatim…');
 
             try {
                 const result = await geocodeAddress(address, city, { signal: controller.signal });
@@ -189,7 +193,7 @@ export function StoreMapPicker({
                 setMessage(
                     error instanceof Error
                         ? error.message
-                        : 'No se pudo consultar Photon para esta dirección.',
+                        : 'No se pudo consultar Nominatim para esta dirección.',
                 );
                 onCoordinatesChangeRef.current(null);
             }
@@ -199,7 +203,7 @@ export function StoreMapPicker({
             controller.abort();
             window.clearTimeout(timeoutId);
         };
-    }, [address, city, query]);
+    }, [cleanAddress, cleanCity, query]);
 
     return (
         <section className="space-y-3 rounded-3xl border border-border bg-bg-secondary p-4 shadow-sm">
@@ -276,9 +280,33 @@ export function StoreMapPicker({
                             <button
                                 key={suggestion}
                                 type="button"
-                                onClick={() => {
-                                    onSuggestionPick?.(suggestion);
-                                    setSuggestions([]);
+                                onClick={async () => {
+                                    setStatus('loading');
+                                    setMessage('Ajustando coordenadas con la sugerencia seleccionada…');
+
+                                    try {
+                                        const result = await geocodeAddress(suggestion, city);
+
+                                        if (!result) {
+                                            setStatus('error');
+                                            setMessage('No pudimos ajustar las coordenadas con esa sugerencia.');
+                                            return;
+                                        }
+
+                                        const nextCoordinates = {
+                                            latitude: result.latitude,
+                                            longitude: result.longitude,
+                                        };
+
+                                        onCoordinatesChangeRef.current(nextCoordinates);
+                                        currentCoordinatesRef.current = nextCoordinates;
+                                        setStatus('ready');
+                                        setMessage(result.label ? `Coincidencia encontrada: ${result.label}` : 'Ubicación ajustada correctamente.');
+                                        setSuggestions([]);
+                                    } catch (error) {
+                                        setStatus('error');
+                                        setMessage(error instanceof Error ? error.message : 'No se pudo consultar la sugerencia seleccionada.');
+                                    }
                                 }}
                                 className="rounded-full border border-border bg-bg-secondary px-3 py-1.5 text-xs font-medium text-text transition hover:border-babyblue-300 hover:text-babyblue-700"
                             >

@@ -140,7 +140,6 @@ export function validateCVV(cvv: string, cardProvider?: CardProvider): string | 
 
     // American Express uses 4-digit CVV
     const isAmex = cardProvider === 'amex';
-    const expectedLength = isAmex ? 4 : 3;
     const minLength = isAmex ? 4 : 3;
     const maxLength = isAmex ? 4 : 4;
 

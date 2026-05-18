@@ -168,6 +168,10 @@ export function StoresManagementPage() {
     }
   };
 
+  const roundTo7Decimals = (num: number): number => {
+    return Math.round(num * 10000000) / 10000000;
+  };
+
   const handleFormSubmit = async (formData: FormData) => {
     try {
       setIsLoading(true);
@@ -180,8 +184,8 @@ export function StoresManagementPage() {
         name: (formData.get('name') as string) || '',
         address: (formData.get('address') as string) || '',
         city: locationValue,
-        latitude: latitudeValue.trim() ? Number(latitudeValue) : undefined,
-        longitude: longitudeValue.trim() ? Number(longitudeValue) : undefined,
+        latitude: latitudeValue.trim() ? roundTo7Decimals(Number(latitudeValue)) : undefined,
+        longitude: longitudeValue.trim() ? roundTo7Decimals(Number(longitudeValue)) : undefined,
         capacity: capacityValue ? parseInt(capacityValue, 10) : undefined,
         status: (formData.get('status') as string) as 'active' | 'inactive' | undefined,
       };
@@ -342,24 +346,6 @@ export function StoresManagementPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-text mb-2">Dirección</label>
-            <input
-              type="text"
-              name="address"
-              required
-              value={storeForm.address}
-              placeholder="Dirección completa"
-              onChange={(event) => {
-                const nextValue = normalizeStoreAddress(event.currentTarget.value);
-                event.currentTarget.value = nextValue;
-                setStoreForm((prev) => ({ ...prev, address: nextValue }));
-              }}
-              title="Solo letras, números, espacios y signos de dirección básicos"
-              className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
-            />
-          </div>
-
-          <div>
             {editingStore ? (
               <>
                 <label className="block text-sm font-medium text-text mb-2">Ciudad</label>
@@ -381,7 +367,7 @@ export function StoresManagementPage() {
             ) : (
               <>
                 <LocationPicker
-                  label="Lugar"
+                  label="Ciudad"
                   value={storeForm.city}
                   onChange={(value) => setStoreForm((prev) => ({ ...prev, city: extractCityName(value) }))}
                 />
@@ -390,7 +376,25 @@ export function StoresManagementPage() {
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-text mb-2">Dirección</label>
+            <input
+              type="text"
+              name="address"
+              required
+              value={storeForm.address}
+              placeholder="Dirección completa"
+              onChange={(event) => {
+                const nextValue = normalizeStoreAddress(event.currentTarget.value);
+                event.currentTarget.value = nextValue;
+                setStoreForm((prev) => ({ ...prev, address: nextValue }));
+              }}
+              title="Solo letras, números, espacios y signos de dirección básicos"
+              className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
+            />
+          </div>
+
+          {/*<div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-text mb-2">Latitud (opcional)</label>
               <input
@@ -416,7 +420,7 @@ export function StoresManagementPage() {
                 className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
               />
             </div>
-          </div>
+          </div>*/}
 
           <StoreMapPicker
             address={storeForm.address}
@@ -430,8 +434,10 @@ export function StoresManagementPage() {
                 longitude: coordinates ? String(coordinates.longitude) : '',
               }));
             }}
-            onSuggestionPick={(value) => setStoreForm((prev) => ({ ...prev, address: value }))}
           />
+
+          <input type="hidden" name="latitude" value={storeForm.latitude} />
+          <input type="hidden" name="longitude" value={storeForm.longitude} />
 
           <div className="grid grid-cols-2 gap-4">
             <div>

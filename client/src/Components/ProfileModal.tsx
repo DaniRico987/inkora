@@ -71,16 +71,19 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (profile.address.trim()) {
-      const isAddressValid = await validateAddress(profile.address, '');
-      if (!isAddressValid) {
-        const suggestions = await suggestAddresses(profile.address, '');
-        const suggestionText = suggestions.length > 0
-          ? ` Sugerencias: ${suggestions.slice(0, 3).map((suggestion) => suggestion.label).join(' · ')}`
-          : '';
-        showError(`No pudimos verificar la dirección ingresada.${suggestionText}`);
-        return;
-      }
+    if (!profile.address.trim()) {
+      showError('La dirección es obligatoria en tu perfil');
+      return;
+    }
+
+    const isAddressValid = await validateAddress(profile.address, '');
+    if (!isAddressValid) {
+      const suggestions = await suggestAddresses(profile.address, '');
+      const suggestionText = suggestions.length > 0
+        ? ` Sugerencias: ${suggestions.slice(0, 3).map((suggestion) => suggestion.label).join(' · ')}`
+        : '';
+      showError(`No pudimos verificar la dirección ingresada.${suggestionText}`);
+      return;
     }
 
     setSaving(true);
@@ -167,6 +170,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                 label="Dirección"
                 value={profile.address}
                 onChange={(e) => handleInputChange('address', e.target.value)}
+                required
               />
 
               <div>

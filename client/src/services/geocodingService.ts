@@ -1,5 +1,7 @@
 const NOMINATIM_API_URL = 'https://nominatim.openstreetmap.org/search';
 const DEFAULT_LANGUAGE = 'es';
+const DEFAULT_COUNTRY_CODE = 'co';
+const DEFAULT_COUNTRY_NAME = 'colombia';
 const CACHE_TTL_MS = 15 * 60 * 1000;
 const MAX_RETRIES = 3;
 const BASE_BACKOFF_MS = 350;
@@ -9,6 +11,7 @@ type PhotonFeature = {
     geometry?: {
         coordinates?: unknown;
     };
+    boundingBox?: [number, number, number, number] | null;
     properties?: {
         city?: string | null;
         country?: string | null;
@@ -27,7 +30,33 @@ type CachedFeatureList = {
     features: PhotonFeature[];
 };
 
+type CitySearchContext = {
+    boundingBox: [number, number, number, number] | null;
+    cityLabel: string;
+};
+
+type AddressSearchContext = {
+    query: string;
+    street: string;
+    houseNumber: string;
+    neighborhood: string;
+    city: string;
+    state: string;
+};
+
+type SearchCandidate = {
+    cacheKey: string;
+    searchParams: URLSearchParams;
+    context: AddressSearchContext;
+};
+
+type CachedCityContext = {
+    expiresAt: number;
+    context: CitySearchContext | null;
+};
+
 const queryFeatureCache = new Map<string, CachedFeatureList>();
+const cityContextCache = new Map<string, CachedCityContext>();
 
 export type GeocodeResult = {
     latitude: number;
@@ -80,6 +109,108 @@ function buildQuery(address: string, city: string): string {
     return cleanAddress || cleanCity;
 }
 
+function parseAddressParts(address: string, city: string): AddressSearchContext {
+    const normalizedAddress = address.trim();
+    const parts = normalizedAddress.split(',').map((part) => part.trim()).filter(Boolean);
+    const firstPart = parts[0] ?? normalizedAddress;
+    const secondPart = parts[1] ?? '';
+    const thirdPart = parts[2] ?? '';
+    const fourthPart = parts[3] ?? '';
+
+    const houseNumberMatch = firstPart.match(/(?:#|\bno\.?|\bnro\.?|\bnum\.?|\bn\.?\s*)\s*([0-9]+(?:[-/][0-9]+)?[a-z]?)/i)
+        ?? firstPart.match(/\b([0-9]+(?:[-/][0-9]+)?[a-z]?)\b(?:\s*[-]\s*[0-9]+)?$/i);
+
+    const houseNumber = houseNumberMatch?.[1]?.trim() ?? '';
+    const street = normalizePhotonQueryPart(
+        firstPart
+            .replace(/(?:#|\bno\.?|\bnro\.?|\bnum\.?|\bn\.?\s*)\s*[0-9]+(?:[-/][0-9]+)?[a-z]?/i, ' ')
+            .replace(/[\s,]+\d+(?:[-/]\d+)?[a-z]?$/i, ' '),
+    );
+
+    return {
+        query: buildQuery(address, city),
+        street: street,
+        houseNumber: normalizePhotonQueryPart(houseNumber),
+        neighborhood: normalizePhotonQueryPart(secondPart),
+        city: normalizePhotonQueryPart(thirdPart || city),
+        state: normalizePhotonQueryPart(fourthPart),
+    };
+}
+
+function buildCityQueryCandidates(city: string): string[] {
+    const normalizedCity = normalizePhotonQueryPart(city);
+    const normalizedCountry = normalizePhotonQueryPart(DEFAULT_COUNTRY_NAME);
+
+    const candidates = [
+        [normalizedCity, normalizedCountry].filter(Boolean).join(', '),
+        [normalizedCity, normalizedCountry].filter(Boolean).join(' '),
+        normalizedCity,
+    ];
+
+    return candidates.filter((query, index) => Boolean(query) && candidates.indexOf(query) === index);
+}
+
+function buildSearchCandidates(address: string, city: string, cityContext: CitySearchContext | null): SearchCandidate[] {
+    const parts = parseAddressParts(address, city);
+    const cityContextLabel = normalizePhotonQueryPart(cityContext?.cityLabel ?? city);
+    const normalizedCountry = normalizePhotonQueryPart(DEFAULT_COUNTRY_NAME);
+
+    const addressLine = [parts.street, parts.houseNumber].filter(Boolean).join(' ').trim();
+    const resolvedCity = parts.city || cityContextLabel;
+    const detailedLocation = [addressLine, parts.neighborhood, resolvedCity, parts.state, normalizedCountry]
+        .filter(Boolean)
+        .join(', ');
+
+    const structuredParams = new URLSearchParams({
+        format: 'json',
+        addressdetails: '1',
+        limit: '10',
+        countrycodes: DEFAULT_COUNTRY_CODE,
+        'accept-language': DEFAULT_LANGUAGE,
+    });
+
+    if (addressLine) {
+        structuredParams.set('street', addressLine);
+    }
+
+    if (resolvedCity) {
+        structuredParams.set('city', resolvedCity);
+    }
+
+    if (parts.state) {
+        structuredParams.set('state', parts.state);
+    }
+
+    structuredParams.set('country', 'Colombia');
+
+    const freeformParams = new URLSearchParams({
+        q: detailedLocation || buildQuery(address, city),
+        format: 'json',
+        addressdetails: '1',
+        limit: '10',
+        countrycodes: DEFAULT_COUNTRY_CODE,
+        'accept-language': DEFAULT_LANGUAGE,
+    });
+
+    if (cityContext?.boundingBox) {
+        freeformParams.set('viewbox', buildViewboxParam(cityContext.boundingBox));
+        freeformParams.set('bounded', '1');
+    }
+
+    return [
+        {
+            cacheKey: `structured:${addressLine}|${resolvedCity}|${parts.state}|${normalizedCountry}`,
+            searchParams: structuredParams,
+            context: { ...parts, city: resolvedCity },
+        },
+        {
+            cacheKey: `free:${detailedLocation || buildQuery(address, city)}`,
+            searchParams: freeformParams,
+            context: { ...parts, city: resolvedCity },
+        },
+    ].filter((candidate) => candidate.searchParams.toString().length > 0);
+}
+
 function buildQueryCandidates(address: string, city: string): string[] {
     const rawQuery = buildQuery(address, city);
 
@@ -89,19 +220,19 @@ function buildQueryCandidates(address: string, city: string): string[] {
 
     const normalizedAddress = normalizePhotonQueryPart(address);
     const normalizedCity = normalizePhotonQueryPart(city);
+    const normalizedCountry = normalizePhotonQueryPart(DEFAULT_COUNTRY_NAME);
 
     const candidates = [
+        [normalizedAddress, normalizedCity, normalizedCountry].filter(Boolean).join(', '),
+        [normalizedAddress, normalizedCountry].filter(Boolean).join(', '),
         [normalizedAddress, normalizedCity].filter(Boolean).join(', '),
         [normalizedAddress, normalizedCity].filter(Boolean).join(' '),
         normalizedAddress.replace(/\s+/g, ' ').trim(),
         normalizedCity.replace(/\s+/g, ' ').trim(),
+        [normalizedAddress, normalizedCountry].filter(Boolean).join(' '),
     ];
 
     return candidates.filter((query, index) => Boolean(query) && candidates.indexOf(query) === index);
-}
-
-function buildCacheKey(query: string): string {
-    return normalizeText(query);
 }
 
 function getCachedFeatures(cacheKey: string): PhotonFeature[] | null {
@@ -124,6 +255,54 @@ function setCachedFeatures(cacheKey: string, features: PhotonFeature[]): void {
         expiresAt: Date.now() + CACHE_TTL_MS,
         features,
     });
+}
+
+function buildCityCacheKey(city: string): string {
+    return normalizeText(city);
+}
+
+function getCachedCityContext(cacheKey: string): CitySearchContext | null {
+    const cachedEntry = cityContextCache.get(cacheKey);
+
+    if (!cachedEntry) {
+        return null;
+    }
+
+    if (cachedEntry.expiresAt <= Date.now()) {
+        cityContextCache.delete(cacheKey);
+        return null;
+    }
+
+    return cachedEntry.context;
+}
+
+function setCachedCityContext(cacheKey: string, context: CitySearchContext | null): void {
+    cityContextCache.set(cacheKey, {
+        expiresAt: Date.now() + CACHE_TTL_MS,
+        context,
+    });
+}
+
+function parseBoundingBox(value: unknown): [number, number, number, number] | null {
+    if (!Array.isArray(value) || value.length < 4) {
+        return null;
+    }
+
+    const south = Number(value[0]);
+    const north = Number(value[1]);
+    const west = Number(value[2]);
+    const east = Number(value[3]);
+
+    if (![south, north, west, east].every(Number.isFinite)) {
+        return null;
+    }
+
+    return [south, north, west, east];
+}
+
+function buildViewboxParam(boundingBox: [number, number, number, number]): string {
+    const [south, north, west, east] = boundingBox;
+    return `${west},${north},${east},${south}`;
 }
 
 function delay(ms: number, signal?: AbortSignal): Promise<void> {
@@ -233,6 +412,22 @@ function getFeatureCity(feature: PhotonFeature): string | null {
     );
 }
 
+function getFeatureStreet(feature: PhotonFeature): string | null {
+    return feature.properties?.street?.trim() || null;
+}
+
+function getFeatureHouseNumber(feature: PhotonFeature): string | null {
+    return feature.properties?.housenumber?.trim() || null;
+}
+
+function getFeatureNeighborhood(feature: PhotonFeature): string | null {
+    return feature.properties?.locality?.trim() || feature.properties?.district?.trim() || null;
+}
+
+function getFeatureState(feature: PhotonFeature): string | null {
+    return feature.properties?.state?.trim() || null;
+}
+
 function matchesCity(feature: PhotonFeature, city: string): boolean {
     const cleanCity = city.trim();
 
@@ -273,6 +468,66 @@ function matchesCity(feature: PhotonFeature, city: string): boolean {
     });
 }
 
+function matchesCountry(feature: PhotonFeature): boolean {
+    const country = feature.properties?.country?.trim();
+
+    if (!country) {
+        return false;
+    }
+
+    const normalizedCountry = normalizeText(country);
+    return normalizedCountry.includes(DEFAULT_COUNTRY_NAME) || DEFAULT_COUNTRY_NAME.includes(normalizedCountry);
+}
+
+async function resolveCityContext(city: string, signal?: AbortSignal): Promise<CitySearchContext | null> {
+    const cleanCity = city.trim();
+
+    if (!cleanCity) {
+        return null;
+    }
+
+    const cacheKey = buildCityCacheKey(cleanCity);
+    const cachedContext = getCachedCityContext(cacheKey);
+
+    if (cachedContext) {
+        return cachedContext;
+    }
+
+    for (const query of buildCityQueryCandidates(cleanCity)) {
+        const searchParams = new URLSearchParams({
+            q: query,
+            format: 'json',
+            addressdetails: '1',
+            limit: '10',
+            countrycodes: DEFAULT_COUNTRY_CODE,
+            'accept-language': DEFAULT_LANGUAGE,
+        });
+
+        const features = await fetchPhotonFeatures(searchParams, `city:${normalizeText(query)}`, signal);
+        const filteredFeatures = features.filter((feature) => matchesCountry(feature));
+
+        for (const feature of filteredFeatures) {
+            const featureCity = getFeatureCity(feature);
+
+            if (featureCity && !matchesCity(feature, cleanCity)) {
+                continue;
+            }
+
+            const boundingBox = feature.boundingBox;
+            const context = {
+                boundingBox: boundingBox ?? null,
+                cityLabel: featureCity ?? cleanCity,
+            } satisfies CitySearchContext;
+
+            setCachedCityContext(cacheKey, context);
+            return context;
+        }
+    }
+
+    setCachedCityContext(cacheKey, null);
+    return null;
+}
+
 function levenshteinDistance(left: string, right: string): number {
     if (left === right) {
         return 0;
@@ -306,10 +561,14 @@ function levenshteinDistance(left: string, right: string): number {
     return previousRow[right.length];
 }
 
-function scoreFeatureMatch(query: string, feature: PhotonFeature): number {
-    const normalizedQuery = normalizeText(query);
+function scoreFeatureMatch(context: AddressSearchContext, feature: PhotonFeature): number {
+    const normalizedQuery = normalizeText(context.query);
     const normalizedLabel = normalizeText(buildFeatureLabel(feature));
     const normalizedCity = normalizeText(getFeatureCity(feature) ?? '');
+    const normalizedStreet = normalizeText(getFeatureStreet(feature) ?? '');
+    const normalizedHouseNumber = normalizeText(getFeatureHouseNumber(feature) ?? '');
+    const normalizedNeighborhood = normalizeText(getFeatureNeighborhood(feature) ?? '');
+    const normalizedState = normalizeText(getFeatureState(feature) ?? '');
 
     const queryTokens = normalizedQuery.split(' ').filter((token) => token.length > 1);
     const labelTokens = normalizedLabel.split(' ').filter((token) => token.length > 1);
@@ -320,29 +579,45 @@ function scoreFeatureMatch(query: string, feature: PhotonFeature): number {
     const maxLength = Math.max(normalizedQuery.length, normalizedLabel.length, 1);
     const distanceScore = 1 - levenshteinDistance(normalizedQuery, normalizedLabel) / maxLength;
     const cityBonus = normalizedCity && normalizedQuery.includes(normalizedCity) ? 0.15 : 0;
+    const streetBonus = context.street && normalizedStreet.includes(context.street) ? 0.25 : 0;
+    const houseNumberBonus = context.houseNumber && normalizedHouseNumber.includes(context.houseNumber) ? 0.35 : 0;
+    const neighborhoodBonus = context.neighborhood && normalizedNeighborhood.includes(context.neighborhood) ? 0.08 : 0;
+    const stateBonus = context.state && normalizedState.includes(context.state) ? 0.08 : 0;
+    const exactHousePenalty = context.houseNumber && !normalizedHouseNumber ? -0.25 : 0;
 
-    return Math.max(0, tokenScore * 0.6 + Math.max(0, distanceScore) * 0.4 + cityBonus);
+    return Math.max(
+        0,
+        tokenScore * 0.25 +
+        Math.max(0, distanceScore) * 0.2 +
+        cityBonus +
+        streetBonus +
+        houseNumberBonus +
+        neighborhoodBonus +
+        stateBonus +
+        exactHousePenalty,
+    );
 }
 
-function sortFeaturesByQuery(query: string, features: PhotonFeature[]): PhotonFeature[] {
-    return [...features].sort((left, right) => scoreFeatureMatch(query, right) - scoreFeatureMatch(query, left));
+function sortFeaturesByQuery(context: AddressSearchContext, features: PhotonFeature[]): PhotonFeature[] {
+    return [...features].sort((left, right) => scoreFeatureMatch(context, right) - scoreFeatureMatch(context, left));
 }
 
-async function fetchPhotonFeatures(query: string, signal?: AbortSignal): Promise<PhotonFeature[]> {
-    const cacheKey = buildCacheKey(query);
+async function fetchPhotonFeatures(
+    searchParams: URLSearchParams,
+    cacheKey: string,
+    signal?: AbortSignal,
+    cityContext?: CitySearchContext | null,
+): Promise<PhotonFeature[]> {
     const cachedFeatures = getCachedFeatures(cacheKey);
 
     if (cachedFeatures) {
         return cachedFeatures;
     }
 
-    const searchParams = new URLSearchParams({
-        q: query,
-        format: 'json',
-        addressdetails: '1',
-        limit: '10',
-        'accept-language': DEFAULT_LANGUAGE,
-    });
+    if (cityContext?.boundingBox) {
+        searchParams.set('viewbox', buildViewboxParam(cityContext.boundingBox));
+        searchParams.set('bounded', '1');
+    }
 
     const url = `${NOMINATIM_API_URL}?${searchParams.toString()}`;
 
@@ -387,6 +662,7 @@ async function fetchPhotonFeatures(query: string, signal?: AbortSignal): Promise
                 };
 
                 return {
+                    boundingBox: parseBoundingBox(item.boundingbox),
                     geometry: {
                         coordinates: [Number(lon), Number(lat)],
                     },
@@ -415,14 +691,18 @@ async function searchPhotonFeatures(
     options: GeocodeAddressOptions = {},
     strictCityMatch = true,
 ): Promise<PhotonFeature[]> {
-    const queryCandidates = buildQueryCandidates(address, city);
+    const cityContext = await resolveCityContext(city, options.signal);
+    const candidates = buildSearchCandidates(address, city, cityContext);
 
-    for (const query of queryCandidates) {
-        const features = await fetchPhotonFeatures(query, options.signal);
-        const filteredFeatures = strictCityMatch ? features.filter((feature) => matchesCity(feature, city)) : features;
+    for (const candidate of candidates) {
+        const features = await fetchPhotonFeatures(candidate.searchParams, candidate.cacheKey, options.signal, cityContext);
+        const filteredFeatures = features.filter((feature) => matchesCountry(feature));
+        const cityFilteredFeatures = strictCityMatch
+            ? filteredFeatures.filter((feature) => matchesCity(feature, city))
+            : filteredFeatures;
 
-        if (filteredFeatures.length > 0) {
-            return sortFeaturesByQuery(query, filteredFeatures);
+        if (cityFilteredFeatures.length > 0) {
+            return sortFeaturesByQuery(candidate.context, cityFilteredFeatures);
         }
     }
 
@@ -484,7 +764,7 @@ export async function geocodeAddress(
         return null;
     }
 
-    const bestScore = scoreFeatureMatch(buildQuery(address, city), bestFeature);
+    const bestScore = scoreFeatureMatch(parseAddressParts(address, city), bestFeature);
 
     return bestScore >= 0.45 ? bestResult : null;
 }

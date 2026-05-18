@@ -14,12 +14,11 @@ import {
   deleteClientCard,
   getClientProfile,
   updateClientProfile,
-  type ClientCardType,
   type ClientProfile,
 } from '../api/clients';
 import { getCategories, type Category } from '../api/categories';
 import { subscribeToCategory, unsubscribeFromCategory } from '../api/subscriptions';
-import { maskCardNumber, normalizeCardNumber } from '../utils/cardNumber';
+import { maskCardNumber } from '../utils/cardNumber';
 import { validateCard } from '../utils/cardValidation';
 import { validateDateValue } from '../utils/dateValidation';
 import { suggestAddresses, validateAddress } from '../services/addressValidation';
@@ -145,16 +144,19 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
       return;
     }
 
-    if (form.address.trim()) {
-      const isAddressValid = await validateAddress(form.address, '');
-      if (!isAddressValid) {
-        const suggestions = await suggestAddresses(form.address, '');
-        const suggestionText = suggestions.length > 0
-          ? ` Sugerencias: ${suggestions.slice(0, 3).map((suggestion) => suggestion.label).join(' · ')}`
-          : '';
-        snackbar.warning(`No pudimos verificar la dirección ingresada.${suggestionText}`);
-        return;
-      }
+    if (!form.address.trim()) {
+      snackbar.warning('La dirección es obligatoria en tu perfil');
+      return;
+    }
+
+    const isAddressValid = await validateAddress(form.address, '');
+    if (!isAddressValid) {
+      const suggestions = await suggestAddresses(form.address, '');
+      const suggestionText = suggestions.length > 0
+        ? ` Sugerencias: ${suggestions.slice(0, 3).map((suggestion) => suggestion.label).join(' · ')}`
+        : '';
+      snackbar.warning(`No pudimos verificar la dirección ingresada.${suggestionText}`);
+      return;
     }
 
     try {

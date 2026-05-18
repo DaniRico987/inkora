@@ -28,8 +28,6 @@ const BOOK_LANGUAGE_OPTIONS = [
   { label: 'Ruso', value: 'Ruso' },
 ];
 
-const CURRENT_YEAR = new Date().getFullYear();
-
 const normalizeBookText = (value: string) =>
   value
     .replace(/[^\p{L}\p{N}\s]/gu, '')
@@ -48,17 +46,6 @@ const extractCityName = (value: string) => value.split(',')[0]?.trim() || '';
 
 const normalizeIsbnValue = (value: string) => value.replace(/\D/g, '');
 
-const normalizeLanguageValue = (value: string) => {
-  const normalized = value.trim();
-  if (normalized === 'Ingles') return 'Inglés';
-  if (normalized === 'Espanol') return 'Español';
-  if (normalized === 'Portugues') return 'Portugués';
-  if (normalized === 'Frances') return 'Francés';
-  if (normalized === 'Aleman') return 'Alemán';
-  if (normalized === 'Neerlandes') return 'Neerlandés';
-  if (normalized === 'Japones') return 'Japonés';
-  return normalized;
-};
 export function AdminDashboard() {
   const navigate = useNavigate();
   const token = getAccessToken();
@@ -153,6 +140,10 @@ export function AdminDashboard() {
     }
   };
 
+  const roundTo7Decimals = (num: number): number => {
+    return Math.round(num * 10000000) / 10000000;
+  };
+
   const handleFormSubmitStore = async (formData: FormData) => {
     try {
       setIsLoading(true);
@@ -165,8 +156,8 @@ export function AdminDashboard() {
         name: (formData.get('name') as string) || '',
         address: (formData.get('address') as string) || '',
         city: locationValue,
-        latitude: latitudeValue ? parseFloat(latitudeValue) : undefined,
-        longitude: longitudeValue ? parseFloat(longitudeValue) : undefined,
+        latitude: latitudeValue ? roundTo7Decimals(parseFloat(latitudeValue)) : undefined,
+        longitude: longitudeValue ? roundTo7Decimals(parseFloat(longitudeValue)) : undefined,
         capacity: capacityValue ? parseInt(capacityValue, 10) : undefined,
         status: (formData.get('status') as string) as 'active' | 'inactive' | undefined,
       };
@@ -568,6 +559,15 @@ export function AdminDashboard() {
           </div>
 
           <div>
+            <LocationPicker
+              label="Ciudad"
+              value={storeLocation}
+              onChange={(value) => setStoreLocation(extractCityName(value))}
+            />
+            <input type="hidden" name="city" value={storeLocation} readOnly />
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-text mb-2">Dirección</label>
             <input
               type="text"
@@ -580,15 +580,6 @@ export function AdminDashboard() {
               title="Solo letras, números, espacios y signos de dirección básicos"
               className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
             />
-          </div>
-
-          <div>
-            <LocationPicker
-              label="Lugar"
-              value={storeLocation}
-              onChange={(value) => setStoreLocation(extractCityName(value))}
-            />
-            <input type="hidden" name="city" value={storeLocation} readOnly />
           </div>
 
           <div className="grid grid-cols-2 gap-4">

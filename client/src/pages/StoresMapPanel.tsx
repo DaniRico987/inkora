@@ -22,6 +22,68 @@ const storeIcon = new L.Icon({
   shadowSize: [41, 41],
 });
 
+const selectedStoreIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+  iconRetinaUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
+
+type StoreMarkerProps = {
+  store: StoreLocation;
+  isSelected: boolean;
+  onMarkerClick: (storeId: number) => void;
+};
+
+function StoreMarker({ store, isSelected, onMarkerClick }: StoreMarkerProps) {
+  const markerRef = useRef<L.Marker | null>(null);
+  const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${store.position[0]},${store.position[1]}`;
+
+  useEffect(() => {
+    if (!markerRef.current) {
+      return;
+    }
+
+    const marker = markerRef.current;
+    const icon = isSelected ? selectedStoreIcon : storeIcon;
+    marker.setIcon(icon);
+
+    if (isSelected) {
+      marker.openPopup();
+    } else {
+      marker.closePopup();
+    }
+  }, [isSelected]);
+
+  return (
+    <Marker
+      ref={markerRef}
+      position={store.position}
+      icon={isSelected ? selectedStoreIcon : storeIcon}
+      eventHandlers={{ click: () => onMarkerClick(store.id) }}
+    >
+      <Popup>
+        <div className="max-w-55 px-1 py-0.5 text-gray-900">
+          <p className="font-semibold leading-tight">{store.name}</p>
+          <p className="mt-1 text-xs leading-snug text-gray-700">{store.description}</p>
+          <p className="mt-1 text-xs text-gray-600">Estado: {store.status}</p>
+          <a
+            href={googleMapsUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 inline-flex text-xs font-medium text-primary-600 underline underline-offset-2 hover:text-primary-700"
+          >
+            Abrir en Google Maps
+          </a>
+        </div>
+      </Popup>
+    </Marker>
+  );
+}
+
 function MapViewportController({
   stores,
   selectedStoreId,
@@ -92,15 +154,12 @@ function StoresMapPanel({ stores, selectedStoreId, onSelectStore }: StoresMapPan
       />
       <MapViewportController stores={validStores} selectedStoreId={selectedStoreId} />
       {validStores.map((store) => (
-        <Marker key={store.id} position={store.position} icon={storeIcon} eventHandlers={{ click: () => onSelectStore(store.id) }}>
-          <Popup>
-            <div className="max-w-55 px-1 py-0.5 text-gray-900">
-              <p className="font-semibold leading-tight">{store.name}</p>
-              <p className="mt-1 text-xs leading-snug text-gray-700">{store.description}</p>
-              <p className="mt-1 text-xs text-gray-600">Estado: {store.status}</p>
-            </div>
-          </Popup>
-        </Marker>
+        <StoreMarker
+          key={store.id}
+          store={store}
+          isSelected={selectedStoreId === store.id}
+          onMarkerClick={onSelectStore}
+        />
       ))}
     </MapContainer>
   );

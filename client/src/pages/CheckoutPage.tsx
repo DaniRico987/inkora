@@ -310,6 +310,8 @@ export function CheckoutPage() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [purchase, setPurchase] = useState<Purchase | null>(null);
+  const [userProfile, setUserProfile] = useState<{ firstName: string; lastName: string; address: string | null } | null>(null);
+  const [useDefaultAddress, setUseDefaultAddress] = useState(true);
   const cartItems = cart?.items ?? [];
   const subtotal = cart?.subtotal ?? 0;
   const total = cart?.total ?? 0;
@@ -348,6 +350,20 @@ export function CheckoutPage() {
         if (cancelled) return;
 
         setRegisteredCards(profile.cards);
+        setUserProfile({
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          address: profile.address,
+        });
+
+        // Pre-fill address form if user has a saved address
+        if (profile.address) {
+          setAddressForm((prev) => ({
+            ...prev,
+            fullName: `${profile.firstName} ${profile.lastName}`.trim(),
+            street: profile.address || '',
+          }));
+        }
       } catch (error) {
         if (!cancelled) {
           const message = error instanceof Error ? error.message : 'No se pudieron cargar tus tarjetas registradas';
@@ -494,6 +510,10 @@ export function CheckoutPage() {
 
     if (addressForm.street.trim().length < 8) {
       nextErrors.street = 'La dirección debe incluir calle y altura';
+    }
+
+    if (addressForm.notes.trim().length < 5) {
+      nextErrors.notes = 'Agrega una referencia adicional obligatoria';
     }
 
     if (addressForm.location.trim().length < 3) {
@@ -906,67 +926,128 @@ export function CheckoutPage() {
 
                 {deliveryMode === 'homeDelivery' ? (
                   <>
-                    <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                      <div className="sm:col-span-2">
-                        <InputText
-                          label="Nombre y apellido del destinatario"
-                          value={addressForm.fullName}
-                          onChange={(event) => updateAddressField('fullName', event.target.value)}
-                          autoComplete="name"
-                          maxLength={80}
-                          required
-                        />
-                        {fieldErrors.fullName && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.fullName}</p>}
-                      </div>
+                    {userProfile?.address && useDefaultAddress ? (
+                      <div className="mt-6 space-y-4">
+                        <div className="rounded-3xl border border-emerald-200 bg-emerald-50/70 p-5">
+                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Dirección registrada en tu perfil</p>
+                          <p className="mt-3 text-sm leading-6 text-text">
+                            <span className="font-semibold">{addressForm.fullName}</span>
+                          </p>
+                          <p className="mt-2 text-sm leading-6 text-text">{addressForm.street}</p>
+                          {addressForm.location && (
+                            <p className="mt-1 text-sm text-text-muted">{addressForm.location}</p>
+                          )}
+                          {addressForm.postalCode && (
+                            <p className="mt-1 text-sm text-text-muted">CP: {addressForm.postalCode}</p>
+                          )}
+                        </div>
 
-                      <div className="sm:col-span-2">
-                        <InputText
-                          label="Dirección de entrega"
-                          value={addressForm.street}
-                          onChange={(event) => updateAddressField('street', event.target.value)}
-                          autoComplete="street-address"
-                          maxLength={120}
-                          required
-                        />
-                        {fieldErrors.street && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.street}</p>}
-                      </div>
+                        <div>
+                          <InputTextarea
+                            label="Referencia adicional obligatoria"
+                            value={addressForm.notes}
+                            onChange={(event) => updateAddressField('notes', event.target.value)}
+                            maxLength={255}
+                            required
+                          />
+                          {fieldErrors.notes && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.notes}</p>}
+                        </div>
 
-                      <div className="sm:col-span-2">
-                        <LocationPicker
-                          label="Ubicación"
-                          value={addressForm.location}
-                          onChange={(location) => updateAddressField('location', location)}
-                          error={fieldErrors.location}
-                        />
+                        <button
+                          type="button"
+                          onClick={() => setUseDefaultAddress(false)}
+                          className="w-full rounded-full border border-babyblue-400 bg-babyblue-50/70 px-5 py-3 font-semibold text-babyblue-700 transition hover:bg-babyblue-100"
+                        >
+                          Usar una dirección diferente
+                        </button>
                       </div>
+                    ) : (
+                      <>
+                        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                          <div className="sm:col-span-2">
+                            <InputText
+                              label="Nombre y apellido del destinatario"
+                              value={addressForm.fullName}
+                              onChange={(event) => updateAddressField('fullName', event.target.value)}
+                              autoComplete="name"
+                              maxLength={80}
+                              required
+                            />
+                            {fieldErrors.fullName && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.fullName}</p>}
+                          </div>
 
-                      <div>
-                        <InputText
-                          label="Código postal"
-                          value={addressForm.postalCode}
-                          onChange={(event) => updateAddressField('postalCode', event.target.value)}
-                          autoComplete="postal-code"
-                          maxLength={5}
-                          inputMode="numeric"
-                          required
-                        />
-                        {fieldErrors.postalCode && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.postalCode}</p>}
-                      </div>
+                          <div className="sm:col-span-2">
+                            <InputText
+                              label="Dirección de entrega"
+                              value={addressForm.street}
+                              onChange={(event) => updateAddressField('street', event.target.value)}
+                              autoComplete="street-address"
+                              maxLength={120}
+                              required
+                            />
+                            {fieldErrors.street && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.street}</p>}
+                          </div>
 
-                      <div className="sm:col-span-2">
-                        <InputTextarea
-                          label="Indicaciones opcionales"
-                          value={addressForm.notes}
-                          onChange={(event) => updateAddressField('notes', event.target.value)}
-                          maxLength={255}
-                        />
-                      </div>
-                    </div>
+                          <div className="sm:col-span-2">
+                            <LocationPicker
+                              label="Ubicación"
+                              value={addressForm.location}
+                              onChange={(location) => updateAddressField('location', location)}
+                              error={fieldErrors.location}
+                            />
+                          </div>
 
-                    <div className="mt-4 rounded-2xl border border-border bg-bg p-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Vista previa</p>
-                      <p className="mt-2 text-sm leading-6 text-text">{shippingAddress || 'Completa los campos para ver la dirección formateada.'}</p>
-                    </div>
+                          <div>
+                            <InputText
+                              label="Código postal"
+                              value={addressForm.postalCode}
+                              onChange={(event) => updateAddressField('postalCode', event.target.value)}
+                              autoComplete="postal-code"
+                              maxLength={5}
+                              inputMode="numeric"
+                              required
+                            />
+                            {fieldErrors.postalCode && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.postalCode}</p>}
+                          </div>
+
+                          <div className="sm:col-span-2">
+                            <InputTextarea
+                              label="Referencia adicional obligatoria"
+                              value={addressForm.notes}
+                              onChange={(event) => updateAddressField('notes', event.target.value)}
+                              maxLength={255}
+                              required
+                            />
+                            {fieldErrors.notes && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.notes}</p>}
+                          </div>
+                        </div>
+
+                        {userProfile?.address && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setUseDefaultAddress(true);
+                              setAddressForm((prev) => ({
+                                ...prev,
+                                fullName: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
+                                street: userProfile.address || '',
+                                location: '',
+                                postalCode: '',
+                                notes: '',
+                              }));
+                            }}
+                            className="mt-4 w-full rounded-full border border-border bg-bg px-5 py-3 font-semibold text-text transition hover:border-babyblue-300 hover:text-babyblue-700"
+                          >
+                            Usar dirección registrada
+                          </button>
+                        )}
+
+                        <div className="mt-4 rounded-2xl border border-border bg-bg p-4">
+                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Vista previa</p>
+                          <p className="mt-2 text-sm leading-6 text-text">{shippingAddress || 'Completa los campos para ver la dirección formateada.'}</p>
+                        </div>
+                      </>
+                    )}
                   </>
                 ) : (
                   <div className="mt-6 space-y-4">

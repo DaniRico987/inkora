@@ -108,16 +108,19 @@ export function ProfilePage() {
       return;
     }
 
-    if (form.address.trim()) {
-      const isAddressValid = await validateAddress(form.address, '');
-      if (!isAddressValid) {
-        const suggestions = await suggestAddresses(form.address, '');
-        const suggestionText = suggestions.length > 0
-          ? ` Sugerencias: ${suggestions.slice(0, 3).map((suggestion) => suggestion.label).join(' · ')}`
-          : '';
-        snackbar.warning(`No pudimos verificar la dirección ingresada.${suggestionText}`);
-        return;
-      }
+    if (!form.address.trim()) {
+      snackbar.warning('La dirección es obligatoria en tu perfil');
+      return;
+    }
+
+    const isAddressValid = await validateAddress(form.address, '');
+    if (!isAddressValid) {
+      const suggestions = await suggestAddresses(form.address, '');
+      const suggestionText = suggestions.length > 0
+        ? ` Sugerencias: ${suggestions.slice(0, 3).map((suggestion) => suggestion.label).join(' · ')}`
+        : '';
+      snackbar.warning(`No pudimos verificar la dirección ingresada.${suggestionText}`);
+      return;
     }
 
     // Client-side validations to match register page checks
@@ -379,6 +382,7 @@ export function ProfilePage() {
               value={form.address}
               validationType="address"
               onChange={(event) => setForm((prev) => ({ ...prev, address: event.target.value }))}
+              required
             />
             <div className="flex justify-end">
               <Button

@@ -106,7 +106,7 @@ export function MyReservationsView({ embedded = false, onGoToCart, historyOnly =
     const [isCancelling, setIsCancelling] = useState(false);
     const [recentlyCancelledIds, setRecentlyCancelledIds] = useState<number[]>([]);
     const [bookCoverById, setBookCoverById] = useState<Record<number, string | null>>({});
-    const { addItem, loadCart, removeItem } = useCart();
+    const { loadCart, removeItem } = useCart(); // eslint-disable-line @typescript-eslint/no-unused-vars -- addItem is not used but comes from hook
     const navigate = useNavigate();
 
     function AddReservationToCartButton({
