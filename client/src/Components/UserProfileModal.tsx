@@ -723,7 +723,13 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
                 />
               )}
 
-              {activeSection === 'history' && <MyHistoryView embedded showReservations={false} />}
+              {activeSection === 'history' && (
+                <MyHistoryView
+                  embedded
+                  showReservations={false}
+                  onOpenPurchaseDetails={onClose}
+                />
+              )}
 
             </div>
           )}

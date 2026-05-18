@@ -126,3 +126,63 @@ export async function createAdmin(data: CreateAdminRequest) {
     throw error;
   }
 }
+
+export type AdminReturnRequestItem = {
+  purchaseItemId: number;
+  bookId: number;
+  title: string;
+  author: string;
+  quantity: number;
+  coverUrl: string | null;
+  previewUrl: string | null;
+};
+
+export type AdminReturnRequest = {
+  returnBookId: number;
+  purchaseId: number;
+  clientId: number;
+  clientName: string;
+  clientEmail: string;
+  reason: 'badCondition' | 'didNotMeetExpectations' | 'lateDelivery' | null;
+  reasonLabel: string;
+  additionalDescription: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  requestDate: string;
+  approvalDate: string | null;
+  qrCodeUrl: string | null;
+  purchaseDate: string;
+  totalAmount: number;
+  items: AdminReturnRequestItem[];
+};
+
+export async function getPendingReturns(): Promise<AdminReturnRequest[]> {
+  try {
+    const response = await apiClient.get<AdminReturnRequest[]>('/returns/pending');
+    return Array.isArray(response.data) ? response.data : [];
+  } catch (error) {
+    console.error('Error fetching pending returns:', error);
+    throw error;
+  }
+}
+
+export async function approveReturn(returnBookId: number): Promise<AdminReturnRequest> {
+  try {
+    const response = await apiClient.patch<AdminReturnRequest>(`/returns/${returnBookId}/approve`);
+    return response.data;
+  } catch (error) {
+    console.error('Error approving return:', error);
+    throw error;
+  }
+}
+
+export async function rejectReturn(returnBookId: number, adminNote?: string): Promise<AdminReturnRequest> {
+  try {
+    const response = await apiClient.patch<AdminReturnRequest>(`/returns/${returnBookId}/reject`, {
+      adminNote,
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error rejecting return:', error);
+    throw error;
+  }
+}

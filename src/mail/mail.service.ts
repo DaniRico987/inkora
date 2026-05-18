@@ -10,7 +10,12 @@ import {
   buildNewBookNotificationTemplate,
   buildPasswordResetTemplate,
   buildPurchaseInvoiceTemplate,
+  buildBirthdayVoucherTemplate,
+  buildReturnApprovedTemplate,
+  buildReturnRejectedTemplate,
 } from './mail.templates';
+
+type MailAttachment = NonNullable<nodemailer.SendMailOptions['attachments']>[number];
 
 @Injectable()
 export class MailService {
@@ -176,6 +181,104 @@ export class MailService {
     });
   }
 
+  async sendReturnApprovedEmail(
+    email: string,
+    params: {
+      firstName: string;
+      returnBookId: number;
+      purchaseId: number;
+      reasonLabel: string;
+      additionalDescription?: string;
+      validationCode: string;
+      qrCodeDataUrl: string;
+    },
+  ) {
+    const template = buildReturnApprovedTemplate(
+      {
+        firstName: params.firstName,
+        returnBookId: params.returnBookId,
+        purchaseId: params.purchaseId,
+        reasonLabel: params.reasonLabel,
+        additionalDescription: params.additionalDescription,
+        validationCode: params.validationCode,
+      },
+      {
+        logoUrl: this.logoUrl,
+        logoCid: this.logoCid,
+      },
+    );
+
+    const qrBase64 = this.extractBase64FromDataUrl(params.qrCodeDataUrl);
+
+    await this.sendEmail({
+      to: email,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
+      extraAttachments: [
+        {
+          filename: `return-${params.returnBookId}-qr.png`,
+          content: qrBase64,
+          encoding: 'base64',
+          contentType: 'image/png',
+        },
+      ],
+    });
+  }
+
+  async sendReturnRejectedEmail(
+    email: string,
+    params: {
+      firstName: string;
+      returnBookId: number;
+      purchaseId: number;
+      reasonLabel: string;
+      additionalDescription?: string;
+      adminNote?: string;
+    },
+  ) {
+    const template = buildReturnRejectedTemplate(
+      {
+        firstName: params.firstName,
+        returnBookId: params.returnBookId,
+        purchaseId: params.purchaseId,
+        reasonLabel: params.reasonLabel,
+        additionalDescription: params.additionalDescription,
+        adminNote: params.adminNote,
+      },
+      {
+        logoUrl: this.logoUrl,
+        logoCid: this.logoCid,
+      },
+    );
+
+    await this.sendEmail({
+      to: email,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
+    });
+  }
+
+  async sendBirthdayVoucher(
+    email: string,
+    firstName: string,
+    voucherUrl: string,
+    voucherCode: string,
+  ) {
+    const template = buildBirthdayVoucherTemplate(
+      { firstName, voucherUrl, voucherCode },
+      { logoUrl: this.logoUrl, logoCid: this.logoCid },
+    );
+
+    await this.sendEmail({
+      to: email,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
+    });
+  }
+
   private getRequiredConfig(key: string): string {
     const value = this.configService.get<string>(key)?.trim();
     if (!value) {
@@ -248,10 +351,11 @@ export class MailService {
     subject: string;
     html: string;
     text: string;
+    extraAttachments?: MailAttachment[];
   }): Promise<void> {
     const from = this.getRequiredConfig('MAIL_FROM');
     const replyTo = this.configService.get<string>('MAIL_REPLY_TO')?.trim();
-    const attachments = this.logoPath
+    const baseAttachments = this.logoPath
       ? [
           {
             filename: 'inkora-logo.png',
@@ -261,6 +365,11 @@ export class MailService {
         ]
       : undefined;
 
+    const attachments = [
+      ...(baseAttachments || []),
+      ...(params.extraAttachments || []),
+    ];
+
     await this.transporter.sendMail({
       from,
       to: params.to,
@@ -268,11 +377,21 @@ export class MailService {
       html: params.html,
       text: params.text,
       ...(replyTo ? { replyTo } : {}),
-      ...(attachments ? { attachments } : {}),
+      ...(attachments.length > 0 ? { attachments } : {}),
     });
 
     this.logger.log(
       `Correo enviado a ${params.to} con asunto "${params.subject}"`,
     );
+  }
+
+  private extractBase64FromDataUrl(dataUrl: string): string {
+    const marker = 'base64,';
+    const markerIndex = dataUrl.indexOf(marker);
+    if (markerIndex === -1) {
+      throw new Error('Formato invalido de imagen QR en base64');
+    }
+
+    return dataUrl.slice(markerIndex + marker.length);
   }
 }

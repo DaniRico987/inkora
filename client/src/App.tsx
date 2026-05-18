@@ -20,7 +20,6 @@ import { CheckoutPage } from './pages/CheckoutPage';
 import { OrderTrackingPage } from './pages/OrderTrackingPage';
 import { MyReservationsPage } from './pages/MyReservationsPage';
 import { MyHistoryPage } from './pages/MyHistoryPage';
-//import { ComponentsTestPage } from './pages/ComponentsTestPage';
 import { SnackbarProvider } from './Components/SnackbarProvider';
 import { NotificationsProvider } from './hooks/useNotifications';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -36,10 +35,12 @@ import { AdminDashboard } from './pages/AdminDashboard';
 import { AdminChangePasswordPage } from './pages/AdminChangePasswordPage.tsx';
 import { BooksManagementPage } from './pages/BooksManagementPage';
 import { StoresManagementPage } from './pages/StoresManagementPage';
+import { ReturnsManagementPage } from './pages/ReturnsManagementPage';
 import { AdminsManagementPage } from './pages/AdminsManagementPage';
 import { RootAdminCreationPage } from './pages/RootAdminCreationPage';
 import { NewsPage } from './pages/NewsPage';
 import { StoresPage } from './pages/StoresPage';
+import WalletPage from './pages/Wallet/WalletPage';
 
 type AppRole = 'visitor' | 'client' | 'admin' | 'root';
 
@@ -270,10 +271,18 @@ function AppContent() {
             }
           />
           <Route
-            path="/profile"
+            path="/stores"
             element={
               <AccessGuard allowedRoles={['client']}>
-                <Navigate to="/" replace />
+                <StoresPage />
+              </AccessGuard>
+            }
+          />
+          <Route
+            path="/wallet"
+            element={
+              <AccessGuard allowedRoles={['client']}>
+                <WalletPage />
               </AccessGuard>
             }
           />
@@ -334,6 +343,14 @@ function AppContent() {
             element={
               <AdminRouteGuard>
                 <StoresManagementPage />
+              </AdminRouteGuard>
+            }
+          />
+          <Route
+            path="/admin/returns"
+            element={
+              <AdminRouteGuard>
+                <ReturnsManagementPage />
               </AdminRouteGuard>
             }
           />

@@ -36,4 +36,10 @@ export class CreatePurchaseDto {
     message: 'shippingAddress no puede superar 255 caracteres',
   })
   shippingAddress?: string;
+
+  @ApiPropertyOptional({ example: 'BIRTH-123-xyz', description: 'Codigo de voucher de cliente' })
+  @IsOptional()
+  @IsString({ message: 'voucherCode debe ser texto' })
+  @MaxLength(100, { message: 'voucherCode no puede superar 100 caracteres' })
+  voucherCode?: string;
 }

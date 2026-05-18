@@ -1,13 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Spinner } from './Spinner';
 import type { CartItem as CartItemType } from '../interfaces/CartInterface';
 
-/** Mismo limite que reservas / API carrito */
-const MAX_BOOK_QUANTITY = 3;
-
 interface CartItemProps {
   item: CartItemType;
-  onUpdate: (cartItemId: number, quantity: number) => Promise<void>;
   onRemove: (cartItemId: number) => Promise<void>;
   index?: number;
   reservationCountdown?: {
@@ -28,42 +24,16 @@ function formatCountdown(totalMs: number): string {
 
 /**
  * CartItem - Componente para mostrar un item individual del carrito
- * Permite actualizar cantidad y eliminar
+ * Muestra la cantidad y permite eliminar
  */
 export const CartItem: React.FC<CartItemProps> = ({
   item,
-  onUpdate,
   onRemove,
   index = 0,
   reservationCountdown,
 }) => {
-  const [quantity, setQuantity] = useState(item.quantity);
-  const [isUpdating, setIsUpdating] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
   const [isConfirmingRemove, setIsConfirmingRemove] = useState(false);
-
-  useEffect(() => {
-    setQuantity(item.quantity);
-  }, [item.quantity]);
-
-  const handleQuantityChange = async (raw: number) => {
-    if (!Number.isFinite(raw) || raw < 1) {
-      return;
-    }
-
-    const newQuantity = Math.min(MAX_BOOK_QUANTITY, Math.floor(raw));
-    setQuantity(newQuantity);
-    setIsUpdating(true);
-
-    try {
-      await onUpdate(item.cartItemId, newQuantity);
-    } catch {
-      // Revertir si hay error
-      setQuantity(item.quantity);
-    } finally {
-      setIsUpdating(false);
-    }
-  };
 
   const handleRemove = async () => {
     setIsRemoving(true);
@@ -114,7 +84,7 @@ export const CartItem: React.FC<CartItemProps> = ({
                   Libro seleccionado
                 </span>
                 <span className="rounded-full bg-bg px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted">
-                  Actualizable
+                  Seleccionado
                 </span>
                 {reservationCountdown && (
                   <span className="rounded-full bg-amber-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">
@@ -149,50 +119,18 @@ export const CartItem: React.FC<CartItemProps> = ({
         </div>
 
         <div className="flex flex-col gap-3 xl:min-w-65 xl:items-end">
-          <div className="flex w-full items-center gap-2 rounded-2xl border border-border bg-bg-secondary px-3 py-2 shadow-sm sm:w-auto">
-            <button
-              onClick={() => handleQuantityChange(quantity - 1)}
-              disabled={isUpdating || quantity <= 1}
-              className="flex h-10 w-10 min-w-10 items-center justify-center rounded-xl bg-bg text-lg font-semibold text-text transition hover:bg-border disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Disminuir cantidad"
-            >
-              −
-            </button>
-
-            <div className="flex min-w-16 flex-1 flex-col items-center justify-center px-2 sm:flex-initial">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted">
-                Cantidad
-              </span>
-              <input
-                type="number"
-                min="1"
-                max={MAX_BOOK_QUANTITY}
-                value={quantity}
-                onChange={(e) => handleQuantityChange(Number(e.target.value))}
-                disabled={isUpdating}
-                className="mt-1 w-full border-0 bg-transparent text-center text-lg font-black text-text outline-none ring-0 [appearance:textfield] focus:ring-0 sm:text-xl [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              />
-              <span className="mt-1 text-[10px] text-text-muted">
-                Max. {MAX_BOOK_QUANTITY} por titulo
-              </span>
-            </div>
-
-            <button
-              onClick={() => handleQuantityChange(quantity + 1)}
-              disabled={isUpdating || quantity >= MAX_BOOK_QUANTITY}
-              className="flex h-10 w-10 min-w-10 items-center justify-center rounded-xl bg-babyblue-600 text-lg font-semibold text-white transition hover:bg-babyblue-700 disabled:cursor-not-allowed disabled:opacity-50"
-              aria-label="Aumentar cantidad"
-            >
-              +
-            </button>
+          <div className="w-full rounded-2xl border border-border bg-bg-secondary px-4 py-3 text-left xl:self-start xl:text-right">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted">
+              Cantidad
+            </p>
+            <p className="mt-1 text-2xl font-black text-text">{item.quantity}</p>
           </div>
 
           <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-end">
             {!isConfirmingRemove ? (
               <button
                 onClick={() => setIsConfirmingRemove(true)}
-                disabled={isUpdating}
-                className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
               >
                 <svg
                   className="h-4 w-4"

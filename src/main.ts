@@ -7,6 +7,25 @@ dotenv.config();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.set('trust proxy', 1);
+
+  app.use((req: any, res: any, next: any) => {
+    const enforceHttps =
+      process.env.ENFORCE_HTTPS === 'true' || process.env.NODE_ENV === 'production';
+    const forwardedProto = String(req.headers['x-forwarded-proto'] ?? '');
+    const isSecure = Boolean(req.secure) || forwardedProto.split(',')[0]?.trim() === 'https';
+
+    if (enforceHttps && !isSecure) {
+      return res.redirect(301, `https://${req.headers.host}${req.originalUrl}`);
+    }
+
+    if (isSecure) {
+      res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
+
+    return next();
+  });
 
   // Prefijo global
   app.setGlobalPrefix('api/v1');
@@ -62,9 +81,18 @@ async function bootstrap() {
       'Flujo de compras, seguimiento y actualización de estados',
     )
     .addTag(
+      'Returns',
+      'Solicitud y gestion de devoluciones de compras entregadas',
+    )
+    .addTag(
+      'Wallet',
+      'Saldo, historial y movimientos financieros del cliente. Requiere HTTPS',
+    )
+    .addTag(
       'Reservations',
       'Reservas de libros con expiración automática de 24 horas',
     )
+    .addTag('Vouchers', 'Gestión y acceso a vouchers y bonos promocionales')
     .addTag(
       'Clients',
       'Operaciones del cliente autenticado, incluyendo historial consolidado de transacciones',

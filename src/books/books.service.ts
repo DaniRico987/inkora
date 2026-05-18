@@ -13,15 +13,13 @@ import { GetBooksQueryDto } from './dto/get-books-query.dto';
 import { PaginatedBooksResponseDto } from './dto/paginated-books-response.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
 import { UploadBookCoverResponseDto } from './dto/upload-book-cover-response.dto';
-import { S3Service } from '../storage/s3.service';
-import { UploadedFile } from '../storage/interfaces/uploaded-file.interface';
+import { fileToBase64 } from '../utils/file.utils';
 import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class BooksService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly s3Service: S3Service,
     private readonly notificationsService: NotificationsService,
   ) {}
 
@@ -40,12 +38,12 @@ export class BooksService {
         orderBy,
         select: {
           bookId: true,
-          coverUrl: true,
           title: true,
           author: true,
           price: true,
           condition: true,
           isAvailable: true,
+          coverUrl: true,
           inventories: {
             select: {
               availableQuantity: true,
@@ -235,7 +233,7 @@ export class BooksService {
 
   async uploadCover(
     id: number,
-    file: UploadedFile,
+    file: Express.Multer.File,
   ): Promise<UploadBookCoverResponseDto> {
     const book = await this.prisma.book.findUnique({
       where: { bookId: id },
@@ -246,12 +244,12 @@ export class BooksService {
       throw new NotFoundException('Libro no encontrado');
     }
 
-    const { url } = await this.s3Service.uploadCover(file, id);
+    const base64 = fileToBase64(file);
 
     const updatedBook = await this.prisma.book.update({
       where: { bookId: id },
       data: {
-        coverUrl: url,
+        coverUrl: base64,
       },
       select: {
         bookId: true,
@@ -261,7 +259,7 @@ export class BooksService {
 
     return {
       id: updatedBook.bookId,
-      coverUrl: updatedBook.coverUrl ?? url,
+      coverUrl: updatedBook.coverUrl ?? base64,
     };
   }
 

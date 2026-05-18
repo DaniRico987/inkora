@@ -4,10 +4,15 @@ import { OrderDeliveryInfo } from '../Components/OrderDeliveryInfo';
 import { OrderAddressModal } from '../Components/OrderAddressModal';
 import { OrderHeader } from '../Components/OrderHeader';
 import { OrderItemsSummary } from '../Components/OrderItemsSummary';
+import { OrderReturnModal } from '../Components/OrderReturnModal';
 import { OrderStatusStepper } from '../Components/OrderStatusStepper';
 import { Spinner } from '../Components/Spinner';
 import { useSnackbar } from '../Components/SnackbarProvider';
-import { updatePurchaseAddress } from '../api/purchases';
+import {
+  createReturnRequest,
+  updatePurchaseAddress,
+  type ReturnReason,
+} from '../api/purchases';
 import { usePurchaseTracking } from '../hooks/usePurchaseTracking';
 import { suggestAddresses, validateAddress } from '../services/addressValidation';
 
@@ -19,8 +24,13 @@ export function OrderTrackingPage() {
   const snackbar = useSnackbar();
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [isAddressSaving, setIsAddressSaving] = useState(false);
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+  const [isReturnSubmitting, setIsReturnSubmitting] = useState(false);
+  const [hasRequestedReturn, setHasRequestedReturn] = useState(false);
 
   const canChangeAddress = purchase?.status === 'inPreparation';
+  const canRequestReturn =
+    purchase?.status === 'delivered' && !hasRequestedReturn;
   const currentShippingAddress = useMemo(
     () => purchase?.shippingAddress?.trim() || '',
     [purchase?.shippingAddress],
@@ -33,6 +43,15 @@ export function OrderTrackingPage() {
 
   const closeAddressModal = () => {
     setIsAddressModalOpen(false);
+  };
+
+  const openReturnModal = () => {
+    clearError();
+    setIsReturnModalOpen(true);
+  };
+
+  const closeReturnModal = () => {
+    setIsReturnModalOpen(false);
   };
 
   const handleAddressSubmit = async (nextAddress: string) => {
@@ -67,6 +86,33 @@ export function OrderTrackingPage() {
       snackbar.error(message);
     } finally {
       setIsAddressSaving(false);
+    }
+  };
+
+  const handleReturnSubmit = async (payload: {
+    reason: ReturnReason;
+    additionalDescription?: string;
+  }) => {
+    if (!purchase) return;
+
+    setIsReturnSubmitting(true);
+    try {
+      await createReturnRequest({
+        purchaseId: purchase.purchaseId,
+        reason: payload.reason,
+        additionalDescription: payload.additionalDescription,
+      });
+      setHasRequestedReturn(true);
+      setIsReturnModalOpen(false);
+      snackbar.success('Solicitud de devolucion enviada correctamente');
+    } catch (submitError) {
+      const message =
+        submitError instanceof Error
+          ? submitError.message
+          : 'No se pudo enviar la solicitud de devolucion';
+      snackbar.error(message);
+    } finally {
+      setIsReturnSubmitting(false);
     }
   };
 
@@ -183,6 +229,20 @@ export function OrderTrackingPage() {
                 Si detectas alguna inconsistencia, contacta soporte y te ayudaremos con prioridad.
               </p>
               <div className="mt-4 flex flex-col gap-3">
+                {canRequestReturn ? (
+                  <button
+                    type="button"
+                    onClick={openReturnModal}
+                    className="inline-flex items-center justify-center rounded-full bg-danger-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-danger-700"
+                  >
+                    Solicitar devolucion
+                  </button>
+                ) : null}
+                {hasRequestedReturn ? (
+                  <p className="rounded-2xl border border-emerald-300/60 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700">
+                    Ya registraste una solicitud de devolucion para este pedido.
+                  </p>
+                ) : null}
                 <Link
                   to="/catalog"
                   className="inline-flex items-center justify-center rounded-full border border-border bg-bg px-4 py-2.5 text-sm font-semibold text-text transition hover:border-babyblue-300 hover:text-babyblue-700"
@@ -203,6 +263,15 @@ export function OrderTrackingPage() {
           onClose={closeAddressModal}
           onSubmit={handleAddressSubmit}
           isLoading={isAddressSaving}
+        />
+      )}
+      {purchase && (
+        <OrderReturnModal
+          isOpen={isReturnModalOpen}
+          purchaseId={purchase.purchaseId}
+          onClose={closeReturnModal}
+          onSubmit={handleReturnSubmit}
+          isLoading={isReturnSubmitting}
         />
       )}
     </div>

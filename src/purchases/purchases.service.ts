@@ -5,7 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { DeliveryMode, Prisma, PurchaseStatus } from '@prisma/client';
+import { DeliveryMode, Prisma, PurchaseStatus, ReservationStatus } from '@prisma/client';
 import { PrismaService } from 'prisma/prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
@@ -15,6 +15,7 @@ import {
   StoresService,
   type StoreReferenceDto,
 } from '../stores/stores.service';
+import { WalletService } from '../wallet/wallet.service';
 
 type PurchaseCartItem = {
   bookId: number;
@@ -104,6 +105,7 @@ export class PurchasesService {
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
     private readonly storesService: StoresService,
+    private readonly walletService: WalletService,
   ) {}
 
   async createPurchase(
@@ -157,14 +159,23 @@ export class PurchasesService {
       return sum + item.quantity * toNumber(item.unitPrice);
     }, 0);
 
+    const requestedItems = this.groupCartItemsByBook(cartItems);
     let pickupStoreName: string | undefined;
 
     const purchase = await this.prisma.$transaction(
       async (tx): Promise<PurchaseDetails> => {
         pickupStoreName = await this.validatePurchaseInventory(
           tx,
+          clientId,
           cartItems,
           dto.deliveryMode,
+          dto.pickupStoreId,
+        );
+
+        const reservedConsumption = await this.consumeReservedInventoryForPurchase(
+          tx,
+          clientId,
+          requestedItems,
           dto.pickupStoreId,
         );
 
@@ -173,10 +184,35 @@ export class PurchasesService {
           pickupStoreName,
         );
 
+        // Apply voucher if provided
+        let finalTotal = totalAmount;
+        let appliedVoucherId: number | null = null;
+        if (dto.voucherCode) {
+          const clientInfo = await tx.client.findUnique({ where: { clientId }, select: { userId: true } });
+          const voucher = await tx.voucher.findUnique({ where: { code: dto.voucherCode } });
+          if (!voucher) {
+            throw new BadRequestException('Voucher invalido');
+          }
+          if (voucher.userId !== clientInfo?.userId) {
+            throw new BadRequestException('Voucher no pertenece a este cliente');
+          }
+          if (voucher.isUsed) {
+            throw new BadRequestException('Voucher ya fue usado');
+          }
+          const nowUtc = new Date();
+          if (voucher.expiresAt < nowUtc) {
+            throw new BadRequestException('Voucher expirado');
+          }
+
+          const discount = (Number(voucher.discountPercentage) / 100) * finalTotal;
+          finalTotal = finalTotal - discount;
+          appliedVoucherId = voucher.id;
+        }
+
         const createdPurchase = await tx.purchase.create({
           data: {
             clientId,
-            totalAmount,
+            totalAmount: finalTotal,
             paymentMethod: dto.paymentMethod,
             shippingAddress: dto.shippingAddress,
             deliveryMode: dto.deliveryMode,
@@ -227,10 +263,61 @@ export class PurchasesService {
           },
         });
 
+        const remainingPurchaseItems = new Map<number, number>();
+        for (const [bookId, quantity] of requestedItems.entries()) {
+          const reservedUsed = reservedConsumption.get(bookId) ?? 0;
+          const remaining = Math.max(0, quantity - reservedUsed);
+          if (remaining > 0) {
+            remainingPurchaseItems.set(bookId, remaining);
+          }
+        }
+
+        if (remainingPurchaseItems.size > 0) {
+          const requestedBookIds = [...remainingPurchaseItems.keys()];
+          const decrementInventories = await tx.inventory.findMany({
+            where: {
+              bookId: { in: requestedBookIds },
+              availableQuantity: { gt: 0 },
+              ...(dto.deliveryMode === DeliveryMode.storePickup
+                ? { storeId: dto.pickupStoreId }
+                : {}),
+            },
+            select: {
+              inventoryId: true,
+              bookId: true,
+              storeId: true,
+              availableQuantity: true,
+            },
+            orderBy: [{ bookId: 'asc' }, { storeId: 'asc' }],
+          });
+
+          for (const [bookId, remaining] of remainingPurchaseItems.entries()) {
+            const bookInventories = decrementInventories.filter(
+              (inventory) => inventory.bookId === bookId,
+            );
+            await this.decrementInventoryForPurchase(tx, bookInventories, remaining);
+          }
+        }
+
+        await this.walletService.recordPurchaseTransaction(tx, {
+          clientId,
+          amount: finalTotal,
+          purchaseId: createdPurchase.purchaseId,
+          gatewayReference: dto.paymentMethod ?? null,
+        });
+
         await tx.cart.update({
           where: { cartId: cart.cartId },
           data: { status: 'processed' },
         });
+
+        // mark voucher as used if applied (with audit fields)
+        if (appliedVoucherId) {
+          await tx.voucher.update({
+            where: { id: appliedVoucherId },
+            data: { isUsed: true, usedAt: new Date(), appliedToPurchaseId: createdPurchase.purchaseId },
+          });
+        }
 
         await tx.cartItem.deleteMany({ where: { cartId: cart.cartId } });
 
@@ -264,6 +351,7 @@ export class PurchasesService {
             },
           },
         },
+        returnBook: true,
       },
     });
 
@@ -493,6 +581,19 @@ export class PurchasesService {
         author: string;
       };
     }>;
+    returnBook?: {
+      returnBookId: number;
+      purchaseId: number;
+      clientId: number;
+      reason?: string | null;
+      additionalDescription?: string | null;
+      requestDate: Date;
+      status: any;
+      qrCodeUrl?: string | null;
+      approvalDate?: Date | null;
+      adminNote?: string | null;
+      decisionDate?: Date | null;
+    } | null;
   }): PurchaseResponseDto {
     return {
       purchaseId: purchase.purchaseId,
@@ -518,11 +619,27 @@ export class PurchasesService {
           subtotal: item.quantity * unitPrice,
         };
       }),
+      returnBook: purchase.returnBook
+        ? {
+            returnBookId: purchase.returnBook.returnBookId,
+            purchaseId: purchase.returnBook.purchaseId,
+            clientId: purchase.returnBook.clientId,
+            reason: (purchase.returnBook.reason as any) ?? null,
+            additionalDescription: purchase.returnBook.additionalDescription,
+            requestDate: purchase.returnBook.requestDate,
+            status: purchase.returnBook.status,
+            qrCodeUrl: purchase.returnBook.qrCodeUrl,
+            approvalDate: purchase.returnBook.approvalDate ?? null,
+            adminNote: purchase.returnBook.adminNote ?? null,
+            decisionDate: purchase.returnBook.decisionDate ?? null,
+          }
+        : null,
     };
   }
 
   private async validatePurchaseInventory(
     tx: Prisma.TransactionClient,
+    clientId: number,
     cartItems: PurchaseCartItem[],
     deliveryMode: DeliveryMode,
     pickupStoreId?: number,
@@ -565,6 +682,13 @@ export class PurchasesService {
       }
     }
 
+    const reservedQuantities = await this.getReservedQuantitiesForClient(
+      tx,
+      clientId,
+      requestedBookIds,
+      pickupStoreId,
+    );
+
     if (deliveryMode === DeliveryMode.storePickup) {
       if (!pickupStoreId) {
         throw new BadRequestException(
@@ -598,6 +722,7 @@ export class PurchasesService {
         requestedItems,
         inventories,
         books,
+        reservedQuantities,
       );
 
       if (insufficient) {
@@ -614,13 +739,6 @@ export class PurchasesService {
         throw new BadRequestException(
           `La tienda seleccionada no tiene stock suficiente para retiro. ${suggestion}`,
         );
-      }
-
-      for (const [bookId, quantity] of requestedItems.entries()) {
-        const bookInventories = inventories.filter(
-          (inventory) => inventory.bookId === bookId,
-        );
-        await this.decrementInventoryForPurchase(tx, bookInventories, quantity);
       }
 
       return pickupStore.name;
@@ -640,16 +758,220 @@ export class PurchasesService {
       orderBy: [{ bookId: 'asc' }, { storeId: 'asc' }],
     });
 
-    this.assertInventoryAvailability(requestedItems, inventories, books);
-
-    for (const [bookId, quantity] of requestedItems.entries()) {
-      const bookInventories = inventories.filter(
-        (inventory) => inventory.bookId === bookId,
-      );
-      await this.decrementInventoryForPurchase(tx, bookInventories, quantity);
-    }
+    this.assertInventoryAvailability(
+      requestedItems,
+      inventories,
+      books,
+      reservedQuantities,
+    );
 
     return undefined;
+  }
+
+  private async getReservedQuantitiesForClient(
+    tx: Prisma.TransactionClient,
+    clientId: number,
+    requestedBookIds: number[],
+    pickupStoreId?: number,
+  ): Promise<Map<number, number>> {
+    const now = new Date();
+    const reservationItems = await tx.reservationItem.findMany({
+      where: {
+        reservation: {
+          clientId,
+          status: ReservationStatus.active,
+          expirationDate: { gt: now },
+        },
+        bookId: { in: requestedBookIds },
+        storeId: pickupStoreId ? pickupStoreId : undefined,
+        quantity: { gt: 0 },
+      },
+      select: {
+        bookId: true,
+        quantity: true,
+      },
+    });
+
+    const reservedQuantities = new Map<number, number>();
+    for (const item of reservationItems) {
+      reservedQuantities.set(
+        item.bookId,
+        (reservedQuantities.get(item.bookId) ?? 0) + item.quantity,
+      );
+    }
+
+    return reservedQuantities;
+  }
+
+  private async consumeReservedInventoryForPurchase(
+    tx: Prisma.TransactionClient,
+    clientId: number,
+    requestedItems: Map<number, number>,
+    pickupStoreId?: number,
+  ): Promise<Map<number, number>> {
+    const now = new Date();
+    const reservationItems = await tx.reservationItem.findMany({
+      where: {
+        reservation: {
+          clientId,
+          status: ReservationStatus.active,
+          expirationDate: { gt: now },
+        },
+        bookId: { in: [...requestedItems.keys()] },
+        storeId: pickupStoreId ? pickupStoreId : undefined,
+        quantity: { gt: 0 },
+      },
+      select: {
+        reservationItemId: true,
+        reservationId: true,
+        bookId: true,
+        storeId: true,
+        quantity: true,
+      },
+      orderBy: [
+        { reservation: { reservationDate: 'asc' } },
+        { reservationItemId: 'asc' },
+      ],
+    });
+
+    const consumedByBook = new Map<number, number>();
+    const reservationItemsToUpdate: Array<{
+      reservationItemId: number;
+      quantity: number;
+    }> = [];
+    const reservationItemsToDelete: number[] = [];
+    const affectedReservationIds = new Set<number>();
+
+    for (const [bookId, requestedQuantity] of requestedItems.entries()) {
+      let remaining = requestedQuantity;
+      for (const reservationItem of reservationItems) {
+        if (remaining <= 0) {
+          break;
+        }
+
+        if (reservationItem.bookId !== bookId) {
+          continue;
+        }
+
+        const take = Math.min(remaining, reservationItem.quantity);
+        if (take <= 0) {
+          continue;
+        }
+
+        remaining -= take;
+        consumedByBook.set(
+          bookId,
+          (consumedByBook.get(bookId) ?? 0) + take,
+        );
+        affectedReservationIds.add(reservationItem.reservationId);
+
+        const leftoverQuantity = reservationItem.quantity - take;
+        if (leftoverQuantity > 0) {
+          reservationItemsToUpdate.push({
+            reservationItemId: reservationItem.reservationItemId,
+            quantity: leftoverQuantity,
+          });
+        } else {
+          reservationItemsToDelete.push(reservationItem.reservationItemId);
+        }
+
+        await tx.inventory.update({
+          where: {
+            bookId_storeId: {
+              bookId: reservationItem.bookId,
+              storeId: reservationItem.storeId,
+            },
+          },
+          data: {
+            reservedQuantity: { decrement: take },
+          },
+        });
+      }
+    }
+
+    for (const item of reservationItemsToUpdate) {
+      await tx.reservationItem.update({
+        where: { reservationItemId: item.reservationItemId },
+        data: { quantity: item.quantity },
+      });
+    }
+
+    if (reservationItemsToDelete.length > 0) {
+      await tx.reservationItem.deleteMany({
+        where: { reservationItemId: { in: reservationItemsToDelete } },
+      });
+    }
+
+    for (const reservationId of affectedReservationIds) {
+      const remainingItems = await tx.reservationItem.count({
+        where: { reservationId },
+      });
+      if (remainingItems === 0) {
+        await tx.reservation.update({
+          where: { reservationId },
+          data: { status: ReservationStatus.converted },
+        });
+      }
+    }
+
+    return consumedByBook;
+  }
+
+  private assertInventoryAvailability(
+    requestedItems: Map<number, number>,
+    inventories: PurchaseBookInventory[],
+    books: PurchaseBookAvailability[],
+    reservedQuantities: Map<number, number>,
+  ): void {
+    const availableByBook = new Map<number, number>();
+
+    for (const inventory of inventories) {
+      availableByBook.set(
+        inventory.bookId,
+        (availableByBook.get(inventory.bookId) ?? 0) +
+          inventory.availableQuantity,
+      );
+    }
+
+    for (const [bookId, quantity] of requestedItems.entries()) {
+      const available =
+        (availableByBook.get(bookId) ?? 0) +
+        (reservedQuantities.get(bookId) ?? 0);
+      if (available < quantity) {
+        const bookTitle = books.find((book) => book.bookId === bookId)?.title;
+        throw new BadRequestException(
+          `Stock insuficiente para "${bookTitle ?? `bookId ${bookId}`}": solicitado ${quantity}, disponible ${available}`,
+        );
+      }
+    }
+  }
+
+  private findInsufficientBooks(
+    requestedItems: Map<number, number>,
+    inventories: StoreInventoryView[],
+    books: PurchaseBookAvailability[],
+    reservedQuantities: Map<number, number>,
+  ): PurchaseBookAvailability | null {
+    const availableByBook = new Map<number, number>();
+
+    for (const inventory of inventories) {
+      availableByBook.set(
+        inventory.bookId,
+        (availableByBook.get(inventory.bookId) ?? 0) +
+          inventory.availableQuantity,
+      );
+    }
+
+    for (const [bookId, quantity] of requestedItems.entries()) {
+      const available =
+        (availableByBook.get(bookId) ?? 0) +
+        (reservedQuantities.get(bookId) ?? 0);
+      if (available < quantity) {
+        return books.find((book) => book.bookId === bookId) ?? null;
+      }
+    }
+
+    return null;
   }
 
   private groupCartItemsByBook(
@@ -665,57 +987,6 @@ export class PurchasesService {
     }
 
     return requestedItems;
-  }
-
-  private assertInventoryAvailability(
-    requestedItems: Map<number, number>,
-    inventories: PurchaseBookInventory[],
-    books: PurchaseBookAvailability[],
-  ): void {
-    const availableByBook = new Map<number, number>();
-
-    for (const inventory of inventories) {
-      availableByBook.set(
-        inventory.bookId,
-        (availableByBook.get(inventory.bookId) ?? 0) +
-          inventory.availableQuantity,
-      );
-    }
-
-    for (const [bookId, quantity] of requestedItems.entries()) {
-      const available = availableByBook.get(bookId) ?? 0;
-      if (available < quantity) {
-        const bookTitle = books.find((book) => book.bookId === bookId)?.title;
-        throw new BadRequestException(
-          `Stock insuficiente para "${bookTitle ?? `bookId ${bookId}`}": solicitado ${quantity}, disponible ${available}`,
-        );
-      }
-    }
-  }
-
-  private findInsufficientBooks(
-    requestedItems: Map<number, number>,
-    inventories: StoreInventoryView[],
-    books: PurchaseBookAvailability[],
-  ): PurchaseBookAvailability | null {
-    const availableByBook = new Map<number, number>();
-
-    for (const inventory of inventories) {
-      availableByBook.set(
-        inventory.bookId,
-        (availableByBook.get(inventory.bookId) ?? 0) +
-          inventory.availableQuantity,
-      );
-    }
-
-    for (const [bookId, quantity] of requestedItems.entries()) {
-      const available = availableByBook.get(bookId) ?? 0;
-      if (available < quantity) {
-        return books.find((book) => book.bookId === bookId) ?? null;
-      }
-    }
-
-    return null;
   }
 
   private async findAlternativePickupStore(

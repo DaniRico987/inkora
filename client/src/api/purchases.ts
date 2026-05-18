@@ -9,6 +9,29 @@ export type CreatePurchasePayload = {
   shippingAddress?: string;
 };
 
+export type ReturnReason =
+  | 'badCondition'
+  | 'didNotMeetExpectations'
+  | 'lateDelivery';
+
+export type CreateReturnRequestPayload = {
+  purchaseId: number;
+  reason: ReturnReason;
+  additionalDescription?: string;
+};
+
+export type ReturnRequest = {
+  returnBookId: number;
+  purchaseId: number;
+  clientId: number;
+  reason: ReturnReason | null;
+  additionalDescription: string | null;
+  requestDate: string;
+  status: 'pending' | 'approved' | 'rejected';
+  qrCodeUrl: string | null;
+  approvalDate: string | null;
+};
+
 const apiClient = axios.create({
   baseURL: '/api/v1',
 });
@@ -71,5 +94,16 @@ export async function updatePurchaseAddress(
     return response.data;
   } catch (error) {
     throw normalizeApiError(error, 'No se pudo actualizar la direccion del pedido');
+  }
+}
+
+export async function createReturnRequest(
+  payload: CreateReturnRequestPayload,
+): Promise<ReturnRequest> {
+  try {
+    const response = await apiClient.post<ReturnRequest>('/returns', payload);
+    return response.data;
+  } catch (error) {
+    throw normalizeApiError(error, 'No se pudo enviar la solicitud de devolucion');
   }
 }

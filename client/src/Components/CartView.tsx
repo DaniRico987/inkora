@@ -11,8 +11,7 @@ import { listMappings } from '../utils/reservationCart';
  * Muestra todos los items, permite editar cantidades y eliminar
  */
 export const CartView: React.FC = () => {
-  const { cart, loading, error, updateItem, removeItem, resetError } =
-    useCart();
+  const { cart, loading, error, removeItem, resetError } = useCart();
   const [nowMs, setNowMs] = React.useState<number>(Date.now());
 
   React.useEffect(() => {
@@ -162,7 +161,7 @@ export const CartView: React.FC = () => {
                   Mi carrito
                 </h1>
                 <p className="mt-1 text-base text-text-muted">
-                  Revisa tus libros, ajusta cantidades y continúa al pago cuando
+                  Revisa tus libros, ve subtotales y continúa al pago cuando
                   quieras.
                 </p>
               </div>
@@ -222,7 +221,7 @@ export const CartView: React.FC = () => {
                   Ítems seleccionados
                 </h2>
                 <p className="mt-1 text-sm text-text-muted">
-                  Actualiza cantidades o elimina libros sin perder el contexto.
+                  Elimina libros sin perder el contexto. La cantidad se selecciona en la ficha de cada libro.
                 </p>
               </div>
               <div className="inline-flex w-fit rounded-full border border-border bg-bg px-4 py-2 text-sm font-semibold text-text">
@@ -241,7 +240,6 @@ export const CartView: React.FC = () => {
                 <CartItem
                   key={item.cartItemId}
                   item={item}
-                  onUpdate={updateItem}
                   onRemove={removeItem}
                   index={index}
                   reservationCountdown={

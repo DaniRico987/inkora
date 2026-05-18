@@ -15,8 +15,12 @@ import { PurchasesModule } from './purchases/purchases.module';
 import { ReservationsModule } from './reservations/reservations.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { VouchersModule } from './vouchers/vouchers.module';
+import { TasksModule } from './tasks/tasks.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ClientsModule } from './clients/clients.module';
+import { WalletModule } from './wallet/wallet.module';
+import { ReturnsModule } from './returns/returns.module';
 
 @Module({
   imports: [
@@ -34,7 +38,11 @@ import { ClientsModule } from './clients/clients.module';
     StoresModule,
     PurchasesModule,
     ReservationsModule,
+    VouchersModule,
     ClientsModule,
+    WalletModule,
+    ReturnsModule,
+    TasksModule,
     SubscriptionsModule,
     NotificationsModule,
   ],
