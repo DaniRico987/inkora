@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Dialog, DialogTitle, DialogContent } from '@mui/material';
 import { AdminLayout } from '../Components/AdminLayout';
 import { DataTable, type DataTableColumn, type DataTableAction } from '../Components/DataTable';
-import { FormModal } from '../Components/FormModal';
 import { ConfirmationModal } from '../Components/ConfirmationModal';
 import { useSnackbar } from '../Components/SnackbarProvider';
 import { getRoleFromToken, getAccessToken } from '../auth/session';
@@ -13,47 +13,15 @@ import {
   deleteBook,
   createBook,
   updateBook,
+  updateBookInventory,
+  uploadBookGallery,
+  uploadBookImage,
 } from '../api/books';
 import { getCategories } from '../api/categories';
-import type { Book } from '../interfaces/admin';
-const BOOK_LANGUAGE_OPTIONS = [
-  { label: 'Inglés', value: 'Inglés' },
-  { label: 'Español', value: 'Español' },
-  { label: 'Portugués', value: 'Portugués' },
-  { label: 'Francés', value: 'Francés' },
-  { label: 'Alemán', value: 'Alemán' },
-  { label: 'Italiano', value: 'Italiano' },
-  { label: 'Neerlandés', value: 'Neerlandés' },
-  { label: 'Sueco', value: 'Sueco' },
-  { label: 'Polaco', value: 'Polaco' },
-  { label: 'Griego', value: 'Griego' },
-  { label: 'Chino', value: 'Chino' },
-  { label: 'Japonés', value: 'Japonés' },
-  { label: 'Ruso', value: 'Ruso' },
-];
-
-const CURRENT_YEAR = new Date().getFullYear();
-
-const normalizeBookText = (value: string) =>
-  value
-    .replace(/[^\p{L}\p{N}\s]/gu, '')
-    .replace(/\s+/g, ' ')
-    .replace(/^\s+/, '');
-
-const normalizeIsbnValue = (value: string) => value.replace(/\D/g, '');
-
-const normalizeLanguageValue = (value: string) => {
-  const normalized = value.trim();
-  if (normalized === 'Ingles') return 'Inglés';
-  if (normalized === 'Espanol') return 'Español';
-  if (normalized === 'Portugues') return 'Portugués';
-  if (normalized === 'Frances') return 'Francés';
-  if (normalized === 'Aleman') return 'Alemán';
-  if (normalized === 'Neerlandes') return 'Neerlandés';
-  if (normalized === 'Japones') return 'Japonés';
-  return normalized;
-};
-
+import { getStores } from '../api/stores';
+import { BookForm } from '../Components/BookForm/BookForm';
+import type { Book, Store, Category } from '../interfaces/admin';
+import type { BookDetailItem } from '../api/books';
 export function BooksManagementPage() {
   const navigate = useNavigate();
   const token = getAccessToken();
@@ -61,14 +29,13 @@ export function BooksManagementPage() {
   
   const { success, error } = useSnackbar();
   const [books, setBooks] = useState<Book[]>([]);
-  const [categories, setCategories] = useState<Array<{ categoryId: number; name: string }>>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [stores, setStores] = useState<Store[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingBook, setEditingBook] = useState<Book | null>(null);
-  const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
-  const [inventoryQuantity, setInventoryQuantity] = useState<number>(1);
+  const [editingBook, setEditingBook] = useState<BookDetailItem | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{
     isOpen: boolean;
     bookId?: string;
@@ -86,13 +53,42 @@ export function BooksManagementPage() {
     const fetchCategories = async () => {
       try {
         const data = await getCategories();
-        setCategories(data);
+        const mappedCategories: Category[] = data.map((cat: any) => ({
+          categoryId: cat.categoryId?.toString() || cat.id?.toString() || '',
+          name: cat.name,
+          description: cat.description,
+        }));
+        setCategories(mappedCategories);
       } catch (err) {
         console.error('Error fetching categories:', err);
       }
     };
 
     fetchCategories();
+  }, []);
+
+  // Fetch stores
+  useEffect(() => {
+    const fetchStores = async () => {
+      try {
+        const data = await getStores();
+        const mappedStores: Store[] = (data.items || data || []).map((store: any) => ({
+          storeId: store.storeId?.toString() || store.id?.toString() || '',
+          name: store.name,
+          address: store.address,
+          city: store.city,
+          latitude: store.latitude,
+          longitude: store.longitude,
+          capacity: store.capacity,
+          status: store.status || 'active',
+        }));
+        setStores(mappedStores);
+      } catch (err) {
+        console.error('Error fetching stores:', err);
+      }
+    };
+
+    fetchStores();
   }, []);
 
   // Fetch books
@@ -169,8 +165,6 @@ export function BooksManagementPage() {
 
   const handleAddBook = () => {
     setEditingBook(null);
-    setSelectedCategories([]);
-    setInventoryQuantity(1);
     setIsFormOpen(true);
   };
 
@@ -178,24 +172,7 @@ export function BooksManagementPage() {
     try {
       setIsLoading(true);
       const bookDetail = await getBookDetail(book.bookId);
-      const normalized: Book = {
-        bookId: String(bookDetail.id),
-        title: bookDetail.title,
-        author: bookDetail.author,
-        publicationYear: bookDetail.publicationYear,
-        publisher: bookDetail.publisher,
-        isbn: bookDetail.isbn,
-        language: bookDetail.language,
-        pageCount: bookDetail.pageCount,
-        price: bookDetail.price,
-          condition: (bookDetail.status as 'new' | 'used' | null) || null,
-        isAvailable: bookDetail.isAvailable,
-        description: bookDetail.description,
-        coverUrl: bookDetail.coverUrl,
-        previewUrl: bookDetail.preview,
-      };
-      setEditingBook(normalized);
-      setSelectedCategories(bookDetail.categories.map(c => c.id));
+      setEditingBook(bookDetail);
       setIsFormOpen(true);
     } catch (err) {
       error('Error al cargar datos del libro');
@@ -227,63 +204,61 @@ export function BooksManagementPage() {
     }
   };
 
-  const handleFormSubmit = async (formData: FormData) => {
+  const handleFormSubmit = async (data: {
+    title: string;
+    author: string;
+    publicationYear?: number;
+    publisher?: string;
+    isbn?: string;
+    language?: string;
+    pageCount?: number;
+    price: number;
+    condition?: 'new' | 'used';
+    isAvailable?: boolean;
+    description?: string;
+    coverUrl?: string;
+    previewUrl?: string;
+    categoryIds: number[];
+    initialInventoryQuantity?: number;
+  },
+  inventoryItems: { storeId: number; availableQuantity: number }[],
+  galleryFiles: File[],
+  coverFile: File | null,
+  ) => {
     try {
       setIsLoading(true);
-      const publicationYearValue = formData.get('publicationYear') as string;
-      const pageCountValue = formData.get('pageCount') as string;
-      const priceValue = formData.get('price') as string;
-
-      const data = {
-        title: (formData.get('title') as string) || '',
-        author: (formData.get('author') as string) || '',
-        publicationYear: publicationYearValue
-          ? parseInt(publicationYearValue, 10)
-          : undefined,
-        publisher: (formData.get('publisher') as string) || undefined,
-        isbn: (formData.get('isbn') as string) || undefined,
-        language: (formData.get('language') as string) || undefined,
-        pageCount: pageCountValue ? parseInt(pageCountValue, 10) : undefined,
-        price: priceValue ? parseFloat(priceValue) : 0,
-        condition: (formData.get('condition') as string) as 'new' | 'used' | undefined,
-        isAvailable: (formData.get('isAvailable') as string) === 'on',
-        description: (formData.get('description') as string) || undefined,
-        coverUrl: (formData.get('coverUrl') as string) || undefined,
-        previewUrl: (formData.get('previewUrl') as string) || undefined,
-        categoryIds: selectedCategories,
-        initialInventoryQuantity: inventoryQuantity,
-      };
-
-      const isbnValue = normalizeIsbnValue((formData.get('isbn') as string) || '');
-      const descriptionValue = ((formData.get('description') as string) || '').trim();
-
-      if (inventoryQuantity < 1) {
-        throw new Error('La cantidad de inventario inicial debe ser mayor a 0');
-      }
-      if (!descriptionValue) {
-        throw new Error('La descripción es obligatoria');
-      }
-      if (isbnValue.length !== 13) {
-        throw new Error('El ISBN debe tener exactamente 13 dígitos');
-      }
-
-      data.isbn = isbnValue;
-      data.description = descriptionValue;
 
       if (editingBook) {
-        await updateBook(editingBook.bookId, data);
+        await updateBook(editingBook.id.toString(), data);
+        if (inventoryItems.length > 0) {
+          await updateBookInventory(editingBook.id.toString(), inventoryItems);
+        }
         success('Libro actualizado exitosamente');
       } else {
-        await createBook(data);
+        const createdBook = await createBook(data);
+        const bookId = String(createdBook?.id ?? createdBook?.bookId ?? createdBook ?? '');
+        if (!bookId) {
+          throw new Error('No se pudo obtener el ID del libro creado');
+        }
+
+        if (inventoryItems.length > 0) {
+          await updateBookInventory(bookId, inventoryItems);
+        }
+
+        if (coverFile) {
+          await uploadBookImage(bookId, coverFile);
+        }
+
+        if (galleryFiles.length > 0) {
+          await uploadBookGallery(bookId, galleryFiles);
+        }
+
         success('Libro creado exitosamente');
-        window.location.reload();
-        return;
       }
 
       setIsFormOpen(false);
-      setSelectedCategories([]);
-      setInventoryQuantity(1);
       setCurrentPage(1);
+      setEditingBook(null);
     } catch (err) {
       error('Error al guardar libro');
       console.error(err);
@@ -376,262 +351,33 @@ export function BooksManagementPage() {
         />
       </div>
 
-      {/* Form Modal */}
-      <FormModal
-        isOpen={isFormOpen}
-        title={editingBook ? 'Editar Libro' : 'Crear Libro'}
+      {/* Book Form Dialog */}
+      <Dialog
+        open={isFormOpen}
         onClose={() => {
           setIsFormOpen(false);
           setEditingBook(null);
-          setSelectedCategories([]);
-          setInventoryQuantity(1);
         }}
-        onSubmit={handleFormSubmit}
-        isLoading={isLoading}
-        submitText={editingBook ? 'Actualizar' : 'Crear'}
-        size="lg"
+        maxWidth="md"
+        fullWidth
       >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-text mb-2">Título</label>
-            <input
-              type="text"
-              name="title"
-              required
-              defaultValue={editingBook?.title || ''}
-              placeholder="Nombre del libro"
-              onInput={(event) => {
-                event.currentTarget.value = normalizeBookText(event.currentTarget.value);
-              }}
-              title="Solo letras, números y espacios"
-              className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-text mb-2">Autor</label>
-            <input
-              type="text"
-              name="author"
-              required
-              defaultValue={editingBook?.author || ''}
-              placeholder="Nombre del autor"
-              onInput={(event) => {
-                event.currentTarget.value = normalizeBookText(event.currentTarget.value);
-              }}
-              title="Solo letras, números y espacios"
-              className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-text mb-2">Precio</label>
-              <input
-                type="number"
-                name="price"
-                required
-                step="0.01"
-                min="0"
-                defaultValue={editingBook?.price ?? ''}
-                placeholder="0.00"
-                className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-text mb-2">Año de publicación</label>
-              <input
-                type="number"
-                name="publicationYear"
-                min="1000"
-                max={CURRENT_YEAR}
-                defaultValue={editingBook?.publicationYear ?? ''}
-                placeholder="e.g. 2023"
-                className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-text mb-2">Editorial</label>
-              <input
-                type="text"
-                name="publisher"
-                defaultValue={editingBook?.publisher || ''}
-                placeholder="Editorial"
-                onInput={(event) => {
-                  event.currentTarget.value = normalizeBookText(event.currentTarget.value);
-                }}
-                title="Solo letras, números y espacios"
-                className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-text mb-2">ISBN</label>
-              <input
-                type="text"
-                name="isbn"
-                defaultValue={editingBook?.isbn || ''}
-                placeholder="ISBN"
-                required
-                inputMode="numeric"
-                maxLength={13}
-                minLength={13}
-                pattern="[0-9]{13}"
-                onInput={(event) => {
-                  event.currentTarget.value = normalizeIsbnValue(event.currentTarget.value).slice(0, 13);
-                }}
-                title="Debe tener exactamente 13 dígitos"
-                className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-text mb-2">Idioma</label>
-              <select
-                name="language"
-                defaultValue={normalizeLanguageValue(editingBook?.language || '')}
-                required
-                className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
-              >
-                <option value="" disabled>
-                  Seleccionar idioma
-                </option>
-                {BOOK_LANGUAGE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-text mb-2">Número de páginas</label>
-              <input
-                type="number"
-                name="pageCount"
-                min="1"
-                defaultValue={editingBook?.pageCount ?? ''}
-                placeholder="0"
-                className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 items-end">
-            <div>
-              <label className="block text-sm font-medium text-text mb-2">Condición</label>
-              <select
-                name="condition"
-                defaultValue={editingBook?.condition || 'new'}
-                className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text focus:outline-none focus:border-border-focus transition-colors"
-              >
-                <option value="new">Nuevo</option>
-                <option value="used">Usado</option>
-              </select>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <input
-                id="isAvailable"
-                type="checkbox"
-                name="isAvailable"
-                defaultChecked={editingBook?.isAvailable ?? true}
-                className="h-4 w-4 text-primary-600 border-border focus:ring-primary-500"
-              />
-              <label htmlFor="isAvailable" className="text-sm text-text">
-                Disponible
-              </label>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-text mb-2">Descripción</label>
-            <textarea
-              name="description"
-              rows={3}
-              defaultValue={editingBook?.description || ''}
-              placeholder="Resumen del libro"
-              required
-              title="La descripción es obligatoria"
-              className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors resize-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-text mb-2">URL de portada (opcional)</label>
-            <input
-              type="url"
-              name="coverUrl"
-              defaultValue={editingBook?.coverUrl || ''}
-              placeholder="https://..."
-              className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-text mb-2">URL de vista previa (opcional)</label>
-            <input
-              type="url"
-              name="previewUrl"
-              defaultValue={editingBook?.previewUrl || ''}
-              placeholder="https://..."
-              className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-text mb-2">Categorías</label>
-            <div className="max-h-40 overflow-y-auto border border-border rounded-lg p-2 bg-bg">
-              {categories.map((category) => (
-                <label key={category.categoryId} className="flex items-center gap-2 py-1">
-                  <input
-                    type="checkbox"
-                    checked={selectedCategories.includes(category.categoryId)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedCategories(prev => [...prev, category.categoryId]);
-                      } else {
-                        setSelectedCategories(prev => prev.filter(id => id !== category.categoryId));
-                      }
-                    }}
-                    className="h-4 w-4 text-primary-600 border-border focus:ring-primary-500"
-                  />
-                  <span className="text-sm text-text">{category.name}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-text mb-2">Cantidad de inventario inicial</label>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setInventoryQuantity(prev => Math.max(1, prev - 1))}
-                className="px-3 py-2 rounded-lg border border-border bg-bg text-text hover:bg-border-hover transition-colors"
-              >
-                −
-              </button>
-              <span className="w-12 text-center text-text font-medium">
-                {inventoryQuantity}
-              </span>
-              <button
-                type="button"
-                onClick={() => setInventoryQuantity(prev => prev + 1)}
-                className="px-3 py-2 rounded-lg border border-border bg-bg text-text hover:bg-border-hover transition-colors"
-              >
-                +
-              </button>
-            </div>
-          </div>
-        </div>
-      </FormModal>
+        <DialogTitle sx={{ fontWeight: 600, fontSize: '1.25rem' }}>
+          {editingBook ? 'Editar Libro' : 'Crear Libro'}
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <BookForm
+            initialData={editingBook || undefined}
+            stores={stores}
+            categories={categories}
+            isLoading={isLoading}
+            onSubmit={handleFormSubmit}
+            onCancel={() => {
+              setIsFormOpen(false);
+              setEditingBook(null);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Modal */}
       <ConfirmationModal

@@ -6,10 +6,18 @@ import {
   IconButton,
   Typography,
   Paper,
+  SvgIcon,
 } from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
 import type { PaymentMethod } from '../../interfaces/wallet';
 import { deleteCard } from '../../services/walletService';
+
+function DeleteIconCustom(props: any) {
+  return (
+    <SvgIcon {...props} viewBox="0 0 24 24">
+      <path d="M6 7h12v12H6V7zm3-4h6v2H9V3zm7 4V5H8v2H5v2h14V7h-3z" />
+    </SvgIcon>
+  );
+}
 
 interface RegisteredCardsProps {
   cards: PaymentMethod[];
@@ -46,7 +54,7 @@ const RegisteredCards: React.FC<RegisteredCardsProps> = ({
                   aria-label="delete"
                   onClick={() => handleDelete(card.id)}
                 >
-                  <DeleteIcon />
+                  <DeleteIconCustom />
                 </IconButton>
               }
             >
