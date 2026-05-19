@@ -263,6 +263,93 @@ export class BooksService {
     };
   }
 
+  async updateInventory(id: number, dto: { items: { storeId: number; availableQuantity: number }[] }) {
+    await this.assertBookExists(id);
+
+    const results = [] as { storeId: number; availableQuantity: number }[];
+
+    for (const item of dto.items) {
+      if (item.availableQuantity < 0) {
+        throw new BadRequestException('availableQuantity no puede ser negativo');
+      }
+
+      // Upsert inventory per store
+      const updated = await this.prisma.inventory.upsert({
+        where: { bookId_storeId: { bookId: id, storeId: item.storeId } },
+        create: {
+          bookId: id,
+          storeId: item.storeId,
+          availableQuantity: item.availableQuantity,
+          reservedQuantity: 0,
+        },
+        update: {
+          availableQuantity: item.availableQuantity,
+        },
+      });
+
+      results.push({ storeId: updated.storeId, availableQuantity: updated.availableQuantity });
+    }
+
+    return { items: results };
+  }
+
+  async uploadGallery(id: number, files: Express.Multer.File[]) {
+    await this.assertBookExists(id);
+
+    if (!files || files.length === 0) {
+      throw new BadRequestException('No se enviaron archivos');
+    }
+
+    // Determine next display order
+    const last = await this.prisma.bookImage.findFirst({
+      where: { bookId: id },
+      orderBy: { displayOrder: 'desc' },
+      select: { displayOrder: true },
+    });
+    let nextOrder = (last?.displayOrder ?? 0) + 1;
+
+    const created: { imageId: number; imageUrl: string; displayOrder: number }[] = [];
+
+    for (const file of files) {
+      const fileName = (file.originalname ?? '').toLowerCase();
+      const mimeType = (file.mimetype ?? '').toLowerCase();
+      const hasAllowedExtension = /\.(jpg|jpeg|png|webp)$/.test(fileName);
+      const hasAllowedMime = ['image/jpeg', 'image/png', 'image/webp'].includes(mimeType);
+
+      if (!(hasAllowedMime || (mimeType === 'application/octet-stream' && hasAllowedExtension))) {
+        throw new BadRequestException('Solo se permiten imágenes JPG, PNG o WEBP en la galería');
+      }
+
+      const base64 = fileToBase64(file);
+
+      const createdImage = await this.prisma.bookImage.create({
+        data: {
+          bookId: id,
+          imageUrl: base64,
+          displayOrder: nextOrder,
+        },
+        select: { imageId: true, imageUrl: true, displayOrder: true },
+      });
+
+      created.push({ imageId: createdImage.imageId, imageUrl: createdImage.imageUrl, displayOrder: createdImage.displayOrder });
+      nextOrder++;
+    }
+
+    return created.map((c) => ({ id: c.imageId, url: c.imageUrl, displayOrder: c.displayOrder }));
+  }
+
+  async deleteGalleryImage(id: number, imageId: number) {
+    await this.assertBookExists(id);
+
+    const image = await this.prisma.bookImage.findUnique({ where: { imageId } });
+    if (!image || image.bookId !== id) {
+      throw new NotFoundException('Imagen de galería no encontrada para este libro');
+    }
+
+    await this.prisma.bookImage.delete({ where: { imageId } });
+    return { id: imageId };
+  }
+
   async adminCreate(dto: CreateBookDto) {
     let created: { bookId: number };
     try {

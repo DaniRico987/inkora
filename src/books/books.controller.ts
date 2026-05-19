@@ -4,6 +4,7 @@ import {
   Controller,
   Delete,
   Get,
+  Patch,
   HttpCode,
   HttpStatus,
   Param,
@@ -13,6 +14,7 @@ import {
   Put,
   Query,
   UploadedFile,
+  UploadedFiles,
   UseInterceptors,
   UseGuards,
 } from '@nestjs/common';
@@ -28,7 +30,9 @@ import {
   ApiForbiddenResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import { UpdateBookInventoryDto } from './dto/update-book-inventory.dto';
+import { UploadBookGalleryResponseDto } from './dto/upload-book-gallery-response.dto';
 import { BooksService } from './books.service';
 import { BookDetailDto } from './dto/book-detail.dto';
 import { CreateBookDto } from './dto/create-book.dto';
@@ -299,5 +303,59 @@ export class BooksController {
     }
 
     return this.booksService.uploadCover(id, file);
+  }
+
+  @Patch(':id/inventory')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth('JWT')
+  @ApiOperation({ summary: 'Actualizar inventario de un libro por tienda (admin)' })
+  @ApiBody({ type: UpdateBookInventoryDto })
+  @ApiResponse({ status: 200, description: 'Inventarios actualizados' })
+  @ApiResponse({ status: 400, description: 'Datos inválidos' })
+  async updateInventory(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateBookInventoryDto,
+  ) {
+    return this.booksService.updateInventory(id, dto);
+  }
+
+  @Post(':id/gallery')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @UseInterceptors(FilesInterceptor('files'))
+  @ApiBearerAuth('JWT')
+  @ApiOperation({ summary: 'Subir imágenes de galería para un libro (admin)' })
+  @ApiParam({ name: 'id', description: 'ID del libro', example: 12 })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        files: { type: 'array', items: { type: 'string', format: 'binary' } },
+      },
+    },
+  })
+  @ApiResponse({ status: 201, description: 'Imágenes subidas', type: [UploadBookGalleryResponseDto] })
+  async uploadGallery(
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFiles() files: Express.Multer.File[],
+  ) {
+    return this.booksService.uploadGallery(id, files);
+  }
+
+  @Delete(':id/gallery/:imageId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth('JWT')
+  @ApiOperation({ summary: 'Eliminar imagen de galería (admin)' })
+  @ApiParam({ name: 'id', description: 'ID del libro', example: 12 })
+  @ApiParam({ name: 'imageId', description: 'ID de la imagen', example: 5 })
+  @ApiResponse({ status: 200, description: 'Imagen eliminada' })
+  async deleteGalleryImage(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('imageId', ParseIntPipe) imageId: number,
+  ) {
+    return this.booksService.deleteGalleryImage(id, imageId);
   }
 }

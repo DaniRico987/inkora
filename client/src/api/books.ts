@@ -184,3 +184,37 @@ export async function uploadBookImage(bookId: string, file: File) {
     throw error;
   }
 }
+
+export async function updateBookInventory(bookId: string, items: { storeId: number; availableQuantity: number }[]) {
+  try {
+    const response = await apiClient.patch(`/books/${bookId}/inventory`, { items });
+    return response.data;
+  } catch (error) {
+    console.error('Error updating book inventory:', error);
+    throw error;
+  }
+}
+
+export async function uploadBookGallery(bookId: string, files: File[]) {
+  try {
+    const formData = new FormData();
+    files.forEach((f) => formData.append('files', f));
+    const response = await apiClient.post(`/books/${bookId}/gallery`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error uploading book gallery images:', error);
+    throw error;
+  }
+}
+
+export async function deleteBookGalleryImage(bookId: string, imageId: number) {
+  try {
+    const response = await apiClient.delete(`/books/${bookId}/gallery/${imageId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error deleting book gallery image:', error);
+    throw error;
+  }
+}
