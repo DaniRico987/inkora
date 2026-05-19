@@ -1,5 +1,6 @@
 import 'multer';
 import { BadRequestException } from '@nestjs/common';
+import { Express } from 'express';
 
 const MAX_FILE_SIZE_IN_BYTES = 5 * 1024 * 1024; // 5MB
 

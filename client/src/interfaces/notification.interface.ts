@@ -1,6 +1,6 @@
 export interface Notification {
   notificationId: number;
-  newsId: number;
+  newsId?: number;
   bookId?: number;
   notificationType: string;
   content: string;

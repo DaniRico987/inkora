@@ -6,6 +6,7 @@ import {
   Navigate,
   useLocation,
 } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toggle } from './Components/Toggle';
 import { NavBar, type NavBarVariant } from './Components/NavBar';
 import { useTheme } from './theme/useTheme';
@@ -41,6 +42,17 @@ import { RootAdminCreationPage } from './pages/RootAdminCreationPage';
 import { NewsPage } from './pages/NewsPage';
 import { StoresPage } from './pages/StoresPage';
 import WalletPage from './pages/Wallet/WalletPage';
+import { MessagesPage } from './pages/MessagesPage';
+import { ChatFloatingButton } from './Components/ChatFloatingButton';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 type AppRole = 'visitor' | 'client' | 'admin' | 'root';
 
@@ -286,6 +298,14 @@ function AppContent() {
               </AccessGuard>
             }
           />
+          <Route
+            path="/messages"
+            element={
+              <AccessGuard allowedRoles={['client', 'admin']}>
+                <MessagesPage />
+              </AccessGuard>
+            }
+          />
 
           {/* Admin */}
           <Route
@@ -370,6 +390,7 @@ function AppContent() {
           />
         </Routes>
       </main>
+      {!shouldHideNavBar && <ChatFloatingButton />}
     </div>
   );
 }
@@ -377,22 +398,24 @@ function AppContent() {
 function App() {
   useTheme();
   return (
-    <BrowserRouter>
-      <NotificationsProvider>
-        <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
-          <SnackbarProvider
-            config={{
-              position: 'top-center',
-              maxVisible: 3,
-              maxQueue: 20,
-              dedupeWindowMs: 1500,
-            }}
-          >
-            <AppContent />
-          </SnackbarProvider>
-        </LocalizationProvider>
-      </NotificationsProvider>
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <NotificationsProvider>
+          <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
+            <SnackbarProvider
+              config={{
+                position: 'top-center',
+                maxVisible: 3,
+                maxQueue: 20,
+                dedupeWindowMs: 1500,
+              }}
+            >
+              <AppContent />
+            </SnackbarProvider>
+          </LocalizationProvider>
+        </NotificationsProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }
 

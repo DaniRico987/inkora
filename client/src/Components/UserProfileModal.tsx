@@ -230,6 +230,7 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
       cardForm.expiryDate,
       cardForm.cvv,
       cardForm.cardholder,
+      cardForm.cardType,
     );
 
     setCardFormErrors(validation.errors);

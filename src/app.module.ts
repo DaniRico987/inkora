@@ -16,6 +16,7 @@ import { ReservationsModule } from './reservations/reservations.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { VouchersModule } from './vouchers/vouchers.module';
+import { ConversationsModule } from './conversations/conversations.module';
 import { TasksModule } from './tasks/tasks.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ClientsModule } from './clients/clients.module';
@@ -42,6 +43,7 @@ import { ReturnsModule } from './returns/returns.module';
     ClientsModule,
     WalletModule,
     ReturnsModule,
+    ConversationsModule,
     TasksModule,
     SubscriptionsModule,
     NotificationsModule,
@@ -49,4 +51,4 @@ import { ReturnsModule } from './returns/returns.module';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }

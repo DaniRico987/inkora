@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { InputText, InputSelect } from './Inputs';
 import {
     detectCardProvider,
@@ -52,6 +52,35 @@ export function CardFormInput({
     showCardProvider = true,
 }: CardFormInputProps) {
     const detectedProvider = useMemo(() => detectCardProvider(data.cardNumber), [data.cardNumber]);
+    const [remoteProviderName, setRemoteProviderName] = useState<string | null>(null);
+
+    // Try BIN lookup when local detection is unknown and we have at least 6 digits
+    useEffect(() => {
+        setRemoteProviderName(null);
+        const digits = data.cardNumber.replace(/\D/g, '');
+        const bin = digits.slice(0, 6);
+        if (!bin || bin.length < 6) return;
+
+        if (detectedProvider !== 'unknown') return;
+
+        let cancelled = false;
+        void (async () => {
+            try {
+                const res = await fetch(`https://lookup.binlist.net/${bin}`, { headers: { Accept: 'application/json' } });
+                if (!res.ok) return;
+                const body = await res.json();
+                if (cancelled) return;
+                const name = body.scheme || body.brand || body.network || body.type || null;
+                if (name) setRemoteProviderName(String(name));
+            } catch {
+                // ignore network errors
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [data.cardNumber, detectedProvider]);
 
     const handleCardNumberChange = (value: string) => {
         const formatted = formatCardNumber(value);
@@ -89,10 +118,18 @@ export function CardFormInput({
                 <div className="flex items-end justify-between gap-2">
                     <label className="block text-sm font-medium text-text">
                         Número de tarjeta
-                        {showCardProvider && detectedProvider !== 'unknown' && (
-                            <span className="ml-2 inline-block rounded-full bg-babyblue-50 px-2 py-1 text-xs font-semibold text-babyblue-700">
-                                {getCardProviderDisplayName(detectedProvider)}
-                            </span>
+                        {showCardProvider && (
+                            <>
+                                {detectedProvider !== 'unknown' ? (
+                                    <span className="ml-2 inline-block rounded-full bg-babyblue-50 px-2 py-1 text-xs font-semibold text-babyblue-700">
+                                        {getCardProviderDisplayName(detectedProvider)}
+                                    </span>
+                                ) : remoteProviderName ? (
+                                    <span className="ml-2 inline-block rounded-full bg-babyblue-50 px-2 py-1 text-xs font-semibold text-babyblue-700">
+                                        {remoteProviderName}
+                                    </span>
+                                ) : null}
+                            </>
                         )}
                     </label>
                 </div>

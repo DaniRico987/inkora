@@ -561,6 +561,7 @@ export function CheckoutPage() {
         paymentForm.expiryDate,
         paymentForm.cvv,
         paymentForm.cardholder,
+        'credit', // one-time/new cards are treated as credit for authorization
       );
 
       if (!validation.isValid) {

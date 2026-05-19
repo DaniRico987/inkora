@@ -30,10 +30,10 @@ import { Request } from 'express';
 @ApiTags('Notifications')
 @Controller('notifications')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('client')
+@Roles('client', 'admin')
 @ApiBearerAuth('JWT')
 export class NotificationsController {
-  constructor(private readonly notificationsService: NotificationsService) {}
+  constructor(private readonly notificationsService: NotificationsService) { }
 
   @Get()
   @ApiOperation({ summary: 'Get notifications for the authenticated user' })

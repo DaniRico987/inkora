@@ -76,7 +76,7 @@ export function validateCardNumberWithLuhn(cardNumber: string): boolean {
 /**
  * Validates card number format and length
  */
-export function validateCardNumber(cardNumber: string): string | null {
+export function validateCardNumber(cardNumber: string, options?: { allowNonLuhnForDebit?: boolean; cardType?: 'credit' | 'debit' }): string | null {
     const digits = cardNumber.replace(/\D/g, '');
 
     if (!digits) {
@@ -87,7 +87,8 @@ export function validateCardNumber(cardNumber: string): string | null {
         return 'El número de tarjeta debe tener entre 13 y 19 dígitos';
     }
 
-    if (!validateCardNumberWithLuhn(digits)) {
+    const allowNonLuhn = options?.allowNonLuhnForDebit || options?.cardType === 'debit';
+    if (!allowNonLuhn && !validateCardNumberWithLuhn(digits)) {
         return 'El número de tarjeta no es válido';
     }
 
@@ -117,12 +118,19 @@ export function validateExpiryDate(expiryDate: string): string | null {
     }
 
     const currentDate = new Date();
-    const currentYear = currentDate.getFullYear() % 100;
+    const currentYearFull = currentDate.getFullYear();
+    const currentYear = currentYearFull % 100;
     const currentMonth = currentDate.getMonth() + 1;
 
     // Check if card is expired
     if (year < currentYear || (year === currentYear && month < currentMonth)) {
         return 'La tarjeta ha vencido';
+    }
+
+    // Disallow expiry dates more than 5 years in the future
+    const providedFullYear = Math.floor(currentYearFull / 100) * 100 + year;
+    if (providedFullYear > currentYearFull + 5) {
+        return 'La fecha de expiración no puede ser mayor a 5 años desde hoy';
     }
 
     return null;
@@ -188,11 +196,12 @@ export function validateCard(
     expiryDate: string,
     cvv: string,
     cardholder: string,
+    cardType?: 'credit' | 'debit',
 ): CardValidationResult {
     const cardProvider = detectCardProvider(cardNumber);
     const errors: CardValidationResult['errors'] = {};
 
-    const cardNumberError = validateCardNumber(cardNumber);
+    const cardNumberError = validateCardNumber(cardNumber, { cardType });
     if (cardNumberError) errors.cardNumber = cardNumberError;
 
     const expiryError = validateExpiryDate(expiryDate);

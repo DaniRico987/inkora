@@ -7,7 +7,7 @@ export class NotificationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
-  ) {}
+  ) { }
 
   async sendNewBookNotification(userId: number, newsId: number): Promise<void> {
     // Get news details with book
@@ -74,26 +74,9 @@ export class NotificationsService {
   }
 
   async getUserNotifications(userId: number) {
-    // Get notifications for the user, filtered by subscribed categories via news
     const notifications = await this.prisma.notification.findMany({
       where: {
         userId,
-        news: {
-          isActive: true,
-          newsCategories: {
-            some: {
-              category: {
-                subscriptions: {
-                  some: {
-                    client: {
-                      userId,
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
       },
       include: {
         news: {
