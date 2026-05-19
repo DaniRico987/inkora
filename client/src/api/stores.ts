@@ -120,3 +120,23 @@ export async function getAvailableStores(bookId: number): Promise<AvailableStore
     throw error;
   }
 }
+
+export async function getStoreInventory(storeId: string) {
+  try {
+    const response = await apiClient.get(`/stores/${storeId}/inventory`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching store inventory:', error);
+    throw error;
+  }
+}
+
+export async function getStoreOrders(storeId: string) {
+  try {
+    const response = await apiClient.get(`/stores/${storeId}/orders`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching store orders:', error);
+    throw error;
+  }
+}

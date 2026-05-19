@@ -17,8 +17,10 @@ import {
   deleteStore,
   createStore,
   updateStore,
+  getStoreInventory,
+  getStoreOrders,
 } from '../api/stores';
-import type { Store } from '../interfaces/admin';
+import type { Store, StoreInventoryResponse, StoreOrdersResponse } from '../interfaces/admin';
 
 const normalizeStoreName = (value: string) =>
   value
@@ -77,6 +79,10 @@ export function StoresManagementPage() {
     isOpen: boolean;
     storeId?: string;
   }>({ isOpen: false });
+  const [inventoryData, setInventoryData] = useState<StoreInventoryResponse | null>(null);
+  const [isInventoryOpen, setIsInventoryOpen] = useState(false);
+  const [ordersData, setOrdersData] = useState<StoreOrdersResponse | null>(null);
+  const [isOrdersOpen, setIsOrdersOpen] = useState(false);
 
   // Redirect root users
   useEffect(() => {
@@ -131,6 +137,34 @@ export function StoresManagementPage() {
     }
   };
 
+  const handleViewInventory = async (storeId: string) => {
+    try {
+      setIsLoading(true);
+      const data = await getStoreInventory(storeId);
+      setInventoryData(data);
+      setIsInventoryOpen(true);
+    } catch (err) {
+      error('Error al cargar inventario');
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleViewOrders = async (storeId: string) => {
+    try {
+      setIsLoading(true);
+      const data = await getStoreOrders(storeId);
+      setOrdersData(data);
+      setIsOrdersOpen(true);
+    } catch (err) {
+      error('Error al cargar pedidos');
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleAddStore = () => {
     setEditingStore(null);
     setStoreForm(initialStoreForm);
@@ -151,8 +185,21 @@ export function StoresManagementPage() {
     setIsFormOpen(true);
   };
 
-  const handleDeleteClick = (storeId: string) => {
-    setDeleteConfirm({ isOpen: true, storeId });
+  const handleDeleteClick = async (storeId: string) => {
+    try {
+      setIsLoading(true);
+      const orders = await getStoreOrders(storeId);
+      if (orders.pendingOrders > 0) {
+        error('No se puede eliminar la tienda porque tiene pedidos pendientes (en preparación o enviados).');
+        return;
+      }
+      setDeleteConfirm({ isOpen: true, storeId });
+    } catch (err) {
+      error('Error al verificar pedidos');
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleDeleteConfirm = async () => {
@@ -271,6 +318,18 @@ export function StoresManagementPage() {
   ];
 
   const actions: DataTableAction<Store>[] = [
+    {
+      label: 'Inventario',
+      icon: '📦',
+      onClick: (store) => handleViewInventory(store.storeId),
+      variant: 'secondary',
+    },
+    {
+      label: 'Pedidos',
+      icon: '🛒',
+      onClick: (store) => handleViewOrders(store.storeId),
+      variant: 'secondary',
+    },
     {
       label: 'Editar',
       icon: '✏️',
@@ -533,6 +592,133 @@ export function StoresManagementPage() {
         onCancel={() => setDeleteConfirm({ isOpen: false })}
         isConfirmLoading={isLoading}
       />
+
+      {/* Inventory Modal */}
+      <FormModal
+        isOpen={isInventoryOpen}
+        title={`Inventario: ${inventoryData?.store.name || ''}`}
+        onClose={() => setIsInventoryOpen(false)}
+        onSubmit={async () => setIsInventoryOpen(false)}
+        submitText="Cerrar"
+        size="lg"
+        isLoading={false}
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="bg-bg p-4 rounded-lg border border-border">
+              <p className="text-sm text-text-muted">Total Disponible</p>
+              <p className="text-2xl font-bold text-primary-500">{inventoryData?.totalAvailableQuantity || 0}</p>
+            </div>
+            <div className="bg-bg p-4 rounded-lg border border-border">
+              <p className="text-sm text-text-muted">Total Reservado</p>
+              <p className="text-2xl font-bold text-orange-500">{inventoryData?.totalReservedQuantity || 0}</p>
+            </div>
+          </div>
+          
+          <div className="overflow-x-auto border border-border rounded-lg">
+            <table className="w-full text-left text-sm text-text">
+              <thead className="bg-bg-secondary border-b border-border">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Libro</th>
+                  <th className="px-4 py-3 font-medium text-center">Disponible</th>
+                  <th className="px-4 py-3 font-medium text-center">Reservado</th>
+                  <th className="px-4 py-3 font-medium text-center">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {!inventoryData?.items || inventoryData.items.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-8 text-center text-text-muted">No hay inventario en esta tienda</td>
+                  </tr>
+                ) : (
+                  inventoryData.items.map((item) => (
+                    <tr key={item.bookId} className="hover:bg-bg-secondary/50">
+                      <td className="px-4 py-3">
+                        <p className="font-medium">{item.title}</p>
+                        <p className="text-xs text-text-muted">{item.author}</p>
+                      </td>
+                      <td className="px-4 py-3 text-center">{item.availableQuantity}</td>
+                      <td className="px-4 py-3 text-center">{item.reservedQuantity}</td>
+                      <td className="px-4 py-3 text-center font-medium">{item.totalQuantity}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </FormModal>
+
+      {/* Orders Modal */}
+      <FormModal
+        isOpen={isOrdersOpen}
+        title={`Pedidos: ${ordersData?.store.name || ''}`}
+        onClose={() => setIsOrdersOpen(false)}
+        onSubmit={async () => setIsOrdersOpen(false)}
+        submitText="Cerrar"
+        size="lg"
+        isLoading={false}
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="bg-bg p-4 rounded-lg border border-border">
+              <p className="text-sm text-text-muted">Total Pedidos</p>
+              <p className="text-2xl font-bold text-primary-500">{ordersData?.totalOrders || 0}</p>
+            </div>
+            <div className="bg-bg p-4 rounded-lg border border-border">
+              <p className="text-sm text-text-muted">Pedidos Pendientes</p>
+              <p className="text-2xl font-bold text-orange-500">{ordersData?.pendingOrders || 0}</p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto border border-border rounded-lg max-h-[400px]">
+            <table className="w-full text-left text-sm text-text">
+              <thead className="bg-bg-secondary border-b border-border sticky top-0">
+                <tr>
+                  <th className="px-4 py-3 font-medium">ID Pedido</th>
+                  <th className="px-4 py-3 font-medium">Cliente</th>
+                  <th className="px-4 py-3 font-medium">Estado</th>
+                  <th className="px-4 py-3 font-medium text-right">Monto</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {!ordersData?.orders || ordersData.orders.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-8 text-center text-text-muted">No hay pedidos para esta tienda</td>
+                  </tr>
+                ) : (
+                  ordersData.orders.map((order) => (
+                    <tr key={order.purchaseId} className="hover:bg-bg-secondary/50">
+                      <td className="px-4 py-3 font-medium">#{order.purchaseId}</td>
+                      <td className="px-4 py-3">
+                        <p>{order.client.firstName} {order.client.lastName}</p>
+                        <p className="text-xs text-text-muted">{order.client.email}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          ['inPreparation', 'shipped'].includes(order.status)
+                            ? 'bg-orange-100 text-orange-800'
+                            : order.status === 'delivered'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {order.status === 'inPreparation' ? 'En Preparación' : 
+                           order.status === 'shipped' ? 'Enviado' : 
+                           order.status === 'delivered' ? 'Entregado' : 
+                           order.status === 'cancelled' ? 'Cancelado' : 'Pendiente'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right font-medium">
+                        ${order.totalAmount.toLocaleString()}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </FormModal>
     </AdminLayout>
   );
 }

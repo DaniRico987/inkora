@@ -89,3 +89,52 @@ export interface CreateStoreRequest {
 export interface UpdateStoreRequest extends Partial<CreateStoreRequest> {
   storeId?: string;
 }
+
+export interface StoreInventoryItem {
+  bookId: number;
+  title: string;
+  author: string;
+  availableQuantity: number;
+  reservedQuantity: number;
+  totalQuantity: number;
+}
+
+export interface StoreInventoryResponse {
+  store: Store;
+  items: StoreInventoryItem[];
+  totalAvailableQuantity: number;
+  totalReservedQuantity: number;
+}
+
+export interface StoreOrderClient {
+  clientId: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+}
+
+export interface StoreOrderItem {
+  bookId: number;
+  title: string;
+  quantity: number;
+  unitPrice: number;
+}
+
+export interface StoreOrderResponse {
+  purchaseId: number;
+  purchaseDate: string;
+  status: 'pending' | 'inPreparation' | 'shipped' | 'delivered' | 'cancelled';
+  totalAmount: number;
+  deliveryMode: 'storePickup' | 'homeDelivery' | null;
+  pickupStoreId: number | null;
+  dispatchDate: string | null;
+  client: StoreOrderClient;
+  items: StoreOrderItem[];
+}
+
+export interface StoreOrdersResponse {
+  store: Store;
+  orders: StoreOrderResponse[];
+  totalOrders: number;
+  pendingOrders: number;
+}
