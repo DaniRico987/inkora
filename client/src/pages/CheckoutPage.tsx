@@ -5,7 +5,7 @@ import { LocationPicker } from '../Components/LocationPicker';
 import { Spinner } from '../Components/Spinner';
 import { useSnackbar } from '../Components/SnackbarProvider';
 import { getClientProfile, type ClientCard } from '../api/clients';
-import { createPurchase } from '../api/purchases';
+import { createPurchase, validateVoucherCode, type VoucherValidationResult } from '../api/purchases';
 import { getAvailableStores, type AvailableStore } from '../api/stores';
 import { useCart } from '../hooks/useCart';
 import type { CartItem } from '../interfaces/CartInterface';
@@ -312,6 +312,10 @@ export function CheckoutPage() {
   const [registeredCardsError, setRegisteredCardsError] = useState<string | null>(null);
   const [selectedRegisteredCardId, setSelectedRegisteredCardId] = useState<number | null>(null);
   const [paymentForm, setPaymentForm] = useState<PaymentFormState>(initialPaymentState);
+  const [voucherCode, setVoucherCode] = useState('');
+  const [voucherValidation, setVoucherValidation] = useState<VoucherValidationResult | null>(null);
+  const [voucherValidationLoading, setVoucherValidationLoading] = useState(false);
+  const [voucherValidationError, setVoucherValidationError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [purchase, setPurchase] = useState<Purchase | null>(null);
@@ -339,6 +343,12 @@ export function CheckoutPage() {
     () => pickupStores.filter((store) => store.isFullyAvailable),
     [pickupStores],
   );
+  const voucherDiscountAmount = useMemo(() => {
+    if (!voucherValidation) return 0;
+
+    return subtotal * (voucherValidation.discountPercentage / 100);
+  }, [subtotal, voucherValidation]);
+  const estimatedTotal = Math.max(total - voucherDiscountAmount, 0);
 
   useEffect(() => {
     let cancelled = false;
@@ -367,14 +377,6 @@ export function CheckoutPage() {
     };
 
     void loadRegisteredCards();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
 
     return () => {
       cancelled = true;
@@ -468,6 +470,39 @@ export function CheckoutPage() {
     const maskedNumber = maskCardNumber(paymentForm.cardNumber);
     return maskedNumber ? `Tarjeta nueva · ${maskedNumber}` : 'Nueva tarjeta cargada manualmente.';
   }, [paymentChoice, paymentForm.cardNumber, selectedRegisteredCard]);
+
+  const handleVoucherCodeChange = (value: string) => {
+    setVoucherCode(value);
+
+    if (voucherValidation && value.trim() !== voucherValidation.code) {
+      setVoucherValidation(null);
+      setVoucherValidationError(null);
+    }
+  };
+
+  const handleValidateVoucher = async () => {
+    const trimmedCode = voucherCode.trim();
+
+    if (!trimmedCode) {
+      snackbar.warning('Ingresa un código de voucher');
+      return;
+    }
+
+    try {
+      setVoucherValidationLoading(true);
+      const result = await validateVoucherCode(trimmedCode);
+      setVoucherValidation(result);
+      setVoucherValidationError(null);
+      snackbar.success('Voucher validado correctamente');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo validar el voucher';
+      setVoucherValidation(null);
+      setVoucherValidationError(message);
+      snackbar.error(message);
+    } finally {
+      setVoucherValidationLoading(false);
+    }
+  };
 
   const deliverySummary = useMemo(() => {
     if (deliveryMode === 'homeDelivery') {
@@ -651,6 +686,7 @@ export function CheckoutPage() {
         pickupStoreId: deliveryMode === 'storePickup' ? pickupStoreId ?? undefined : undefined,
         shippingAddress: deliveryMode === 'homeDelivery' ? shippingAddress : undefined,
         paymentMethod: paymentMethodLabel,
+        voucherCode: voucherCode.trim() || undefined,
       });
 
       setPurchase(createdPurchase);
@@ -767,14 +803,20 @@ export function CheckoutPage() {
                     <span>Subtotal</span>
                     <strong className="text-text">{formatCurrency(subtotal)}</strong>
                   </div>
+                  {voucherValidation && (
+                    <div className="flex items-center justify-between gap-4 text-emerald-700">
+                      <span>Descuento voucher</span>
+                      <strong>-{formatCurrency(voucherDiscountAmount)}</strong>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between gap-4">
                     <span>Impuestos</span>
                     <strong className="text-text">{formatCurrency(tax)}</strong>
                   </div>
                   <div className="h-px bg-border" />
                   <div className="flex items-center justify-between gap-4">
-                    <span className="text-base font-semibold text-text-muted">Total</span>
-                    <strong className="text-2xl font-black text-metallicgold-700">{formatCurrency(total)}</strong>
+                    <span className="text-base font-semibold text-text-muted">Total estimado</span>
+                    <strong className="text-2xl font-black text-metallicgold-700">{formatCurrency(estimatedTotal)}</strong>
                   </div>
                 </div>
               </div>
@@ -816,9 +858,45 @@ export function CheckoutPage() {
                     <p className="mt-2 text-xl font-bold text-text">{formatCurrency(tax)}</p>
                   </div>
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Total</p>
-                    <p className="mt-2 text-2xl font-black text-metallicgold-700">{formatCurrency(total)}</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Total estimado</p>
+                    <p className="mt-2 text-2xl font-black text-metallicgold-700">{formatCurrency(estimatedTotal)}</p>
                   </div>
+                </div>
+
+                <div className="mt-6 rounded-3xl border border-border bg-bg p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Voucher</p>
+                  <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-end">
+                    <div className="min-w-0 flex-1">
+                      <InputText
+                        label="Código de voucher"
+                        value={voucherCode}
+                        onChange={(event) => handleVoucherCodeChange(event.target.value)}
+                        maxLength={100}
+                        autoComplete="off"
+                        placeholder="Ingresa tu código"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleValidateVoucher}
+                      disabled={voucherValidationLoading}
+                      className="inline-flex items-center justify-center rounded-full border border-babyblue-300 bg-babyblue-600 px-5 py-3 font-semibold text-white transition hover:bg-babyblue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {voucherValidationLoading ? 'Validando...' : 'Aplicar voucher'}
+                    </button>
+                  </div>
+                  {voucherValidationError && <p className="mt-3 text-sm text-red-600">{voucherValidationError}</p>}
+                  {voucherValidation && (
+                    <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+                      <p className="font-semibold">Voucher aplicado</p>
+                      <p className="mt-1 leading-6">
+                        Código {voucherValidation.code} · {voucherValidation.discountPercentage}% de descuento · vence el {formatDate(voucherValidation.expiresAt)}
+                      </p>
+                      <p className="mt-1 leading-6">
+                        Descuento estimado: {formatCurrency(voucherDiscountAmount)}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-6 flex flex-col gap-3 sm:flex-row">

@@ -1,5 +1,5 @@
 import { CardType } from '@prisma/client';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class ClientMeSubscriptionDto {
   @ApiProperty({ example: 1 })
@@ -30,6 +30,20 @@ export class ClientMeCardDto {
 
   @ApiProperty({ example: 'ANA PEREZ' })
   cardHolder: string;
+}
+
+export class ClientMeBirthdayVoucherDto {
+  @ApiProperty({ example: 'BIRTH-42-may18' })
+  code: string;
+
+  @ApiProperty({ example: 10 })
+  discountPercentage: number;
+
+  @ApiProperty({ example: '2026-05-19T01:00:00.000Z' })
+  expiresAt: Date;
+
+  @ApiProperty({ example: '2026-05-18T01:00:00.000Z' })
+  generatedAt: Date;
 }
 
 export class ClientMeResponseDto {
@@ -71,4 +85,7 @@ export class ClientMeResponseDto {
 
   @ApiProperty({ type: ClientMeCardDto, isArray: true })
   cards: ClientMeCardDto[];
+
+  @ApiPropertyOptional({ type: ClientMeBirthdayVoucherDto, nullable: true })
+  activeBirthdayVoucher: ClientMeBirthdayVoucherDto | null;
 }

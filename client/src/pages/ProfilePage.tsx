@@ -39,6 +39,14 @@ function formatDate(isoDate: string): string {
   return date.toLocaleDateString('es-CO');
 }
 
+function isBirthdayToday(isoDate: string): boolean {
+  if (!isoDate) return false;
+
+  const birthParts = isoDate.slice(5, 10);
+  const todayParts = new Date().toISOString().slice(5, 10);
+  return birthParts === todayParts;
+}
+
 export function ProfilePage() {
   const snackbar = useSnackbar();
   const [activeSection, setActiveSection] = useState<ProfileSection>('personal');
@@ -99,6 +107,24 @@ export function ProfilePage() {
     () => new Set(profile?.subscriptions.map((sub) => sub.categoryId) ?? []),
     [profile],
   );
+
+  const birthdayBanner = useMemo(() => {
+    if (!profile?.activeBirthdayVoucher) return null;
+    if (!isBirthdayToday(profile.birthDate)) return null;
+
+    return profile.activeBirthdayVoucher;
+  }, [profile]);
+
+  const handleCopyVoucherCode = async () => {
+    if (!birthdayBanner) return;
+
+    try {
+      await navigator.clipboard.writeText(birthdayBanner.code);
+      snackbar.success('Código de bono copiado');
+    } catch {
+      snackbar.warning('No se pudo copiar el código automáticamente');
+    }
+  };
 
   const handleSaveProfile = async () => {
     const birthDateError = validateDateValue(form.birthDate, 'birthDate');
@@ -277,6 +303,40 @@ export function ProfilePage() {
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Mi perfil</p>
           <h1 className="mt-2 text-3xl font-bold text-text">Configuración de cuenta</h1>
         </header>
+
+        {birthdayBanner && (
+          <section className="overflow-hidden rounded-3xl border border-amber-200 bg-linear-to-r from-amber-50 via-bg-secondary to-babyblue-50 shadow-sm">
+            <div className="flex flex-col gap-5 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
+              <div className="space-y-3">
+                <div className="inline-flex rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-amber-800">
+                  Bono de cumpleaños activo
+                </div>
+                <div className="space-y-1">
+                  <h2 className="text-2xl font-bold text-text">Feliz cumpleaños, {profile.firstName}.</h2>
+                  <p className="max-w-2xl text-sm leading-6 text-text-muted">
+                    Tienes disponible un descuento del {birthdayBanner.discountPercentage}% con el código {birthdayBanner.code}.
+                    Puedes usarlo en tu próxima compra antes de que venza el {formatDate(birthdayBanner.expiresAt)}.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={handleCopyVoucherCode}
+                  className="inline-flex items-center justify-center rounded-full border border-amber-300 bg-white px-5 py-3 text-sm font-semibold text-amber-900 transition hover:border-amber-400 hover:bg-amber-100"
+                >
+                  Copiar código
+                </button>
+                <a
+                  href="/checkout"
+                  className="inline-flex items-center justify-center rounded-full bg-babyblue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-babyblue-700"
+                >
+                  Ir al checkout
+                </a>
+              </div>
+            </div>
+          </section>
+        )}
 
         <section className="rounded-3xl border border-border bg-bg-secondary p-4 shadow-sm">
           <div className="flex flex-wrap gap-3">

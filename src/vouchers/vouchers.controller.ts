@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Res, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Param, Res, UseGuards, Req, ForbiddenException } from '@nestjs/common';
 import { VouchersService } from './vouchers.service';
 import { Response, Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -38,5 +38,31 @@ export class VouchersController {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=voucher-${voucherId}.pdf`);
     res.send(buffer);
+  }
+
+  @Get('validate/:code')
+  @ApiOperation({ summary: 'Validar un voucher para el checkout' })
+  @ApiParam({ name: 'code', type: 'string', example: 'BIRTH-42-abc123' })
+  @ApiResponse({
+    status: 200,
+    description: 'Voucher válido y listo para aplicar en checkout',
+  })
+  @ApiUnauthorizedResponse({ description: 'Token JWT invalido o ausente' })
+  @ApiForbiddenResponse({ description: 'Solo los clientes pueden validar vouchers' })
+  async validateVoucher(@Param('code') code: string, @Req() req: Request) {
+    const user = req.user as AuthenticatedUser;
+
+    if (!user.clientId) {
+      throw new ForbiddenException('Solo los clientes pueden validar vouchers');
+    }
+
+    const voucher = await this.vouchersService.validateVoucherForClient(code, user);
+
+    return {
+      code: voucher.code,
+      discountPercentage: Number(voucher.discountPercentage),
+      expiresAt: voucher.expiresAt,
+      generatedAt: voucher.createdAt,
+    };
   }
 }

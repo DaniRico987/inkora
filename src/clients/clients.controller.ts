@@ -51,7 +51,7 @@ export class ClientsController {
   @ApiOperation({
     summary: 'Consultar perfil del cliente autenticado',
     description:
-      'Retorna perfil personal, suscripciones literarias y tarjetas activas registradas del cliente autenticado.',
+      'Retorna perfil personal, suscripciones literarias, tarjetas activas registradas y el bono de cumpleaños activo del cliente autenticado.',
   })
   @ApiOkResponse({
     description: 'Perfil del cliente obtenido exitosamente',

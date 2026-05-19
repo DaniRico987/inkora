@@ -7,6 +7,14 @@ export type CreatePurchasePayload = {
   pickupStoreId?: number;
   paymentMethod?: string;
   shippingAddress?: string;
+  voucherCode?: string;
+};
+
+export type VoucherValidationResult = {
+  code: string;
+  discountPercentage: number;
+  expiresAt: string;
+  generatedAt: string;
 };
 
 export type ReturnReason =
@@ -80,6 +88,17 @@ export async function createPurchase(
     return response.data;
   } catch (error) {
     throw normalizeApiError(error, 'No se pudo confirmar la compra');
+  }
+}
+
+export async function validateVoucherCode(
+  code: string,
+): Promise<VoucherValidationResult> {
+  try {
+    const response = await apiClient.get<VoucherValidationResult>(`/vouchers/validate/${encodeURIComponent(code)}`);
+    return response.data;
+  } catch (error) {
+    throw normalizeApiError(error, 'No se pudo validar el voucher');
   }
 }
 

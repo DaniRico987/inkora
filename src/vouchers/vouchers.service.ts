@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import * as PDFDocument from 'pdfkit';
 import { PrismaService } from '../../prisma/prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
@@ -41,6 +41,7 @@ export class VouchersService {
     const code = `BIRTH-${user.userId}-${Date.now().toString(36)}`;
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const discountPercentage = 10;
 
     const pdfBase64 = await this.generatePdfBase64(
       user.firstName,
@@ -51,7 +52,7 @@ export class VouchersService {
     const voucher = await this.prisma.voucher.create({
       data: {
         code,
-        discountPercentage: 10,
+        discountPercentage,
         expiresAt,
         pdfBase64,
         userId: user.userId,
@@ -67,6 +68,11 @@ export class VouchersService {
         user.firstName,
         voucherUrl,
         voucher.code,
+        discountPercentage,
+        expiresAt.toLocaleString('es-CO', {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        }),
       );
     } catch (err) {
       this.logger.error('Error al enviar correo de bono de cumpleanos', err as any);
@@ -94,5 +100,28 @@ export class VouchersService {
     }
 
     return v;
+  }
+
+  async validateVoucherForClient(code: string, user: any) {
+    const voucher = await this.prisma.voucher.findUnique({ where: { code } });
+
+    if (!voucher) {
+      throw new BadRequestException('Voucher invalido');
+    }
+
+    if (voucher.userId !== user.userId) {
+      throw new BadRequestException('Voucher no pertenece a este cliente');
+    }
+
+    if (voucher.isUsed) {
+      throw new BadRequestException('Voucher ya fue usado');
+    }
+
+    const nowUtc = new Date();
+    if (voucher.expiresAt < nowUtc) {
+      throw new BadRequestException('Voucher expirado');
+    }
+
+    return voucher;
   }
 }

@@ -29,10 +29,26 @@ export class ClientsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getMyProfile(userId: number): Promise<ClientMeResponseDto> {
+    const now = new Date();
     const client = await this.prisma.client.findUnique({
       where: { userId },
       include: {
-        user: true,
+        user: {
+          include: {
+            vouchers: {
+              where: {
+                isUsed: false,
+                expiresAt: {
+                  gt: now,
+                },
+              },
+              orderBy: {
+                createdAt: 'desc',
+              },
+              take: 1,
+            },
+          },
+        },
         subscriptions: {
           include: { category: true },
           orderBy: { subscribedAt: 'desc' },
@@ -73,6 +89,16 @@ export class ClientsService {
         expirationDate: card.expirationDate,
         cardHolder: card.cardHolder,
       })),
+      activeBirthdayVoucher: client.user.vouchers[0]
+        ? {
+            code: client.user.vouchers[0].code,
+            discountPercentage: toNumber(
+              client.user.vouchers[0].discountPercentage,
+            ),
+            expiresAt: client.user.vouchers[0].expiresAt,
+            generatedAt: client.user.vouchers[0].createdAt,
+          }
+        : null,
     };
   }
 

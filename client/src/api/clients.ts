@@ -26,6 +26,13 @@ export interface ClientCard {
   cardHolder: string;
 }
 
+export interface ActiveBirthdayVoucher {
+  code: string;
+  discountPercentage: number;
+  expiresAt: string;
+  generatedAt: string;
+}
+
 export interface ClientSubscription {
   subscriptionId: number;
   categoryId: number;
@@ -47,6 +54,7 @@ export interface ClientProfile {
   gender: string | null;
   subscriptions: ClientSubscription[];
   cards: ClientCard[];
+  activeBirthdayVoucher: ActiveBirthdayVoucher | null;
 }
 
 export type UpdateClientProfilePayload = {

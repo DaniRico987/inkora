@@ -265,9 +265,17 @@ export class MailService {
     firstName: string,
     voucherUrl: string,
     voucherCode: string,
+    discountPercentage: number,
+    expiresAtLabel: string,
   ) {
     const template = buildBirthdayVoucherTemplate(
-      { firstName, voucherUrl, voucherCode },
+      {
+        firstName,
+        voucherUrl,
+        voucherCode,
+        discountPercentage,
+        expiresAtLabel,
+      },
       { logoUrl: this.logoUrl, logoCid: this.logoCid },
     );
 

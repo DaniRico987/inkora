@@ -41,6 +41,8 @@ describe('VouchersService', () => {
       user.firstName,
       expect.stringContaining('/vouchers/'),
       expect.any(String),
+      10,
+      expect.any(String),
     );
 
     expect(voucher).toBeDefined();
@@ -70,6 +72,40 @@ describe('VouchersService', () => {
     mockPrisma.voucher.findUnique.mockResolvedValueOnce(null);
     const user = { userId: 1, userType: 'client' } as any;
     await expect(service.getVoucherIfAuthorized(999, user)).rejects.toThrow(NotFoundException);
+  });
+
+  it('validateVoucherForClient: returns voucher when valid', async () => {
+    const voucher = {
+      id: 12,
+      code: 'BIRTH-42-abc',
+      userId: 42,
+      isUsed: false,
+      expiresAt: new Date(Date.now() + 60_000),
+      discountPercentage: 10,
+      createdAt: new Date(),
+    };
+
+    mockPrisma.voucher.findUnique.mockResolvedValueOnce(voucher);
+
+    const result = await service.validateVoucherForClient(voucher.code, { userId: 42 } as any);
+
+    expect(result).toBe(voucher);
+  });
+
+  it('validateVoucherForClient: rejects expired voucher', async () => {
+    mockPrisma.voucher.findUnique.mockResolvedValueOnce({
+      id: 12,
+      code: 'BIRTH-42-abc',
+      userId: 42,
+      isUsed: false,
+      expiresAt: new Date(Date.now() - 60_000),
+      discountPercentage: 10,
+      createdAt: new Date(),
+    });
+
+    await expect(
+      service.validateVoucherForClient('BIRTH-42-abc', { userId: 42 } as any),
+    ).rejects.toThrow('Voucher expirado');
   });
 });
 

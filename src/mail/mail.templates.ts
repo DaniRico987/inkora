@@ -433,12 +433,20 @@ export function buildNewBookNotificationTemplate(
 }
 
 export function buildBirthdayVoucherTemplate(
-  params: { firstName: string; voucherUrl: string; voucherCode: string },
+  params: {
+    firstName: string;
+    voucherUrl: string;
+    voucherCode: string;
+    discountPercentage: number;
+    expiresAtLabel: string;
+  },
   branding?: MailBrandingOptions,
 ): MailTemplate {
   const safeFirstName = escapeHtml(params.firstName);
   const safeVoucherUrl = escapeHtml(params.voucherUrl);
   const safeVoucherCode = escapeHtml(params.voucherCode);
+  const safeDiscountPercentage = escapeHtml(String(params.discountPercentage));
+  const safeExpiresAtLabel = escapeHtml(params.expiresAtLabel);
 
   const bodyHtml = `
     <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#334155;">
@@ -446,7 +454,9 @@ export function buildBirthdayVoucherTemplate(
     </p>
     <div style="margin:16px 0;padding:16px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;">
       <h3 style="margin:0 0 8px 0;font-size:18px;font-weight:700;color:#1e293b;">Tu bono</h3>
+      <p style="margin:0 0 8px 0;font-size:14px;color:#334155;"><strong>Descuento:</strong> ${safeDiscountPercentage}%</p>
       <p style="margin:0 0 8px 0;font-size:16px;color:#0f172a;"><strong>Código:</strong> ${safeVoucherCode}</p>
+      <p style="margin:0 0 8px 0;font-size:14px;color:#334155;"><strong>Vence:</strong> ${safeExpiresAtLabel}</p>
       <p style="margin:0 0 8px 0;font-size:14px;color:#64748b;">Descarga tu bono aquí: <a href="${safeVoucherUrl}">Descargar PDF</a></p>
     </div>
   `;
@@ -461,7 +471,12 @@ export function buildBirthdayVoucherTemplate(
       footer: 'Tu bono es valido por 24 horas. ¡Disfrutalo!',
       branding,
     }),
-    text: `Feliz cumpleanos ${params.firstName}! Descarga tu bono: ${params.voucherUrl}`,
+    text:
+      `Feliz cumpleanos ${params.firstName}!\n` +
+      `Descuento: ${params.discountPercentage}%\n` +
+      `Codigo: ${params.voucherCode}\n` +
+      `Vence: ${params.expiresAtLabel}\n` +
+      `Descarga tu bono: ${params.voucherUrl}`,
   };
 }
 
