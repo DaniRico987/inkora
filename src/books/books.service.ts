@@ -15,13 +15,14 @@ import { UpdateBookDto } from './dto/update-book.dto';
 import { UploadBookCoverResponseDto } from './dto/upload-book-cover-response.dto';
 import { fileToBase64 } from '../utils/file.utils';
 import { NotificationsService } from '../notifications/notifications.service';
+import { Express } from 'express';
 
 @Injectable()
 export class BooksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
-  ) {}
+  ) { }
 
   async findAll(query: GetBooksQueryDto): Promise<PaginatedBooksResponseDto> {
     const page = query.page ?? 1;

@@ -40,7 +40,6 @@ import { GetBooksQueryDto } from './dto/get-books-query.dto';
 import { PaginatedBooksResponseDto } from './dto/paginated-books-response.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
 import { UploadBookCoverResponseDto } from './dto/upload-book-cover-response.dto';
-import { Express } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -48,7 +47,7 @@ import { Roles } from '../auth/roles.decorator';
 @ApiTags('Books')
 @Controller('books')
 export class BooksController {
-  constructor(private readonly booksService: BooksService) {}
+  constructor(private readonly booksService: BooksService) { }
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -359,3 +358,5 @@ export class BooksController {
     return this.booksService.deleteGalleryImage(id, imageId);
   }
 }
+
+import { Express } from 'express';

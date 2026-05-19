@@ -147,9 +147,9 @@ model User {
 }
 
 model Client {
-  clientId Int  @id @default(autoincrement())
-  userId   Int  @unique
-  user     User @relation(fields: [userId], references: [userId])
+  clientId      Int     @id @default(autoincrement())
+  userId        Int     @unique
+  user          User    @relation(fields: [userId], references: [userId])
   walletBalance Decimal @default(0) @db.Decimal(10, 2)
 
   // Relations
@@ -168,17 +168,17 @@ model Client {
 }
 
 model Voucher {
-  id                   Int      @id @default(autoincrement())
-  code                 String   @unique
-  discountPercentage   Int
-  expiresAt            DateTime
-  isUsed               Boolean  @default(false)
-  pdfBase64            String
-  usedAt               DateTime?
-  appliedToPurchaseId  Int?
-  userId               Int
-  user                 User     @relation(fields: [userId], references: [userId])
-  createdAt            DateTime @default(now())
+  id                  Int       @id @default(autoincrement())
+  code                String    @unique
+  discountPercentage  Int
+  expiresAt           DateTime
+  isUsed              Boolean   @default(false)
+  pdfBase64           String
+  usedAt              DateTime?
+  appliedToPurchaseId Int?
+  userId              Int
+  user                User      @relation(fields: [userId], references: [userId])
+  createdAt           DateTime  @default(now())
 
   @@map("voucher")
 }
@@ -350,11 +350,11 @@ model Cart {
 }
 
 model CartItem {
-  cartItemId Int     @id @default(autoincrement())
+  cartItemId Int      @id @default(autoincrement())
   cartId     Int
   bookId     Int
   quantity   Int
-  unitPrice  Decimal @db.Decimal(10, 2)
+  unitPrice  Decimal  @db.Decimal(10, 2)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -419,7 +419,7 @@ model Reservation {
 }
 
 model ReservationItem {
-  reservationItemId Int @id @default(autoincrement())
+  reservationItemId Int  @id @default(autoincrement())
   reservationId     Int
   bookId            Int
   storeId           Int?
@@ -505,7 +505,6 @@ model Transaction {
   @@index([clientId, transactionType, transactionDate], map: "idx_transaction_client_type_date")
   @@index([purchaseId], map: "idx_transaction_purchase")
   @@index([refundId], map: "idx_transaction_refund")
-
   @@map("transaction")
 }
 
@@ -596,26 +595,33 @@ model Conversation {
   clientId       Int
   adminId        Int
   startedAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
   status         ConversationStatus
 
   client   Client    @relation(fields: [clientId], references: [clientId])
   admin    Admin     @relation(fields: [adminId], references: [adminId])
   messages Message[]
 
+  @@index([clientId, status])
+  @@index([adminId, status])
+  @@index([updatedAt])
   @@map("conversation")
 }
 
 model Message {
-  messageId      Int      @id @default(autoincrement())
+  messageId      Int       @id @default(autoincrement())
   conversationId Int
   senderId       Int
-  content        String   @db.Text
-  sentAt         DateTime @default(now())
-  isRead         Boolean  @default(false)
+  content        String    @db.Text
+  sentAt         DateTime  @default(now())
+  isRead         Boolean   @default(false)
+  readAt         DateTime?
 
   conversation Conversation @relation(fields: [conversationId], references: [conversationId])
   sender       User         @relation(fields: [senderId], references: [userId])
 
+  @@index([conversationId, sentAt])
+  @@index([senderId])
   @@map("message")
 }
 
