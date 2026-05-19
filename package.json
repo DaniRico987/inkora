@@ -11,7 +11,7 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
+    "start:prod": "node dist/src/main.js",
     "mail:preview": "ts-node scripts/generate-mail-previews.ts",
     "seed:db": "prisma db seed",
     "seed:categories": "ts-node prisma/seed.ts --only=categories",

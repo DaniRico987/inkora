@@ -1,9 +1,18 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { StoreStatus } from '@prisma/client';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { PurchaseStatus, StoreStatus } from '@prisma/client';
 import { PrismaService } from 'prisma/prisma/prisma.service';
 import { CreateStoreDto } from './dto/create-store.dto';
 import { UpdateStoreDto } from './dto/update-store.dto';
 import { StorePublicDto } from './dto/store-public.dto';
+import { StoreResponseDto } from './dto/store-response.dto';
+import { StoreInventoryResponseDto } from './dto/store-inventory-response.dto';
+import { StoreInventoryItemDto } from './dto/store-inventory-item.dto';
+import { StoreOrdersResponseDto } from './dto/store-orders-response.dto';
+import { StoreOrderResponseDto } from './dto/store-order-response.dto';
 
 export type StoreAvailabilityDto = {
   storeId: number;
@@ -25,6 +34,17 @@ export type StoreReferenceDto = {
   longitude: number | null;
 };
 
+type StoreSummarySelect = {
+  storeId: number;
+  name: string;
+  address: string;
+  city: string;
+  latitude: unknown;
+  longitude: unknown;
+  capacity: number | null;
+  status: StoreStatus;
+};
+
 const toNullableNumber = (value: unknown): number | null => {
   if (value === null || value === undefined) {
     return null;
@@ -36,7 +56,7 @@ const toNullableNumber = (value: unknown): number | null => {
 
 @Injectable()
 export class StoresService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async findAvailableByBook(bookId: number): Promise<StoreAvailabilityDto[]> {
     const inventories = await this.prisma.inventory.findMany({
@@ -88,10 +108,12 @@ export class StoresService {
       });
   }
 
-  async findAll() {
-    return this.prisma.store.findMany({
+  async findAll(): Promise<StoreResponseDto[]> {
+    const stores = await this.prisma.store.findMany({
       orderBy: { storeId: 'asc' },
     });
+
+    return stores.map((store) => this.mapStore(store));
   }
 
   async findPublicStores(): Promise<StorePublicDto[]> {
@@ -122,8 +144,8 @@ export class StoresService {
     }));
   }
 
-  async create(dto: CreateStoreDto) {
-    return this.prisma.store.create({
+  async create(dto: CreateStoreDto): Promise<StoreResponseDto> {
+    const store = await this.prisma.store.create({
       data: {
         name: dto.name,
         address: dto.address,
@@ -134,12 +156,17 @@ export class StoresService {
         status: dto.status ?? 'active',
       },
     });
+
+    return this.mapStore(store);
   }
 
-  async update(storeId: number, dto: UpdateStoreDto) {
+  async update(
+    storeId: number,
+    dto: UpdateStoreDto,
+  ): Promise<StoreResponseDto> {
     await this.assertExists(storeId);
 
-    return this.prisma.store.update({
+    const store = await this.prisma.store.update({
       where: { storeId },
       data: {
         ...(dto.name !== undefined ? { name: dto.name } : {}),
@@ -151,14 +178,32 @@ export class StoresService {
         ...(dto.status !== undefined ? { status: dto.status } : {}),
       },
     });
+
+    return this.mapStore(store);
   }
 
   async delete(storeId: number) {
     await this.assertExists(storeId);
 
+    const pendingOrders = await this.prisma.purchase.count({
+      where: {
+        pickupStoreId: storeId,
+        status: {
+          in: [PurchaseStatus.inPreparation, PurchaseStatus.shipped],
+        },
+      },
+    });
+
+    if (pendingOrders > 0) {
+      throw new BadRequestException(
+        'No se puede eliminar la tienda porque tiene pedidos pendientes en preparación o envío',
+      );
+    }
+
     await this.prisma.$transaction(async (tx) => {
-      await tx.reservationItem.deleteMany({
+      await tx.reservationItem.updateMany({
         where: { storeId },
+        data: { storeId: null },
       });
 
       await tx.inventory.deleteMany({
@@ -176,6 +221,132 @@ export class StoresService {
     });
 
     return { id: storeId };
+  }
+
+  async findInventoryByStoreId(
+    storeId: number,
+  ): Promise<StoreInventoryResponseDto> {
+    const store = await this.findStoreSummaryOrThrow(storeId);
+    const inventories = await this.prisma.inventory.findMany({
+      where: { storeId },
+      select: {
+        bookId: true,
+        availableQuantity: true,
+        reservedQuantity: true,
+        book: {
+          select: {
+            title: true,
+            author: true,
+          },
+        },
+      },
+      orderBy: [{ bookId: 'asc' }],
+    });
+
+    const items = inventories.map(
+      (inventory): StoreInventoryItemDto => ({
+        bookId: inventory.bookId,
+        title: inventory.book.title,
+        author: inventory.book.author,
+        availableQuantity: inventory.availableQuantity,
+        reservedQuantity: inventory.reservedQuantity,
+        totalQuantity: inventory.availableQuantity + inventory.reservedQuantity,
+      }),
+    );
+
+    return {
+      store: this.mapStore(store),
+      items,
+      totalAvailableQuantity: items.reduce(
+        (sum, item) => sum + item.availableQuantity,
+        0,
+      ),
+      totalReservedQuantity: items.reduce(
+        (sum, item) => sum + item.reservedQuantity,
+        0,
+      ),
+    };
+  }
+
+  async findOrdersByStoreId(storeId: number): Promise<StoreOrdersResponseDto> {
+    const store = await this.findStoreSummaryOrThrow(storeId);
+    const purchases = await this.prisma.purchase.findMany({
+      where: { pickupStoreId: storeId },
+      select: {
+        purchaseId: true,
+        purchaseDate: true,
+        status: true,
+        totalAmount: true,
+        deliveryMode: true,
+        pickupStoreId: true,
+        dispatchDate: true,
+        client: {
+          select: {
+            clientId: true,
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+        purchaseItems: {
+          select: {
+            purchaseItemId: true,
+            bookId: true,
+            quantity: true,
+            unitPrice: true,
+            book: {
+              select: {
+                title: true,
+                author: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: [{ purchaseDate: 'desc' }, { purchaseId: 'desc' }],
+    });
+
+    const orders = purchases.map(
+      (purchase): StoreOrderResponseDto => ({
+        purchaseId: purchase.purchaseId,
+        purchaseDate: purchase.purchaseDate,
+        status: purchase.status,
+        totalAmount: toNullableNumber(purchase.totalAmount) ?? 0,
+        deliveryMode: purchase.deliveryMode,
+        pickupStoreId: purchase.pickupStoreId,
+        dispatchDate: purchase.dispatchDate,
+        client: {
+          clientId: purchase.client.clientId,
+          firstName: purchase.client.user.firstName,
+          lastName: purchase.client.user.lastName,
+          email: purchase.client.user.email,
+        },
+        items: purchase.purchaseItems.map((item) => ({
+          purchaseItemId: item.purchaseItemId,
+          bookId: item.bookId,
+          title: item.book.title,
+          author: item.book.author,
+          quantity: item.quantity,
+          unitPrice: toNullableNumber(item.unitPrice) ?? 0,
+          subtotal: (toNullableNumber(item.unitPrice) ?? 0) * item.quantity,
+        })),
+      }),
+    );
+
+    return {
+      store: this.mapStore(store),
+      orders,
+      totalOrders: orders.length,
+      pendingOrders: orders.filter(
+        (order) =>
+          order.status === PurchaseStatus.inPreparation ||
+          order.status === PurchaseStatus.shipped,
+      ).length,
+    };
   }
 
   async findActiveById(storeId: number): Promise<StoreReferenceDto | null> {
@@ -196,12 +367,12 @@ export class StoresService {
       .then((store) =>
         store
           ? {
-            storeId: store.storeId,
-            name: store.name,
-            city: store.city,
-            latitude: toNullableNumber(store.latitude),
-            longitude: toNullableNumber(store.longitude),
-          }
+              storeId: store.storeId,
+              name: store.name,
+              city: store.city,
+              latitude: toNullableNumber(store.latitude),
+              longitude: toNullableNumber(store.longitude),
+            }
           : null,
       );
   }
@@ -214,5 +385,42 @@ export class StoresService {
     if (!existing) {
       throw new NotFoundException('Tienda no encontrada');
     }
+  }
+
+  private async findStoreSummaryOrThrow(
+    storeId: number,
+  ): Promise<StoreSummarySelect> {
+    const store = await this.prisma.store.findUnique({
+      where: { storeId },
+      select: {
+        storeId: true,
+        name: true,
+        address: true,
+        city: true,
+        latitude: true,
+        longitude: true,
+        capacity: true,
+        status: true,
+      },
+    });
+
+    if (!store) {
+      throw new NotFoundException('Tienda no encontrada');
+    }
+
+    return store;
+  }
+
+  private mapStore(store: StoreSummarySelect): StoreResponseDto {
+    return {
+      storeId: store.storeId,
+      name: store.name,
+      address: store.address,
+      city: store.city,
+      latitude: toNullableNumber(store.latitude),
+      longitude: toNullableNumber(store.longitude),
+      capacity: store.capacity,
+      status: store.status,
+    };
   }
 }
