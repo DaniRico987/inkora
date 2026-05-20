@@ -22,13 +22,16 @@ export function StoresPage() {
         if (!mounted) {
           return;
         }
-        const normalizedStores = mapPublicStoresToLocations(Array.isArray(data) ? data : []);
+        const normalizedStores = mapPublicStoresToLocations(
+          Array.isArray(data) ? data : [],
+        );
         setStores(normalizedStores);
       } catch (e) {
         if (!mounted) {
           return;
         }
-        const message = e instanceof Error ? e.message : 'Error al cargar las tiendas';
+        const message =
+          e instanceof Error ? e.message : 'Error al cargar las tiendas';
         setError(message);
       } finally {
         if (mounted) {
@@ -64,7 +67,9 @@ export function StoresPage() {
       <h1 className="mb-1 text-2xl font-semibold tracking-tight text-text">
         Tiendas INKORA
       </h1>
-      <p className="mb-6 text-sm text-text-muted">Pereira — ubicaciones y contacto</p>
+      <p className="mb-6 text-sm text-text-muted">
+        Pereira — ubicaciones y contacto
+      </p>
 
       <div className="flex flex-col gap-6 lg:flex-row lg:items-stretch">
         <aside className="order-2 w-full shrink-0 lg:order-1 lg:w-[min(100%,320px)]">
@@ -79,15 +84,20 @@ export function StoresPage() {
                   <button
                     type="button"
                     onClick={() =>
-                      setSelectedStoreId((prev) => (prev === store.id ? null : store.id))
+                      setSelectedStoreId((prev) =>
+                        prev === store.id ? null : store.id,
+                      )
                     }
-                    className={`w-full rounded-xl border px-4 py-3 text-left transition-colors ${isSelected
+                    className={`w-full rounded-xl border px-4 py-3 text-left transition-colors ${
+                      isSelected
                         ? 'border-primary-400 bg-primary-50/80'
                         : 'border-border bg-bg-secondary hover:border-primary-300 hover:bg-primary-50/40'
-                      }`}
+                    }`}
                   >
                     <p className="font-medium text-text">{store.name}</p>
-                    <p className="mt-1 text-sm text-text-muted">{store.address}</p>
+                    <p className="mt-1 text-sm text-text-muted">
+                      {store.address}
+                    </p>
                     <p className="mt-2 text-xs text-label">{store.status}</p>
                   </button>
                 </li>
@@ -95,7 +105,9 @@ export function StoresPage() {
             })}
           </ul>
           {stores.length === 0 && (
-            <p className="text-sm text-text-muted">No hay tiendas registradas.</p>
+            <p className="text-sm text-text-muted">
+              No hay tiendas registradas.
+            </p>
           )}
         </aside>
 

@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AdminLayout } from '../Components/AdminLayout';
-import { DataTable, type DataTableColumn, type DataTableAction } from '../Components/DataTable';
+import {
+  DataTable,
+  type DataTableColumn,
+  type DataTableAction,
+} from '../Components/DataTable';
 import { FormModal } from '../Components/FormModal';
 import { ConfirmationModal } from '../Components/ConfirmationModal';
 import { LocationPicker } from '../Components/LocationPicker';
@@ -89,10 +93,11 @@ export function StoresManagementPage() {
       setIsLoading(true);
       // El endpoint /stores/search no existe en backend actual, filtramos localmente
       const data = await getStores();
-      const filtered = (Array.isArray(data) ? data : []).filter((store: Store) =>
-        store.name.toLowerCase().includes(query.toLowerCase()) ||
-        store.address.toLowerCase().includes(query.toLowerCase()) ||
-        store.city.toLowerCase().includes(query.toLowerCase())
+      const filtered = (Array.isArray(data) ? data : []).filter(
+        (store: Store) =>
+          store.name.toLowerCase().includes(query.toLowerCase()) ||
+          store.address.toLowerCase().includes(query.toLowerCase()) ||
+          store.city.toLowerCase().includes(query.toLowerCase()),
       );
       setStores(filtered);
       setTotalPages(1);
@@ -145,7 +150,9 @@ export function StoresManagementPage() {
       const latitudeValue = formData.get('latitude') as string;
       const longitudeValue = formData.get('longitude') as string;
       const capacityValue = formData.get('capacity') as string;
-      const locationValue = extractCityName((formData.get('city') as string) || '');
+      const locationValue = extractCityName(
+        (formData.get('city') as string) || '',
+      );
 
       const data = {
         name: (formData.get('name') as string) || '',
@@ -154,7 +161,10 @@ export function StoresManagementPage() {
         latitude: latitudeValue ? parseFloat(latitudeValue) : undefined,
         longitude: longitudeValue ? parseFloat(longitudeValue) : undefined,
         capacity: capacityValue ? parseInt(capacityValue, 10) : undefined,
-        status: (formData.get('status') as string) as 'active' | 'inactive' | undefined,
+        status: formData.get('status') as string as
+          | 'active'
+          | 'inactive'
+          | undefined,
       };
 
       const nameValue = ((formData.get('name') as string) || '').trim();
@@ -216,13 +226,14 @@ export function StoresManagementPage() {
       key: 'capacity',
       label: 'Capacidad',
       width: '15%',
-      render: (value) => (value !== undefined && value !== null ? String(value) : 'N/A'),
+      render: (value) =>
+        value !== undefined && value !== null ? String(value) : 'N/A',
     },
     {
       key: 'status',
       label: 'Estado',
       width: '15%',
-      render: (value) => (String(value).toUpperCase()),
+      render: (value) => String(value).toUpperCase(),
     },
   ];
 
@@ -295,7 +306,9 @@ export function StoresManagementPage() {
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-text mb-2">Nombre de la Tienda</label>
+            <label className="block text-sm font-medium text-text mb-2">
+              Nombre de la Tienda
+            </label>
             <input
               type="text"
               name="name"
@@ -303,7 +316,9 @@ export function StoresManagementPage() {
               defaultValue={editingStore?.name || ''}
               placeholder="Nombre de la tienda"
               onInput={(event) => {
-                event.currentTarget.value = normalizeStoreName(event.currentTarget.value);
+                event.currentTarget.value = normalizeStoreName(
+                  event.currentTarget.value,
+                );
               }}
               title="Solo letras, números y espacios"
               className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
@@ -311,7 +326,9 @@ export function StoresManagementPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-text mb-2">Dirección</label>
+            <label className="block text-sm font-medium text-text mb-2">
+              Dirección
+            </label>
             <input
               type="text"
               name="address"
@@ -319,7 +336,9 @@ export function StoresManagementPage() {
               defaultValue={editingStore?.address || ''}
               placeholder="Dirección completa"
               onInput={(event) => {
-                event.currentTarget.value = normalizeStoreAddress(event.currentTarget.value);
+                event.currentTarget.value = normalizeStoreAddress(
+                  event.currentTarget.value,
+                );
               }}
               title="Solo letras, números, espacios y signos de dirección básicos"
               className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
@@ -329,7 +348,9 @@ export function StoresManagementPage() {
           <div>
             {editingStore ? (
               <>
-                <label className="block text-sm font-medium text-text mb-2">Ciudad</label>
+                <label className="block text-sm font-medium text-text mb-2">
+                  Ciudad
+                </label>
                 <input
                   type="text"
                   name="city"
@@ -337,7 +358,9 @@ export function StoresManagementPage() {
                   defaultValue={editingStore?.city || ''}
                   placeholder="Ciudad"
                   onInput={(event) => {
-                    event.currentTarget.value = normalizeStoreLocation(event.currentTarget.value);
+                    event.currentTarget.value = normalizeStoreLocation(
+                      event.currentTarget.value,
+                    );
                   }}
                   title="Solo letras, números y espacios"
                   className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
@@ -350,14 +373,21 @@ export function StoresManagementPage() {
                   value={storeLocation}
                   onChange={(value) => setStoreLocation(extractCityName(value))}
                 />
-                <input type="hidden" name="city" value={storeLocation} readOnly />
+                <input
+                  type="hidden"
+                  name="city"
+                  value={storeLocation}
+                  readOnly
+                />
               </>
             )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-text mb-2">Latitud (opcional)</label>
+              <label className="block text-sm font-medium text-text mb-2">
+                Latitud (opcional)
+              </label>
               <input
                 type="number"
                 name="latitude"
@@ -369,7 +399,9 @@ export function StoresManagementPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-text mb-2">Longitud (opcional)</label>
+              <label className="block text-sm font-medium text-text mb-2">
+                Longitud (opcional)
+              </label>
               <input
                 type="number"
                 name="longitude"
@@ -383,7 +415,9 @@ export function StoresManagementPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-text mb-2">Capacidad (opcional)</label>
+              <label className="block text-sm font-medium text-text mb-2">
+                Capacidad (opcional)
+              </label>
               <input
                 type="number"
                 name="capacity"
@@ -395,7 +429,9 @@ export function StoresManagementPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-text mb-2">Estado</label>
+              <label className="block text-sm font-medium text-text mb-2">
+                Estado
+              </label>
               <select
                 name="status"
                 required

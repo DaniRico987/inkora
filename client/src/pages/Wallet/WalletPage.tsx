@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import {
   Alert,
+  Box,
   CircularProgress,
   Container,
   Grid,
-  Paper,
   Typography,
 } from '@mui/material';
 import { getClientProfile, type ClientCard } from '../../api/clients';
@@ -27,7 +27,11 @@ const WalletPage = () => {
       setCards(profile.cards);
       setCardsError(null);
     } catch (cardError) {
-      setCardsError(cardError instanceof Error ? cardError.message : 'No se pudieron cargar las tarjetas');
+      setCardsError(
+        cardError instanceof Error
+          ? cardError.message
+          : 'No se pudieron cargar las tarjetas',
+      );
     } finally {
       setCardsLoading(false);
     }
@@ -43,50 +47,84 @@ const WalletPage = () => {
 
   if (loading || cardsLoading) {
     return (
-      <div className="flex justify-center items-center h-screen">
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '100vh',
+          px: 2,
+        }}
+      >
         <CircularProgress />
-      </div>
+      </Box>
     );
   }
 
   if (error || cardsError) {
     return (
-      <div className="p-4">
+      <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 4 } }}>
         <Alert severity="error">{error ?? cardsError}</Alert>
-      </div>
+      </Container>
     );
   }
 
   return (
-    <Container maxWidth="lg" className="py-8">
-      <Typography variant="h4" component="h1" gutterBottom>
-        Monedero Virtual
-      </Typography>
-      <Grid container spacing={4}>
-        <Grid size={{ xs: 12, md: 4 }}>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        background:
+          'linear-gradient(135deg, var(--color-bg) 0%, var(--color-bg-secondary) 100%)',
+        py: { xs: 2, sm: 4 },
+      }}
+    >
+      <Container maxWidth="lg" sx={{ px: { xs: 2, sm: 3 } }}>
+        <Box sx={{ mb: { xs: 4, sm: 6 } }}>
+          <Typography
+            variant="h3"
+            component="h1"
+            sx={{
+              fontWeight: 800,
+              color: 'var(--color-text)',
+              mb: 1,
+              fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
+            }}
+          >
+            Monedero Virtual
+          </Typography>
+          <Typography
+            variant="body1"
+            sx={{
+              color: 'var(--color-text-muted)',
+              mb: { xs: 2, sm: 3 },
+              maxWidth: 720,
+            }}
+          >
+            Gestiona tu saldo y realiza recargas rápidas
+          </Typography>
+        </Box>
+
+        <Grid container spacing={{ xs: 2, sm: 3 }}>
           {wallet && (
-            <Paper className="p-4">
+            <Grid size={{ xs: 12, md: 5 }}>
               <WalletBalance balance={wallet.balance} />
-            </Paper>
+            </Grid>
           )}
-        </Grid>
-        <Grid size={{ xs: 12, md: 8 }}>
-          <Paper className="p-4">
-            <WalletTopUpForm cards={cards} onTopUpCompleted={handleTopUpCompleted} />
-          </Paper>
-        </Grid>
-        <Grid size={{ xs: 12 }}>
-          <Paper className="p-4">
+          <Grid size={{ xs: 12, md: 7 }}>
+            <WalletTopUpForm
+              cards={cards}
+              onTopUpCompleted={handleTopUpCompleted}
+            />
+          </Grid>
+          <Grid size={{ xs: 12 }}>
             <RegisteredCards cards={cards} onCardDeleted={loadCards} />
-          </Paper>
-        </Grid>
-        <Grid size={{ xs: 12 }}>
-          <Paper className="p-4">
+          </Grid>
+          <Grid size={{ xs: 12 }}>
             <TransactionsList transactions={transactions} />
-          </Paper>
+          </Grid>
         </Grid>
-      </Grid>
-    </Container>
+      </Container>
+    </Box>
   );
 };
 

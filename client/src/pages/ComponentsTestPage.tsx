@@ -37,9 +37,12 @@ export function ComponentsTestPage() {
     <div className="w-full min-h-screen px-4 py-8 flex flex-col">
       <NavBar variant="client" />
       <div className="w-full max-w-5xl mx-auto bg-bg-secondary rounded-2xl shadow-lg p-6 sm:p-8">
-        <h1 className="text-2xl font-semibold text-text mb-2">Pagina de prueba de componentes</h1>
+        <h1 className="text-2xl font-semibold text-text mb-2">
+          Pagina de prueba de componentes
+        </h1>
         <p className="text-sm text-text-muted mb-8">
-          Playground para validar apariencia, estados y comportamiento de los componentes base.
+          Playground para validar apariencia, estados y comportamiento de los
+          componentes base.
         </p>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -90,16 +93,27 @@ export function ComponentsTestPage() {
           </section>
 
           <section className="space-y-4">
-            <h2 className="text-lg font-medium text-text">Botones y feedback</h2>
+            <h2 className="text-lg font-medium text-text">
+              Botones y feedback
+            </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Button variant="primary" onClick={() => info('Boton primary presionado')}>
+              <Button
+                variant="primary"
+                onClick={() => info('Boton primary presionado')}
+              >
                 Primary
               </Button>
-              <Button variant="secondary" onClick={() => success('Accion completada correctamente')}>
+              <Button
+                variant="secondary"
+                onClick={() => success('Accion completada correctamente')}
+              >
                 Secondary
               </Button>
-              <Button variant="destructive" onClick={() => error('Accion destructiva de ejemplo')}>
+              <Button
+                variant="destructive"
+                onClick={() => error('Accion destructiva de ejemplo')}
+              >
                 Destructive
               </Button>
               <Button disabled onClick={() => undefined}>
@@ -109,17 +123,24 @@ export function ComponentsTestPage() {
                 Loading
               </Button>
               <Button
-                onClick={() => warning('Mensaje repetible', { dedupeKey: 'warning-demo' })}
+                onClick={() =>
+                  warning('Mensaje repetible', { dedupeKey: 'warning-demo' })
+                }
               >
                 Snackbar dedupe
               </Button>
-              <Button variant="destructive" onClick={() => setIsConfirmModalOpen(true)}>
+              <Button
+                variant="destructive"
+                onClick={() => setIsConfirmModalOpen(true)}
+              >
                 Abrir modal
               </Button>
             </div>
 
             <div className="mt-4 rounded-xl border border-border p-4 bg-bg-card/30">
-              <h3 className="text-sm font-medium text-text mb-2">ErrorLine con countdown</h3>
+              <h3 className="text-sm font-medium text-text mb-2">
+                ErrorLine con countdown
+              </h3>
               <ErrorInLine
                 title="Cuenta bloqueada por intentos fallidos de ejemplo."
                 failedAttempts={{ current: 5, max: 5 }}
@@ -139,7 +160,9 @@ export function ComponentsTestPage() {
             </div>
 
             <div className="mt-4 rounded-xl border border-border p-4 bg-bg-card/30">
-              <h3 className="text-sm font-medium text-text mb-2">Spinner / Loader</h3>
+              <h3 className="text-sm font-medium text-text mb-2">
+                Spinner / Loader
+              </h3>
               <div className="rounded-2xl border border-border/70 bg-bg-secondary/70 p-4">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                   <Spinner size="sm" tone="brand" label="Cargando" />
@@ -159,14 +182,21 @@ export function ComponentsTestPage() {
             </div>
 
             <div className="mt-4 rounded-xl border border-border p-4 bg-bg-card/30">
-              <h3 className="text-sm font-medium text-text mb-3">Status Badge</h3>
+              <h3 className="text-sm font-medium text-text mb-3">
+                Status Badge
+              </h3>
               <div className="flex flex-wrap items-center gap-3">
                 <StatusBadge label="Activo" tone="success" />
                 <StatusBadge label="Pendiente" tone="warning" />
                 <StatusBadge label="Bloqueado" tone="danger" />
                 <StatusBadge label="En revision" tone="info" />
                 <StatusBadge label="Inactivo" tone="neutral" />
-                <StatusBadge label="Sin punto" tone="neutral" withDot={false} size="sm" />
+                <StatusBadge
+                  label="Sin punto"
+                  tone="neutral"
+                  withDot={false}
+                  size="sm"
+                />
               </div>
             </div>
           </section>
@@ -187,7 +217,9 @@ export function ComponentsTestPage() {
             </div>
 
             <div>
-              <h3 className="text-sm font-medium text-text mb-2">Page in the middle</h3>
+              <h3 className="text-sm font-medium text-text mb-2">
+                Page in the middle
+              </h3>
               <Pagination
                 currentPage={pageAtMiddle}
                 totalPages={744}
@@ -207,7 +239,6 @@ export function ComponentsTestPage() {
             </div>
           </div>
         </section>
-
       </div>
 
       <div className="w-full max-w-5xl mx-auto mt-8">
@@ -257,15 +288,17 @@ export function ComponentsTestPage() {
       />
 
       {isPageLoading && (
-        <Spinner size="lg" tone="brand" label="Cargando datos de ejemplo..." fullScreen />
+        <Spinner
+          size="lg"
+          tone="brand"
+          label="Cargando datos de ejemplo..."
+          fullScreen
+        />
       )}
 
       {isPageLoading && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-9999 w-[min(92vw,20rem)]">
-          <Button
-            variant="destructive"
-            onClick={() => setIsPageLoading(false)}
-          >
+          <Button variant="destructive" onClick={() => setIsPageLoading(false)}>
             Detener carga
           </Button>
         </div>

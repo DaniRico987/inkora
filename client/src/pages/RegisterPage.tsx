@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { InputText, InputPassword, InputSelect, InputNumber, InputDate } from '../Components/Inputs';
+import {
+  InputText,
+  InputPassword,
+  InputSelect,
+  InputNumber,
+  InputDate,
+} from '../Components/Inputs';
 import { Button } from '../Components/Button';
 import { AuthHomeButton } from '../Components/AuthHomeButton';
 import { useTheme } from '../theme/useTheme';
@@ -51,8 +57,8 @@ export function RegisterPage() {
   const location = useLocation();
   const authOriginState =
     typeof location.state === 'object' &&
-      location.state !== null &&
-      'from' in location.state
+    location.state !== null &&
+    'from' in location.state
       ? { from: (location.state as { from?: string }).from }
       : undefined;
 
@@ -152,11 +158,13 @@ export function RegisterPage() {
     if (!dni.trim()) nextErrors.dni = 'El DNI es requerido.';
     if (!firstName.trim()) nextErrors.firstName = 'Los nombres son requeridos.';
     if (!lastName.trim()) nextErrors.lastName = 'Los apellidos son requeridos.';
-    if (!birthDate) nextErrors.birthDate = 'La fecha de nacimiento es requerida.';
+    if (!birthDate)
+      nextErrors.birthDate = 'La fecha de nacimiento es requerida.';
     if (!email.trim()) nextErrors.email = 'El correo es requerido.';
     if (!username.trim()) nextErrors.username = 'El username es requerido.';
     if (!password.trim()) nextErrors.password = 'La contraseña es requerida.';
-    if (!confirmPassword.trim()) nextErrors.confirmPassword = 'Debes confirmar la contraseña.';
+    if (!confirmPassword.trim())
+      nextErrors.confirmPassword = 'Debes confirmar la contraseña.';
 
     if (birthDate) {
       const birthDateError = validateDateValue(birthDate, 'birthDate');
@@ -196,7 +204,8 @@ export function RegisterPage() {
     }
 
     if (!passwordPolicy.test(password)) {
-      nextErrors.password = 'La contraseña debe incluir mayúsculas, minúsculas y números.';
+      nextErrors.password =
+        'La contraseña debe incluir mayúsculas, minúsculas y números.';
     }
 
     if (password !== confirmPassword) {
@@ -293,7 +302,7 @@ export function RegisterPage() {
 
       setErrorMessage(
         message ||
-        'No se pudo crear la cuenta. Verifica la información e intenta de nuevo.',
+          'No se pudo crear la cuenta. Verifica la información e intenta de nuevo.',
       );
     } finally {
       setLoading(false);
@@ -363,7 +372,9 @@ export function RegisterPage() {
                     onChange={handleInputChange}
                     length={20}
                   />
-                  {formErrors.dni && <p className="text-xs text-red-300">{formErrors.dni}</p>}
+                  {formErrors.dni && (
+                    <p className="text-xs text-red-300">{formErrors.dni}</p>
+                  )}
                 </div>
                 <div>
                   <InputText
@@ -376,7 +387,11 @@ export function RegisterPage() {
                     maxLength={100}
                     validationType="name"
                   />
-                  {formErrors.firstName && <p className="text-xs text-red-300">{formErrors.firstName}</p>}
+                  {formErrors.firstName && (
+                    <p className="text-xs text-red-300">
+                      {formErrors.firstName}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <InputText
@@ -389,7 +404,11 @@ export function RegisterPage() {
                     maxLength={100}
                     validationType="name"
                   />
-                  {formErrors.lastName && <p className="text-xs text-red-300">{formErrors.lastName}</p>}
+                  {formErrors.lastName && (
+                    <p className="text-xs text-red-300">
+                      {formErrors.lastName}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -402,7 +421,11 @@ export function RegisterPage() {
                     dateValidationMode="birthDate"
                     onChange={handleInputChange}
                   />
-                  {formErrors.birthDate && <p className="text-xs text-red-300">{formErrors.birthDate}</p>}
+                  {formErrors.birthDate && (
+                    <p className="text-xs text-red-300">
+                      {formErrors.birthDate}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <InputSelect
@@ -412,7 +435,9 @@ export function RegisterPage() {
                     value={formData.gender}
                     onChange={handleInputChange}
                   />
-                  {formErrors.gender && <p className="text-xs text-red-300">{formErrors.gender}</p>}
+                  {formErrors.gender && (
+                    <p className="text-xs text-red-300">{formErrors.gender}</p>
+                  )}
                 </div>
               </div>
 
@@ -449,7 +474,9 @@ export function RegisterPage() {
                     onChange={handleInputChange}
                     validationType="email"
                   />
-                  {formErrors.email && <p className="text-xs text-red-300">{formErrors.email}</p>}
+                  {formErrors.email && (
+                    <p className="text-xs text-red-300">{formErrors.email}</p>
+                  )}
                 </div>
                 <div>
                   <InputText
@@ -462,7 +489,11 @@ export function RegisterPage() {
                     maxLength={50}
                     validationType="username"
                   />
-                  {formErrors.username && <p className="text-xs text-red-300">{formErrors.username}</p>}
+                  {formErrors.username && (
+                    <p className="text-xs text-red-300">
+                      {formErrors.username}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -501,20 +532,25 @@ export function RegisterPage() {
               <div className="mb-3">
                 {hasPassword && (
                   <div className="flex items-center gap-2 text-xs mb-1">
-                    <span className="text-text-muted">Fortaleza de contraseña:</span>
-                    <span className="capitalize text-text">{passwordStrength}</span>
+                    <span className="text-text-muted">
+                      Fortaleza de contraseña:
+                    </span>
+                    <span className="capitalize text-text">
+                      {passwordStrength}
+                    </span>
                   </div>
                 )}
                 <div className="h-1.5 rounded-full bg-border overflow-hidden">
                   <div
-                    className={`h-full transition-all duration-300 ${!hasPassword
-                      ? 'bg-transparent'
-                      : passwordStrength === 'fuerte'
-                        ? 'bg-emerald-500'
-                        : passwordStrength === 'media'
-                          ? 'bg-amber-500'
-                          : 'bg-red-500'
-                      }`}
+                    className={`h-full transition-all duration-300 ${
+                      !hasPassword
+                        ? 'bg-transparent'
+                        : passwordStrength === 'fuerte'
+                          ? 'bg-emerald-500'
+                          : passwordStrength === 'media'
+                            ? 'bg-amber-500'
+                            : 'bg-red-500'
+                    }`}
                     style={{
                       width: !hasPassword
                         ? '0%'
@@ -529,24 +565,31 @@ export function RegisterPage() {
               </div>
 
               <div className="mb-3 rounded-xl border border-border p-4">
-                <p className="text-sm font-medium text-text mb-3">Preferencias literarias</p>
+                <p className="text-sm font-medium text-text mb-3">
+                  Preferencias literarias
+                </p>
                 {categoriesLoading ? (
-                  <p className="text-xs text-text-muted">Cargando categorías...</p>
+                  <p className="text-xs text-text-muted">
+                    Cargando categorías...
+                  </p>
                 ) : (
                   <div className="flex flex-wrap gap-2">
                     {categories.map((category) => {
                       const categoryId = Number(category.categoryId);
-                      const selected = Number.isFinite(categoryId) && formData.categoryIds.includes(categoryId);
+                      const selected =
+                        Number.isFinite(categoryId) &&
+                        formData.categoryIds.includes(categoryId);
                       return (
                         <button
                           key={categoryId}
                           type="button"
                           onClick={() => toggleCategory(categoryId)}
                           disabled={!Number.isFinite(categoryId)}
-                          className={`rounded-full border px-3 py-1 text-xs transition-colors ${selected
-                            ? 'border-primary-500 bg-primary-500/20 text-primary-500'
-                            : 'border-border text-text-muted hover:border-primary-400 hover:text-text'
-                            }`}
+                          className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                            selected
+                              ? 'border-primary-500 bg-primary-500/20 text-primary-500'
+                              : 'border-border text-text-muted hover:border-primary-400 hover:text-text'
+                          }`}
                         >
                           {category.name}
                         </button>
@@ -554,7 +597,11 @@ export function RegisterPage() {
                     })}
                   </div>
                 )}
-                {formErrors.categoryIds && <p className="text-xs text-red-300 mt-2">{formErrors.categoryIds}</p>}
+                {formErrors.categoryIds && (
+                  <p className="text-xs text-red-300 mt-2">
+                    {formErrors.categoryIds}
+                  </p>
+                )}
               </div>
 
               {/* Error Message */}

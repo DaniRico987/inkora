@@ -29,12 +29,18 @@ const MAX_BOOK_QUANTITY = 3;
 export function BookDetailPage() {
   const params = useParams<{ id: string }>();
   const bookId = Number(params.id);
-  const { data: book, loading, error } = useBookDetail(Number.isFinite(bookId) ? bookId : null);
+  const {
+    data: book,
+    loading,
+    error,
+  } = useBookDetail(Number.isFinite(bookId) ? bookId : null);
   const snackbar = useSnackbar();
 
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isSubmittingReservation, setIsSubmittingReservation] = useState(false);
-  const [reservationExpiration, setReservationExpiration] = useState<string | null>(null);
+  const [reservationExpiration, setReservationExpiration] = useState<
+    string | null
+  >(null);
   const [selectedQuantity, setSelectedQuantity] = useState(1);
   const [quantityError, setQuantityError] = useState<string | null>(null);
   const [imageFailed, setImageFailed] = useState(false);
@@ -84,7 +90,9 @@ export function BookDetailPage() {
     if (quantity > MAX_BOOK_QUANTITY) {
       setQuantityError(`Máximo ${MAX_BOOK_QUANTITY} unidades por libro.`);
     } else if (quantity > totalAvailable) {
-      setQuantityError('No hay suficientes unidades disponibles para esa cantidad.');
+      setQuantityError(
+        'No hay suficientes unidades disponibles para esa cantidad.',
+      );
     } else {
       setQuantityError(null);
     }
@@ -123,7 +131,10 @@ export function BookDetailPage() {
             const added = await addToCart(item.bookId, item.quantity);
             cartItemIds.push(added.cartItemId);
           } catch (cartErr) {
-            console.error('No se pudo agregar item reservado al carrito:', cartErr);
+            console.error(
+              'No se pudo agregar item reservado al carrito:',
+              cartErr,
+            );
           }
         }
 
@@ -140,7 +151,9 @@ export function BookDetailPage() {
         console.error('Error mapeando reserva a carrito:', mapErr);
       }
 
-      snackbar.success('Libro agregado al carrito y reserva creada correctamente');
+      snackbar.success(
+        'Libro agregado al carrito y reserva creada correctamente',
+      );
     } catch (submitError) {
       const message =
         submitError instanceof Error
@@ -157,7 +170,10 @@ export function BookDetailPage() {
       <div className="w-full px-4 py-10 sm:py-12">
         <div className="mx-auto max-w-3xl rounded-2xl border border-border bg-bg-secondary p-6">
           <p className="text-text">El identificador del libro no es valido.</p>
-          <Link to="/catalog" className="mt-4 inline-flex text-babyblue-700 hover:underline">
+          <Link
+            to="/catalog"
+            className="mt-4 inline-flex text-babyblue-700 hover:underline"
+          >
             Volver al catalogo
           </Link>
         </div>
@@ -184,8 +200,13 @@ export function BookDetailPage() {
     return (
       <div className="w-full px-4 py-10 sm:py-12">
         <div className="mx-auto max-w-3xl rounded-2xl border border-danger-300/60 bg-bg-secondary p-6">
-          <p className="text-danger-700">{error || 'No se pudo cargar este libro'}</p>
-          <Link to="/catalog" className="mt-4 inline-flex text-babyblue-700 hover:underline">
+          <p className="text-danger-700">
+            {error || 'No se pudo cargar este libro'}
+          </p>
+          <Link
+            to="/catalog"
+            className="mt-4 inline-flex text-babyblue-700 hover:underline"
+          >
             Volver al catalogo
           </Link>
         </div>
@@ -196,13 +217,17 @@ export function BookDetailPage() {
   return (
     <div className="w-full px-4 py-8 sm:py-10">
       <div className="mx-auto max-w-7xl space-y-6">
-        <Link to="/catalog" className="inline-flex text-sm font-medium text-babyblue-700 hover:underline">
+        <Link
+          to="/catalog"
+          className="inline-flex text-sm font-medium text-babyblue-700 hover:underline"
+        >
           ← Volver al catalogo
         </Link>
 
         {reservationExpiration && (
           <div className="rounded-2xl border border-emerald-300/60 bg-emerald-50 p-4 text-emerald-900">
-            Reserva confirmada. Expira el {formatExpiration(reservationExpiration)}.
+            Reserva confirmada. Expira el{' '}
+            {formatExpiration(reservationExpiration)}.
           </div>
         )}
 
@@ -227,26 +252,35 @@ export function BookDetailPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">
                 Ficha del libro
               </p>
-              <h1 className="mt-2 text-3xl font-bold text-text">{book.title}</h1>
+              <h1 className="mt-2 text-3xl font-bold text-text">
+                {book.title}
+              </h1>
               <p className="mt-1 text-sm text-text-muted">{book.author}</p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-xl border border-border bg-bg p-3">
                 <p className="text-xs text-text-muted">Precio</p>
-                <p className="text-xl font-semibold text-babyblue-700">${formatPrice(book.price)}</p>
+                <p className="text-xl font-semibold text-babyblue-700">
+                  ${formatPrice(book.price)}
+                </p>
               </div>
               <div className="rounded-xl border border-border bg-bg p-3">
                 <p className="text-xs text-text-muted">Disponibilidad total</p>
-                <p className="text-xl font-semibold text-text">{totalAvailable} ejemplares</p>
+                <p className="text-xl font-semibold text-text">
+                  {totalAvailable} ejemplares
+                </p>
                 <p className="mt-2 text-sm text-text-muted">
-                  Quedarán {remainingAvailable} unidades tras agregar {selectedQuantity}.
+                  Quedarán {remainingAvailable} unidades tras agregar{' '}
+                  {selectedQuantity}.
                 </p>
               </div>
             </div>
 
             {book.description && (
-              <p className="text-sm leading-6 text-text-muted">{book.description}</p>
+              <p className="text-sm leading-6 text-text-muted">
+                {book.description}
+              </p>
             )}
 
             {isClientAuthenticated && (
@@ -256,22 +290,29 @@ export function BookDetailPage() {
                     <button
                       type="button"
                       onClick={() => handleQuantityChange(selectedQuantity - 1)}
-                      disabled={selectedQuantity <= 1 || isSubmittingReservation}
+                      disabled={
+                        selectedQuantity <= 1 || isSubmittingReservation
+                      }
                       className="h-10 w-10 rounded-xl bg-bg text-lg font-semibold text-text transition hover:bg-border disabled:cursor-not-allowed disabled:opacity-40"
                       aria-label="Disminuir cantidad"
                     >
                       −
                     </button>
-                    <div className="min-w-[5rem] text-center">
+                    <div className="min-w-20 text-center">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted">
                         Cantidad
                       </p>
                       <input
                         type="number"
                         min={1}
-                        max={Math.max(1, Math.min(MAX_BOOK_QUANTITY, totalAvailable))}
+                        max={Math.max(
+                          1,
+                          Math.min(MAX_BOOK_QUANTITY, totalAvailable),
+                        )}
                         value={selectedQuantity}
-                        onChange={(e) => handleQuantityChange(Number(e.target.value))}
+                        onChange={(e) =>
+                          handleQuantityChange(Number(e.target.value))
+                        }
                         disabled={isSubmittingReservation}
                         className="mt-1 w-full border-0 bg-transparent text-center text-lg font-black text-text outline-none ring-0 [appearance:textfield] focus:ring-0"
                       />
@@ -280,7 +321,8 @@ export function BookDetailPage() {
                       type="button"
                       onClick={() => handleQuantityChange(selectedQuantity + 1)}
                       disabled={
-                        selectedQuantity >= Math.min(MAX_BOOK_QUANTITY, totalAvailable) ||
+                        selectedQuantity >=
+                          Math.min(MAX_BOOK_QUANTITY, totalAvailable) ||
                         isSubmittingReservation
                       }
                       className="h-10 w-10 rounded-xl bg-babyblue-600 text-lg font-semibold text-white transition hover:bg-babyblue-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -292,7 +334,10 @@ export function BookDetailPage() {
 
                   <div className="rounded-2xl border border-border bg-bg p-3 text-sm text-text-muted">
                     <p>Máximo {MAX_BOOK_QUANTITY} unidades por libro.</p>
-                    <p>{Math.min(MAX_BOOK_QUANTITY, totalAvailable)} disponibles para agregar.</p>
+                    <p>
+                      {Math.min(MAX_BOOK_QUANTITY, totalAvailable)} disponibles
+                      para agregar.
+                    </p>
                   </div>
                 </div>
 
@@ -302,7 +347,9 @@ export function BookDetailPage() {
                   onClick={() => setIsConfirmOpen(true)}
                   disabled={addToCartDisabled}
                 >
-                  {isSubmittingReservation ? 'Agregando al carrito...' : `Agregar ${selectedQuantity} al carrito`}
+                  {isSubmittingReservation
+                    ? 'Agregando al carrito...'
+                    : `Agregar ${selectedQuantity} al carrito`}
                 </button>
 
                 {quantityError && (
@@ -311,7 +358,8 @@ export function BookDetailPage() {
 
                 {(!book.isAvailable || totalAvailable <= 0) && (
                   <p className="text-sm text-danger-700">
-                    Este libro no se encuentra disponible para reserva en este momento.
+                    Este libro no se encuentra disponible para reserva en este
+                    momento.
                   </p>
                 )}
               </div>
@@ -320,7 +368,9 @@ export function BookDetailPage() {
         </section>
 
         <section className="rounded-3xl border border-border bg-bg-secondary p-5 shadow-sm sm:p-6">
-          <h2 className="text-xl font-semibold text-text">Disponibilidad por tienda</h2>
+          <h2 className="text-xl font-semibold text-text">
+            Disponibilidad por tienda
+          </h2>
           {book.inventoriesByStore.length === 0 ? (
             <p className="mt-3 text-sm text-text-muted">
               No hay inventario configurado para este libro.
@@ -337,9 +387,16 @@ export function BookDetailPage() {
                 </thead>
                 <tbody>
                   {book.inventoriesByStore.map((inventory) => (
-                    <tr key={inventory.storeId} className="border-b border-border/70">
-                      <td className="px-2 py-2 text-text">{inventory.storeName}</td>
-                      <td className="px-2 py-2 text-text-muted">{inventory.city}</td>
+                    <tr
+                      key={inventory.storeId}
+                      className="border-b border-border/70"
+                    >
+                      <td className="px-2 py-2 text-text">
+                        {inventory.storeName}
+                      </td>
+                      <td className="px-2 py-2 text-text-muted">
+                        {inventory.city}
+                      </td>
                       <td className="px-2 py-2 font-semibold text-text">
                         {inventory.availableQuantity}
                       </td>

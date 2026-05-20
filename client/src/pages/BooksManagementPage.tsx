@@ -2,7 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogTitle, DialogContent } from '@mui/material';
 import { AdminLayout } from '../Components/AdminLayout';
-import { DataTable, type DataTableColumn, type DataTableAction } from '../Components/DataTable';
+import {
+  DataTable,
+  type DataTableColumn,
+  type DataTableAction,
+} from '../Components/DataTable';
 import { ConfirmationModal } from '../Components/ConfirmationModal';
 import { useSnackbar } from '../Components/SnackbarProvider';
 import { getRoleFromToken, getAccessToken } from '../auth/session';
@@ -26,7 +30,7 @@ export function BooksManagementPage() {
   const navigate = useNavigate();
   const token = getAccessToken();
   const role = getRoleFromToken(token);
-  
+
   const { success, error } = useSnackbar();
   const [books, setBooks] = useState<Book[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -72,16 +76,18 @@ export function BooksManagementPage() {
     const fetchStores = async () => {
       try {
         const data = await getStores();
-        const mappedStores: Store[] = (data.items || data || []).map((store: any) => ({
-          storeId: store.storeId?.toString() || store.id?.toString() || '',
-          name: store.name,
-          address: store.address,
-          city: store.city,
-          latitude: store.latitude,
-          longitude: store.longitude,
-          capacity: store.capacity,
-          status: store.status || 'active',
-        }));
+        const mappedStores: Store[] = (data.items || data || []).map(
+          (store: any) => ({
+            storeId: store.storeId?.toString() || store.id?.toString() || '',
+            name: store.name,
+            address: store.address,
+            city: store.city,
+            latitude: store.latitude,
+            longitude: store.longitude,
+            capacity: store.capacity,
+            status: store.status || 'active',
+          }),
+        );
         setStores(mappedStores);
       } catch (err) {
         console.error('Error fetching stores:', err);
@@ -125,7 +131,6 @@ export function BooksManagementPage() {
 
     fetchBooks();
   }, [currentPage, error]);
-
 
   const handleSearch = async (query: string) => {
     if (!query) {
@@ -204,26 +209,27 @@ export function BooksManagementPage() {
     }
   };
 
-  const handleFormSubmit = async (data: {
-    title: string;
-    author: string;
-    publicationYear?: number;
-    publisher?: string;
-    isbn?: string;
-    language?: string;
-    pageCount?: number;
-    price: number;
-    condition?: 'new' | 'used';
-    isAvailable?: boolean;
-    description?: string;
-    coverUrl?: string;
-    previewUrl?: string;
-    categoryIds: number[];
-    initialInventoryQuantity?: number;
-  },
-  inventoryItems: { storeId: number; availableQuantity: number }[],
-  galleryFiles: File[],
-  coverFile: File | null,
+  const handleFormSubmit = async (
+    data: {
+      title: string;
+      author: string;
+      publicationYear?: number;
+      publisher?: string;
+      isbn?: string;
+      language?: string;
+      pageCount?: number;
+      price: number;
+      condition?: 'new' | 'used';
+      isAvailable?: boolean;
+      description?: string;
+      coverUrl?: string;
+      previewUrl?: string;
+      categoryIds: number[];
+      initialInventoryQuantity?: number;
+    },
+    inventoryItems: { storeId: number; availableQuantity: number }[],
+    galleryFiles: File[],
+    coverFile: File | null,
   ) => {
     try {
       setIsLoading(true);
@@ -236,7 +242,9 @@ export function BooksManagementPage() {
         success('Libro actualizado exitosamente');
       } else {
         const createdBook = await createBook(data);
-        const bookId = String(createdBook?.id ?? createdBook?.bookId ?? createdBook ?? '');
+        const bookId = String(
+          createdBook?.id ?? createdBook?.bookId ?? createdBook ?? '',
+        );
         if (!bookId) {
           throw new Error('No se pudo obtener el ID del libro creado');
         }

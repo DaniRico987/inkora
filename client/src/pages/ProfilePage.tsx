@@ -1,37 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from '../Components/Button';
 import { InputDate, InputSelect, InputText } from '../Components/Inputs';
 import { LocationPicker } from '../Components/LocationPicker';
 import { Spinner } from '../Components/Spinner';
 import { useSnackbar } from '../Components/SnackbarProvider';
 import {
-  createClientCard,
-  deleteClientCard,
   getClientProfile,
   updateClientProfile,
-  type ClientCardType,
   type ClientProfile,
 } from '../api/clients';
 import { getCategories, type Category } from '../api/categories';
-import { subscribeToCategory, unsubscribeFromCategory } from '../api/subscriptions';
-import { formatCardNumberInput, maskCardNumber, normalizeCardNumber } from '../utils/cardNumber';
+import {
+  subscribeToCategory,
+  unsubscribeFromCategory,
+} from '../api/subscriptions';
 import { validateDateValue } from '../utils/dateValidation';
 
 type ProfileSection = 'personal' | 'preferences' | 'cards';
-
-type CardFormState = {
-  number: string;
-  cardHolder: string;
-  expirationDate: string;
-  cardType: ClientCardType;
-};
-
-const initialCardForm: CardFormState = {
-  number: '',
-  cardHolder: '',
-  expirationDate: '',
-  cardType: 'credit',
-};
 
 function formatDate(isoDate: string): string {
   const date = new Date(isoDate);
@@ -49,14 +35,15 @@ function isBirthdayToday(isoDate: string): boolean {
 
 export function ProfilePage() {
   const snackbar = useSnackbar();
-  const [activeSection, setActiveSection] = useState<ProfileSection>('personal');
+  const [activeSection, setActiveSection] =
+    useState<ProfileSection>('personal');
   const [profile, setProfile] = useState<ClientProfile | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
-  const [savingCard, setSavingCard] = useState(false);
-  const [processingCategoryId, setProcessingCategoryId] = useState<number | null>(null);
-  const [deletingCardId, setDeletingCardId] = useState<number | null>(null);
+  const [processingCategoryId, setProcessingCategoryId] = useState<
+    number | null
+  >(null);
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -68,7 +55,6 @@ export function ProfilePage() {
     address: '',
     gender: '',
   });
-  const [cardForm, setCardForm] = useState<CardFormState>(initialCardForm);
 
   const loadData = async () => {
     try {
@@ -86,13 +72,16 @@ export function ProfilePage() {
         dni: profileResult.dni ?? '',
         email: profileResult.email ?? '',
         username: profileResult.username ?? '',
-        birthDate: profileResult.birthDate ? profileResult.birthDate.slice(0, 10) : '',
+        birthDate: profileResult.birthDate
+          ? profileResult.birthDate.slice(0, 10)
+          : '',
         birthPlace: profileResult.birthPlace ?? '',
         address: profileResult.address ?? '',
         gender: profileResult.gender ?? '',
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'No se pudo cargar tu perfil';
+      const message =
+        error instanceof Error ? error.message : 'No se pudo cargar tu perfil';
       snackbar.error(message);
     } finally {
       setLoading(false);
@@ -155,12 +144,19 @@ export function ProfilePage() {
       snackbar.warning('Ingresa un correo electrónico válido.');
       return;
     }
-    if (form.username && (form.username.length < 3 || form.username.length > 50)) {
-      snackbar.warning('El nombre de usuario debe tener entre 3 y 50 caracteres.');
+    if (
+      form.username &&
+      (form.username.length < 3 || form.username.length > 50)
+    ) {
+      snackbar.warning(
+        'El nombre de usuario debe tener entre 3 y 50 caracteres.',
+      );
       return;
     }
     if (form.username && !/^[a-zA-Z0-9_]+$/.test(form.username)) {
-      snackbar.warning('El nombre de usuario solo puede contener letras, números y guiones bajos.');
+      snackbar.warning(
+        'El nombre de usuario solo puede contener letras, números y guiones bajos.',
+      );
       return;
     }
 
@@ -179,7 +175,10 @@ export function ProfilePage() {
       setProfile(updated);
       snackbar.success('Datos personales actualizados');
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'No se pudo actualizar el perfil';
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'No se pudo actualizar el perfil';
       snackbar.error(message);
     } finally {
       setSavingProfile(false);
@@ -191,19 +190,21 @@ export function ProfilePage() {
 
     const isSubscribed = subscribedCategoryIds.has(categoryId);
     const previousSubscriptions = profile.subscriptions;
-    const categoryName = categories.find((category) => category.categoryId === categoryId)?.name ?? 'Categoría';
+    const categoryName =
+      categories.find((category) => category.categoryId === categoryId)?.name ??
+      'Categoría';
 
     const nextSubscriptions = isSubscribed
       ? previousSubscriptions.filter((sub) => sub.categoryId !== categoryId)
       : [
-        ...previousSubscriptions,
-        {
-          subscriptionId: -Date.now(),
-          categoryId,
-          categoryName,
-          subscribedAt: new Date().toISOString(),
-        },
-      ];
+          ...previousSubscriptions,
+          {
+            subscriptionId: -Date.now(),
+            categoryId,
+            categoryName,
+            subscribedAt: new Date().toISOString(),
+          },
+        ];
 
     setProfile({ ...profile, subscriptions: nextSubscriptions });
     setProcessingCategoryId(categoryId);
@@ -221,60 +222,13 @@ export function ProfilePage() {
       setProfile(refreshed);
     } catch (error) {
       setProfile({ ...profile, subscriptions: previousSubscriptions });
-      const message = error instanceof Error ? error.message : 'No se pudo actualizar la preferencia';
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'No se pudo actualizar la preferencia';
       snackbar.error(message);
     } finally {
       setProcessingCategoryId(null);
-    }
-  };
-
-  const handleAddCard = async () => {
-    if (normalizeCardNumber(cardForm.number).length !== 16) {
-      snackbar.warning('Ingresa un número de tarjeta válido');
-      return;
-    }
-
-    const expirationDateError = validateDateValue(cardForm.expirationDate, 'cardExpiration');
-    if (expirationDateError) {
-      snackbar.warning(expirationDateError);
-      return;
-    }
-
-    try {
-      setSavingCard(true);
-      const updated = await createClientCard({
-        maskedNumber: maskCardNumber(cardForm.number),
-        cardType: cardForm.cardType,
-        expirationDate: cardForm.expirationDate,
-        cardHolder: cardForm.cardHolder.trim(),
-      });
-      setProfile(updated);
-      setCardForm(initialCardForm);
-      snackbar.success('Tarjeta agregada correctamente');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'No se pudo agregar la tarjeta';
-      snackbar.error(message);
-    } finally {
-      setSavingCard(false);
-    }
-  };
-
-  const handleDeleteCard = async (cardId: number) => {
-    if (!profile) return;
-
-    const previousCards = profile.cards;
-    setProfile({ ...profile, cards: previousCards.filter((card) => card.cardId !== cardId) });
-    setDeletingCardId(cardId);
-
-    try {
-      await deleteClientCard(cardId);
-      snackbar.success('Tarjeta eliminada');
-    } catch (error) {
-      setProfile({ ...profile, cards: previousCards });
-      const message = error instanceof Error ? error.message : 'No se pudo eliminar la tarjeta';
-      snackbar.error(message);
-    } finally {
-      setDeletingCardId(null);
     }
   };
 
@@ -282,7 +236,12 @@ export function ProfilePage() {
     return (
       <div className="w-full px-4 py-12 sm:py-16">
         <div className="mx-auto flex min-h-[55vh] max-w-6xl items-center justify-center rounded-3xl border border-border bg-bg-secondary shadow-sm">
-          <Spinner size="lg" tone="calm" label="Cargando perfil..." fullScreen={false} />
+          <Spinner
+            size="lg"
+            tone="calm"
+            label="Cargando perfil..."
+            fullScreen={false}
+          />
         </div>
       </div>
     );
@@ -300,8 +259,12 @@ export function ProfilePage() {
     <div className="w-full px-4 py-8 sm:py-10">
       <div className="mx-auto max-w-7xl space-y-6">
         <header className="rounded-3xl border border-border bg-bg-secondary p-5 shadow-sm sm:p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Mi perfil</p>
-          <h1 className="mt-2 text-3xl font-bold text-text">Configuración de cuenta</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">
+            Mi perfil
+          </p>
+          <h1 className="mt-2 text-3xl font-bold text-text">
+            Configuración de cuenta
+          </h1>
         </header>
 
         {birthdayBanner && (
@@ -312,10 +275,15 @@ export function ProfilePage() {
                   Bono de cumpleaños activo
                 </div>
                 <div className="space-y-1">
-                  <h2 className="text-2xl font-bold text-text">Feliz cumpleaños, {profile.firstName}.</h2>
+                  <h2 className="text-2xl font-bold text-text">
+                    Feliz cumpleaños, {profile.firstName}.
+                  </h2>
                   <p className="max-w-2xl text-sm leading-6 text-text-muted">
-                    Tienes disponible un descuento del {birthdayBanner.discountPercentage}% con el código {birthdayBanner.code}.
-                    Puedes usarlo en tu próxima compra antes de que venza el {formatDate(birthdayBanner.expiresAt)}.
+                    Tienes disponible un descuento del{' '}
+                    {birthdayBanner.discountPercentage}% con el código{' '}
+                    {birthdayBanner.code}. Puedes usarlo en tu próxima compra
+                    antes de que venza el {formatDate(birthdayBanner.expiresAt)}
+                    .
                   </p>
                 </div>
               </div>
@@ -349,7 +317,9 @@ export function ProfilePage() {
               Datos personales
             </Button>
             <Button
-              variant={activeSection === 'preferences' ? 'primary' : 'secondary'}
+              variant={
+                activeSection === 'preferences' ? 'primary' : 'secondary'
+              }
               size="auto"
               className="rounded-full px-5 py-2 text-sm"
               onClick={() => setActiveSection('preferences')}
@@ -374,38 +344,56 @@ export function ProfilePage() {
                 label="Nombres"
                 value={form.firstName}
                 validationType="name"
-                onChange={(event) => setForm((prev) => ({ ...prev, firstName: event.target.value }))}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    firstName: event.target.value,
+                  }))
+                }
               />
               <InputText
                 label="Apellidos"
                 value={form.lastName}
                 validationType="name"
-                onChange={(event) => setForm((prev) => ({ ...prev, lastName: event.target.value }))}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, lastName: event.target.value }))
+                }
               />
               <InputText label="DNI" value={form.dni} disabled />
               <InputText
                 label="Correo"
                 value={form.email}
                 validationType="email"
-                onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, email: event.target.value }))
+                }
               />
               <InputText
                 label="Usuario"
                 value={form.username}
                 validationType="username"
-                onChange={(event) => setForm((prev) => ({ ...prev, username: event.target.value }))}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, username: event.target.value }))
+                }
               />
               <InputDate
                 label="Fecha de nacimiento"
                 value={form.birthDate}
                 dateValidationMode="birthDate"
-                onChange={(event) => setForm((prev) => ({ ...prev, birthDate: event.target.value }))}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    birthDate: event.target.value,
+                  }))
+                }
               />
               <div>
                 <LocationPicker
                   label="Lugar de nacimiento"
                   value={form.birthPlace}
-                  onChange={(birthPlace) => setForm((prev) => ({ ...prev, birthPlace }))}
+                  onChange={(birthPlace) =>
+                    setForm((prev) => ({ ...prev, birthPlace }))
+                  }
                 />
               </div>
               <InputSelect
@@ -418,14 +406,18 @@ export function ProfilePage() {
                   { value: 'other', label: 'Otro' },
                   { value: 'prefer_not_say', label: 'Prefiero no decir' },
                 ]}
-                onChange={(event) => setForm((prev) => ({ ...prev, gender: event.target.value }))}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, gender: event.target.value }))
+                }
               />
             </div>
             <InputText
               label="Dirección"
               value={form.address}
               validationType="address"
-              onChange={(event) => setForm((prev) => ({ ...prev, address: event.target.value }))}
+              onChange={(event) =>
+                setForm((prev) => ({ ...prev, address: event.target.value }))
+              }
             />
             <div className="flex justify-end">
               <Button
@@ -443,19 +435,31 @@ export function ProfilePage() {
 
         {activeSection === 'preferences' && (
           <section className="rounded-3xl border border-border bg-bg-secondary p-5 shadow-sm sm:p-6">
-            <h2 className="text-lg font-semibold text-text">Categorías literarias</h2>
+            <h2 className="text-lg font-semibold text-text">
+              Categorías literarias
+            </h2>
             <p className="mt-1 text-sm text-text-muted">
-              Activa o desactiva las categorías de las que quieres recibir novedades.
+              Activa o desactiva las categorías de las que quieres recibir
+              novedades.
             </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {categories.map((category) => {
-                const isSubscribed = subscribedCategoryIds.has(category.categoryId);
+                const isSubscribed = subscribedCategoryIds.has(
+                  category.categoryId,
+                );
                 const isBusy = processingCategoryId === category.categoryId;
                 return (
-                  <div key={category.categoryId} className="rounded-2xl border border-border bg-bg p-3">
-                    <p className="text-sm font-semibold text-text">{category.name}</p>
+                  <div
+                    key={category.categoryId}
+                    className="rounded-2xl border border-border bg-bg p-3"
+                  >
+                    <p className="text-sm font-semibold text-text">
+                      {category.name}
+                    </p>
                     {category.description && (
-                      <p className="mt-1 line-clamp-2 text-xs text-text-muted">{category.description}</p>
+                      <p className="mt-1 line-clamp-2 text-xs text-text-muted">
+                        {category.description}
+                      </p>
                     )}
                     <div className="mt-3">
                       <Button
@@ -463,7 +467,9 @@ export function ProfilePage() {
                         size="auto"
                         loading={isBusy}
                         className="rounded-full px-4 py-1.5 text-xs"
-                        onClick={() => handleToggleCategory(category.categoryId)}
+                        onClick={() =>
+                          handleToggleCategory(category.categoryId)
+                        }
                       >
                         {isSubscribed ? 'Suscrito' : 'Suscribirme'}
                       </Button>
@@ -476,87 +482,61 @@ export function ProfilePage() {
         )}
 
         {activeSection === 'cards' && (
-          <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.9fr)]">
-            <div className="rounded-3xl border border-border bg-bg-secondary p-5 shadow-sm sm:p-6">
-              <h2 className="text-lg font-semibold text-text">Tarjetas registradas</h2>
+          <section className="rounded-3xl border border-border bg-bg-secondary p-5 shadow-sm sm:p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-text">
+                  Tarjetas registradas
+                </h2>
+                <p className="mt-1 text-sm text-text-muted">
+                  Vista previa de tus tarjetas y acceso directo al monedero
+                  virtual.
+                </p>
+              </div>
+              <Link
+                to="/wallet"
+                className="sm:ml-auto inline-flex shrink-0 items-center justify-center rounded-full bg-primary-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-400/40"
+              >
+                Ir al monedero virtual
+              </Link>
+            </div>
+
+            <div className="mt-5 rounded-2xl border border-border bg-bg p-4">
+              <p className="text-sm font-semibold text-text">
+                {profile.cards.length} tarjeta
+                {profile.cards.length !== 1 ? 's' : ''} registrada
+                {profile.cards.length !== 1 ? 's' : ''}
+              </p>
+              <p className="mt-1 text-xs text-text-muted">
+                El saldo y las recargas se administran desde el monedero
+                virtual.
+              </p>
+
               {profile.cards.length === 0 ? (
-                <p className="mt-3 text-sm text-text-muted">No tienes tarjetas registradas.</p>
+                <p className="mt-4 text-sm text-text-muted">
+                  No tienes tarjetas registradas.
+                </p>
               ) : (
                 <div className="mt-4 space-y-3">
                   {profile.cards.map((card) => (
-                    <article key={card.cardId} className="rounded-2xl border border-border bg-bg p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-text">{card.maskedNumber}</p>
-                          <p className="mt-1 text-xs text-text-muted">
-                            {card.cardType === 'credit' ? 'Crédito' : 'Débito'} · Expira {formatDate(card.expirationDate)}
-                          </p>
-                          <p className="mt-1 text-xs text-text-muted">{card.cardHolder}</p>
-                        </div>
-                        <Button
-                          variant="destructive"
-                          size="auto"
-                          loading={deletingCardId === card.cardId}
-                          className="rounded-full px-3 py-1 text-xs"
-                          onClick={() => handleDeleteCard(card.cardId)}
-                        >
-                          Eliminar
-                        </Button>
-                      </div>
+                    <article
+                      key={card.cardId}
+                      className="rounded-2xl border border-border bg-bg-secondary p-4"
+                    >
+                      <p className="text-sm font-semibold text-text">
+                        {card.maskedNumber}
+                      </p>
+                      <p className="mt-1 text-xs text-text-muted">
+                        {card.cardType === 'credit' ? 'Crédito' : 'Débito'} ·
+                        Expira {formatDate(card.expirationDate)}
+                      </p>
+                      <p className="mt-1 text-xs text-text-muted">
+                        {card.cardHolder}
+                      </p>
                     </article>
                   ))}
                 </div>
               )}
-            </div>
-
-            <div className="rounded-3xl border border-border bg-bg-secondary p-5 shadow-sm sm:p-6">
-              <h2 className="text-lg font-semibold text-text">Agregar nueva tarjeta</h2>
-              <InputText
-                label="Número de tarjeta"
-                value={cardForm.number}
-                maxLength={19}
-                inputMode="numeric"
-                autoComplete="cc-number"
-                hideLabelOnFocus
-                onChange={(event) =>
-                  setCardForm((prev) => ({ ...prev, number: formatCardNumberInput(event.target.value) }))
-                }
-              />
-              <InputText
-                label="Titular"
-                value={cardForm.cardHolder}
-                validationType="name"
-                hideLabelOnFocus
-                onChange={(event) => setCardForm((prev) => ({ ...prev, cardHolder: event.target.value }))}
-              />
-              <InputDate
-                label="Fecha de expiración"
-                value={cardForm.expirationDate}
-                dateValidationMode="cardExpiration"
-                datePickerMode="monthYear"
-                hideLabelOnFocus
-                onChange={(event) => setCardForm((prev) => ({ ...prev, expirationDate: event.target.value }))}
-              />
-              <InputSelect
-                label="Tipo de tarjeta"
-                value={cardForm.cardType}
-                options={[
-                  { label: 'Crédito', value: 'credit' },
-                  { label: 'Débito', value: 'debit' },
-                ]}
-                onChange={(event) =>
-                  setCardForm((prev) => ({ ...prev, cardType: event.target.value as ClientCardType }))
-                }
-              />
-              <Button
-                variant="primary"
-                size="full"
-                loading={savingCard}
-                className="rounded-full py-2 text-sm"
-                onClick={handleAddCard}
-              >
-                Guardar tarjeta
-              </Button>
             </div>
           </section>
         )}

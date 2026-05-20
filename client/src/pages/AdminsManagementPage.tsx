@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AdminLayout } from '../Components/AdminLayout';
-import { DataTable, type DataTableColumn, type DataTableAction } from '../Components/DataTable';
+import {
+  DataTable,
+  type DataTableColumn,
+  type DataTableAction,
+} from '../Components/DataTable';
 import { useSnackbar } from '../Components/SnackbarProvider';
 import { ConfirmationModal } from '../Components/ConfirmationModal';
-import {
-  getAdmins,
-  deactivateAdmin,
-  activateAdmin,
-} from '../api/admin';
+import { getAdmins, deactivateAdmin, activateAdmin } from '../api/admin';
 import { getRoleFromToken, getAccessToken } from '../auth/session';
 import type { Admin } from '../interfaces/admin';
 import { StatusBadge } from '../Components/StatusBadge';
@@ -61,7 +61,7 @@ export function AdminsManagementPage() {
 
   const handleActionClick = (
     userId: number,
-    action: 'deactivate' | 'activate'
+    action: 'deactivate' | 'activate',
   ) => {
     setActionConfirm({ isOpen: true, userId, action });
   };
@@ -181,7 +181,9 @@ export function AdminsManagementPage() {
             ? '¿Estás seguro de que deseas desactivar este administrador? No podrá iniciar sesión.'
             : '¿Estás seguro de que deseas activar este administrador?'
         }
-        confirmText={actionConfirm.action === 'deactivate' ? 'Desactivar' : 'Activar'}
+        confirmText={
+          actionConfirm.action === 'deactivate' ? 'Desactivar' : 'Activar'
+        }
         cancelText="Cancelar"
         onConfirm={handleActionConfirm}
         onCancel={() => setActionConfirm({ isOpen: false })}

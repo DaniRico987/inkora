@@ -5,12 +5,20 @@ import { LocationPicker } from '../Components/LocationPicker';
 import { Spinner } from '../Components/Spinner';
 import { useSnackbar } from '../Components/SnackbarProvider';
 import { getClientProfile, type ClientCard } from '../api/clients';
-import { createPurchase, validateVoucherCode, type VoucherValidationResult } from '../api/purchases';
+import {
+  createPurchase,
+  validateVoucherCode,
+  type VoucherValidationResult,
+} from '../api/purchases';
 import { getAvailableStores, type AvailableStore } from '../api/stores';
 import { useCart } from '../hooks/useCart';
 import type { CartItem } from '../interfaces/CartInterface';
 import type { Purchase } from '../interfaces/PurchaseInterface';
-import { formatCardNumberInput, maskCardNumber, normalizeCardNumber } from '../utils/cardNumber';
+import {
+  formatCardNumberInput,
+  maskCardNumber,
+  normalizeCardNumber,
+} from '../utils/cardNumber';
 
 type CheckoutStep = 1 | 2 | 3 | 4;
 type PaymentChoice = 'registered' | 'new';
@@ -31,7 +39,15 @@ type PaymentFormState = {
   cvv: string;
 };
 
-type FieldErrors = Partial<Record<keyof AddressFormState | keyof PaymentFormState | 'pickupStoreId' | 'registeredCardId', string>>;
+type FieldErrors = Partial<
+  Record<
+    | keyof AddressFormState
+    | keyof PaymentFormState
+    | 'pickupStoreId'
+    | 'registeredCardId',
+    string
+  >
+>;
 
 type PickupStoreOption = {
   storeId: number;
@@ -50,7 +66,9 @@ type PickupStoreOption = {
   totalAvailableQuantity: number;
 };
 
-function groupCartItemsByBook(items: CartItem[]): Map<number, { title: string; quantity: number }> {
+function groupCartItemsByBook(
+  items: CartItem[],
+): Map<number, { title: string; quantity: number }> {
   const grouped = new Map<number, { title: string; quantity: number }>();
 
   for (const item of items) {
@@ -73,7 +91,15 @@ function buildPickupStoreOptions(
   const storeMap = new Map<
     number,
     {
-      store: Omit<PickupStoreOption, 'availableByBook' | 'isFullyAvailable' | 'coveredBooks' | 'totalBooks' | 'missingBooks' | 'totalAvailableQuantity'>;
+      store: Omit<
+        PickupStoreOption,
+        | 'availableByBook'
+        | 'isFullyAvailable'
+        | 'coveredBooks'
+        | 'totalBooks'
+        | 'missingBooks'
+        | 'totalAvailableQuantity'
+      >;
       availableByBook: Record<number, number>;
     }
   >();
@@ -88,8 +114,10 @@ function buildPickupStoreOptions(
             name: store.name,
             address: store.address,
             city: store.city,
-            latitude: typeof store.latitude === 'number' ? store.latitude : null,
-            longitude: typeof store.longitude === 'number' ? store.longitude : null,
+            latitude:
+              typeof store.latitude === 'number' ? store.latitude : null,
+            longitude:
+              typeof store.longitude === 'number' ? store.longitude : null,
             capacity: store.capacity ?? null,
             status: store.status,
           },
@@ -117,7 +145,9 @@ function buildPickupStoreOptions(
       }
 
       const shortage = requirement.quantity - availableQuantity;
-      missingBooks.push(`${requirement.title} (${shortage} faltante${shortage > 1 ? 's' : ''})`);
+      missingBooks.push(
+        `${requirement.title} (${shortage} faltante${shortage > 1 ? 's' : ''})`,
+      );
     }
 
     return {
@@ -168,17 +198,18 @@ const PAYMENT_METHODS: Array<{
   title: string;
   description: string;
 }> = [
-    {
-      value: 'registered',
-      title: 'Tarjeta registrada',
-      description: 'Usa el medio guardado para confirmar el pedido sin volver a cargar datos.',
-    },
-    {
-      value: 'new',
-      title: 'Nueva tarjeta',
-      description: 'Ingresa los datos de una tarjeta nueva para este checkout.',
-    },
-  ];
+  {
+    value: 'registered',
+    title: 'Tarjeta registrada',
+    description:
+      'Usa el medio guardado para confirmar el pedido sin volver a cargar datos.',
+  },
+  {
+    value: 'new',
+    title: 'Nueva tarjeta',
+    description: 'Ingresa los datos de una tarjeta nueva para este checkout.',
+  },
+];
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('es-AR', {
@@ -226,7 +257,10 @@ function getStepLabel(step: CheckoutStep): string {
   }
 }
 
-function getStepState(step: CheckoutStep, current: CheckoutStep): 'completed' | 'current' | 'pending' {
+function getStepState(
+  step: CheckoutStep,
+  current: CheckoutStep,
+): 'completed' | 'current' | 'pending' {
   if (step < current) return 'completed';
   if (step === current) return 'current';
   return 'pending';
@@ -247,7 +281,9 @@ function CheckoutStepper({ currentStep }: { currentStep: CheckoutStep }) {
             key={step}
             className={[
               'rounded-2xl border px-4 py-3 transition',
-              isCurrent ? 'border-babyblue-400 bg-babyblue-50/70 shadow-sm' : 'border-border bg-bg-secondary',
+              isCurrent
+                ? 'border-babyblue-400 bg-babyblue-50/70 shadow-sm'
+                : 'border-border bg-bg-secondary',
             ].join(' ')}
           >
             <div className="flex items-center gap-3">
@@ -267,7 +303,12 @@ function CheckoutStepper({ currentStep }: { currentStep: CheckoutStep }) {
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">
                   Paso {step}
                 </p>
-                <p className={['text-sm font-bold', isCurrent ? 'text-babyblue-700' : 'text-text'].join(' ')}>
+                <p
+                  className={[
+                    'text-sm font-bold',
+                    isCurrent ? 'text-babyblue-700' : 'text-text',
+                  ].join(' ')}
+                >
                   {getStepLabel(step)}
                 </p>
               </div>
@@ -283,14 +324,18 @@ function CartLine({ item }: { item: CartItem }) {
   return (
     <div className="flex flex-col gap-3 rounded-3xl border border-border bg-bg p-4 shadow-sm sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
-        <p className="truncate text-base font-semibold text-text">{item.title}</p>
+        <p className="truncate text-base font-semibold text-text">
+          {item.title}
+        </p>
         <p className="mt-1 text-sm text-text-muted">
           {item.author} · {item.quantity} x {formatCurrency(item.unitPrice)}
         </p>
       </div>
       <div className="text-left sm:text-right">
         <p className="text-sm text-text-muted">Subtotal</p>
-        <p className="text-lg font-bold text-text">{formatCurrency(item.subtotal)}</p>
+        <p className="text-lg font-bold text-text">
+          {formatCurrency(item.subtotal)}
+        </p>
       </div>
     </div>
   );
@@ -300,22 +345,36 @@ export function CheckoutPage() {
   const snackbar = useSnackbar();
   const { cart, loading: cartLoading, error: cartError, loadCart } = useCart();
   const [currentStep, setCurrentStep] = useState<CheckoutStep>(1);
-  const [addressForm, setAddressForm] = useState<AddressFormState>(initialAddressState);
-  const [deliveryMode, setDeliveryMode] = useState<DeliveryChoice>('homeDelivery');
+  const [addressForm, setAddressForm] =
+    useState<AddressFormState>(initialAddressState);
+  const [deliveryMode, setDeliveryMode] =
+    useState<DeliveryChoice>('homeDelivery');
   const [pickupStoreId, setPickupStoreId] = useState<number | null>(null);
   const [pickupStores, setPickupStores] = useState<PickupStoreOption[]>([]);
   const [pickupStoresLoading, setPickupStoresLoading] = useState(false);
-  const [pickupStoresError, setPickupStoresError] = useState<string | null>(null);
-  const [paymentChoice, setPaymentChoice] = useState<PaymentChoice>('registered');
+  const [pickupStoresError, setPickupStoresError] = useState<string | null>(
+    null,
+  );
+  const [paymentChoice, setPaymentChoice] =
+    useState<PaymentChoice>('registered');
   const [registeredCards, setRegisteredCards] = useState<ClientCard[]>([]);
   const [registeredCardsLoading, setRegisteredCardsLoading] = useState(false);
-  const [registeredCardsError, setRegisteredCardsError] = useState<string | null>(null);
-  const [selectedRegisteredCardId, setSelectedRegisteredCardId] = useState<number | null>(null);
-  const [paymentForm, setPaymentForm] = useState<PaymentFormState>(initialPaymentState);
+  const [registeredCardsError, setRegisteredCardsError] = useState<
+    string | null
+  >(null);
+  const [selectedRegisteredCardId, setSelectedRegisteredCardId] = useState<
+    number | null
+  >(null);
+  const [paymentForm, setPaymentForm] =
+    useState<PaymentFormState>(initialPaymentState);
   const [voucherCode, setVoucherCode] = useState('');
-  const [voucherValidation, setVoucherValidation] = useState<VoucherValidationResult | null>(null);
-  const [voucherValidationLoading, setVoucherValidationLoading] = useState(false);
-  const [voucherValidationError, setVoucherValidationError] = useState<string | null>(null);
+  const [voucherValidation, setVoucherValidation] =
+    useState<VoucherValidationResult | null>(null);
+  const [voucherValidationLoading, setVoucherValidationLoading] =
+    useState(false);
+  const [voucherValidationError, setVoucherValidationError] = useState<
+    string | null
+  >(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [purchase, setPurchase] = useState<Purchase | null>(null);
@@ -324,17 +383,29 @@ export function CheckoutPage() {
   const total = cart?.total ?? 0;
   const tax = cart?.tax ?? 0;
   const hasItems = cartItems.length > 0;
-  const shippingAddress = useMemo(() => composeShippingAddress(addressForm), [addressForm]);
+  const shippingAddress = useMemo(
+    () => composeShippingAddress(addressForm),
+    [addressForm],
+  );
   const selectedRegisteredCard = useMemo(
-    () => registeredCards.find((card) => card.cardId === selectedRegisteredCardId) ?? registeredCards[0] ?? null,
+    () =>
+      registeredCards.find(
+        (card) => card.cardId === selectedRegisteredCardId,
+      ) ??
+      registeredCards[0] ??
+      null,
     [registeredCards, selectedRegisteredCardId],
   );
-  const paymentMethodLabel = paymentChoice === 'registered'
-    ? selectedRegisteredCard
-      ? `Tarjeta registrada · ${selectedRegisteredCard.maskedNumber}`
-      : 'Tarjeta registrada'
-    : 'Nueva tarjeta';
-  const requiredByBook = useMemo(() => groupCartItemsByBook(cartItems), [cartItems]);
+  const paymentMethodLabel =
+    paymentChoice === 'registered'
+      ? selectedRegisteredCard
+        ? `Tarjeta registrada · ${selectedRegisteredCard.maskedNumber}`
+        : 'Tarjeta registrada'
+      : 'Nueva tarjeta';
+  const requiredByBook = useMemo(
+    () => groupCartItemsByBook(cartItems),
+    [cartItems],
+  );
   const selectedPickupStore = useMemo(
     () => pickupStores.find((store) => store.storeId === pickupStoreId) ?? null,
     [pickupStores, pickupStoreId],
@@ -365,7 +436,10 @@ export function CheckoutPage() {
         setRegisteredCards(profile.cards);
       } catch (error) {
         if (!cancelled) {
-          const message = error instanceof Error ? error.message : 'No se pudieron cargar tus tarjetas registradas';
+          const message =
+            error instanceof Error
+              ? error.message
+              : 'No se pudieron cargar tus tarjetas registradas';
           setRegisteredCardsError(message);
           setRegisteredCards([]);
         }
@@ -431,15 +505,25 @@ export function CheckoutPage() {
         setPickupStores(options);
 
         setPickupStoreId((current) => {
-          if (current && options.some((store) => store.storeId === current && store.isFullyAvailable)) {
+          if (
+            current &&
+            options.some(
+              (store) => store.storeId === current && store.isFullyAvailable,
+            )
+          ) {
             return current;
           }
 
-          return options.find((store) => store.isFullyAvailable)?.storeId ?? null;
+          return (
+            options.find((store) => store.isFullyAvailable)?.storeId ?? null
+          );
         });
       } catch (error) {
         if (!cancelled) {
-          const message = error instanceof Error ? error.message : 'No se pudieron cargar las tiendas disponibles';
+          const message =
+            error instanceof Error
+              ? error.message
+              : 'No se pudieron cargar las tiendas disponibles';
           setPickupStoresError(message);
           setPickupStores([]);
           setPickupStoreId(null);
@@ -468,7 +552,9 @@ export function CheckoutPage() {
     }
 
     const maskedNumber = maskCardNumber(paymentForm.cardNumber);
-    return maskedNumber ? `Tarjeta nueva · ${maskedNumber}` : 'Nueva tarjeta cargada manualmente.';
+    return maskedNumber
+      ? `Tarjeta nueva · ${maskedNumber}`
+      : 'Nueva tarjeta cargada manualmente.';
   }, [paymentChoice, paymentForm.cardNumber, selectedRegisteredCard]);
 
   const handleVoucherCodeChange = (value: string) => {
@@ -495,7 +581,10 @@ export function CheckoutPage() {
       setVoucherValidationError(null);
       snackbar.success('Voucher validado correctamente');
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'No se pudo validar el voucher';
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'No se pudo validar el voucher';
       setVoucherValidation(null);
       setVoucherValidationError(message);
       snackbar.error(message);
@@ -522,7 +611,10 @@ export function CheckoutPage() {
 
   const updatePaymentField = (field: keyof PaymentFormState, value: string) => {
     if (field === 'cardNumber') {
-      setPaymentForm((prev) => ({ ...prev, cardNumber: formatCardNumber(value) }));
+      setPaymentForm((prev) => ({
+        ...prev,
+        cardNumber: formatCardNumber(value),
+      }));
       return;
     }
 
@@ -534,7 +626,8 @@ export function CheckoutPage() {
 
     if (field === 'expiry') {
       const digits = value.replace(/\D/g, '').slice(0, 4);
-      const formatted = digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits;
+      const formatted =
+        digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits;
       setPaymentForm((prev) => ({ ...prev, expiry: formatted }));
       return;
     }
@@ -569,9 +662,11 @@ export function CheckoutPage() {
     const nextErrors: FieldErrors = {};
 
     if (!pickupStoreId) {
-      nextErrors.pickupStoreId = 'Selecciona una tienda con stock suficiente para continuar';
+      nextErrors.pickupStoreId =
+        'Selecciona una tienda con stock suficiente para continuar';
     } else if (!selectedPickupStore?.isFullyAvailable) {
-      nextErrors.pickupStoreId = 'La tienda seleccionada no cubre todo el carrito';
+      nextErrors.pickupStoreId =
+        'La tienda seleccionada no cubre todo el carrito';
     }
 
     setFieldErrors((prev) => ({ ...prev, ...nextErrors }));
@@ -619,7 +714,9 @@ export function CheckoutPage() {
         return;
       }
     } else if (!validatePickupStep()) {
-      snackbar.error('Selecciona una tienda con stock suficiente para continuar');
+      snackbar.error(
+        'Selecciona una tienda con stock suficiente para continuar',
+      );
       return;
     }
 
@@ -672,7 +769,10 @@ export function CheckoutPage() {
   };
 
   const submitPurchase = async () => {
-    const deliveryValid = deliveryMode === 'homeDelivery' ? validateAddressStep() : validatePickupStep();
+    const deliveryValid =
+      deliveryMode === 'homeDelivery'
+        ? validateAddressStep()
+        : validatePickupStep();
 
     if (!deliveryValid || !validatePaymentStep()) {
       snackbar.error('Revisa los campos antes de confirmar la compra');
@@ -683,8 +783,12 @@ export function CheckoutPage() {
     try {
       const createdPurchase = await createPurchase({
         deliveryMode,
-        pickupStoreId: deliveryMode === 'storePickup' ? pickupStoreId ?? undefined : undefined,
-        shippingAddress: deliveryMode === 'homeDelivery' ? shippingAddress : undefined,
+        pickupStoreId:
+          deliveryMode === 'storePickup'
+            ? (pickupStoreId ?? undefined)
+            : undefined,
+        shippingAddress:
+          deliveryMode === 'homeDelivery' ? shippingAddress : undefined,
         paymentMethod: paymentMethodLabel,
         voucherCode: voucherCode.trim() || undefined,
       });
@@ -698,9 +802,14 @@ export function CheckoutPage() {
       } catch {
         // noop
       }
-      snackbar.success(`Compra confirmada. Pedido #${createdPurchase.purchaseId}`);
+      snackbar.success(
+        `Compra confirmada. Pedido #${createdPurchase.purchaseId}`,
+      );
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'No se pudo confirmar la compra';
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'No se pudo confirmar la compra';
       snackbar.error(message);
     } finally {
       setIsSubmitting(false);
@@ -711,7 +820,12 @@ export function CheckoutPage() {
     return (
       <div className="w-full px-4 py-12 sm:py-16">
         <div className="mx-auto flex min-h-[60vh] max-w-5xl items-center justify-center rounded-4xl border border-border bg-bg-secondary shadow-sm">
-          <Spinner size="lg" tone="calm" label="Preparando tu checkout..." fullScreen={false} />
+          <Spinner
+            size="lg"
+            tone="calm"
+            label="Preparando tu checkout..."
+            fullScreen={false}
+          />
         </div>
       </div>
     );
@@ -724,8 +838,12 @@ export function CheckoutPage() {
           <div className="inline-flex rounded-full bg-danger-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-danger-700">
             Checkout no disponible
           </div>
-          <h1 className="mt-4 text-3xl font-bold text-text">No pudimos cargar tu carrito</h1>
-          <p className="mt-3 text-sm leading-6 text-text-muted sm:text-base">{cartError}</p>
+          <h1 className="mt-4 text-3xl font-bold text-text">
+            No pudimos cargar tu carrito
+          </h1>
+          <p className="mt-3 text-sm leading-6 text-text-muted sm:text-base">
+            {cartError}
+          </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <button
               type="button"
@@ -750,8 +868,12 @@ export function CheckoutPage() {
     return (
       <div className="w-full px-4 py-10 sm:py-12">
         <div className="mx-auto max-w-3xl rounded-4xl border border-border bg-bg-secondary p-8 shadow-sm sm:p-10">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-babyblue-700">Checkout</p>
-          <h1 className="mt-3 text-3xl font-bold text-text">Tu carrito está vacío</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-babyblue-700">
+            Checkout
+          </p>
+          <h1 className="mt-3 text-3xl font-bold text-text">
+            Tu carrito está vacío
+          </h1>
           <p className="mt-3 text-sm leading-6 text-text-muted">
             Agrega libros al carrito antes de iniciar el flujo de pago.
           </p>
@@ -788,7 +910,8 @@ export function CheckoutPage() {
                   Finaliza tu compra sin perder el contexto.
                 </h1>
                 <p className="max-w-2xl text-sm leading-6 text-text-muted sm:text-base">
-                  Revisa tu carrito, elige envío a domicilio o recogida en tienda, completa los datos y confirma la compra.
+                  Revisa tu carrito, elige envío a domicilio o recogida en
+                  tienda, completa los datos y confirma la compra.
                 </p>
               </div>
 
@@ -797,11 +920,15 @@ export function CheckoutPage() {
 
             <div className="border-t border-border bg-bg-secondary p-6 sm:p-8 lg:border-l lg:border-t-0">
               <div className="rounded-[1.75rem] border border-border bg-bg p-5 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Resumen rápido</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">
+                  Resumen rápido
+                </p>
                 <div className="mt-4 space-y-3 text-sm text-text-muted">
                   <div className="flex items-center justify-between gap-4">
                     <span>Subtotal</span>
-                    <strong className="text-text">{formatCurrency(subtotal)}</strong>
+                    <strong className="text-text">
+                      {formatCurrency(subtotal)}
+                    </strong>
                   </div>
                   {voucherValidation && (
                     <div className="flex items-center justify-between gap-4 text-emerald-700">
@@ -815,8 +942,12 @@ export function CheckoutPage() {
                   </div>
                   <div className="h-px bg-border" />
                   <div className="flex items-center justify-between gap-4">
-                    <span className="text-base font-semibold text-text-muted">Total estimado</span>
-                    <strong className="text-2xl font-black text-metallicgold-700">{formatCurrency(estimatedTotal)}</strong>
+                    <span className="text-base font-semibold text-text-muted">
+                      Total estimado
+                    </span>
+                    <strong className="text-2xl font-black text-metallicgold-700">
+                      {formatCurrency(estimatedTotal)}
+                    </strong>
                   </div>
                 </div>
               </div>
@@ -830,15 +961,24 @@ export function CheckoutPage() {
               <section className="rounded-4xl border border-border bg-bg-secondary p-6 shadow-sm sm:p-8">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Paso 1</p>
-                    <h2 className="mt-2 text-2xl font-bold text-text">Resumen del carrito</h2>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">
+                      Paso 1
+                    </p>
+                    <h2 className="mt-2 text-2xl font-bold text-text">
+                      Resumen del carrito
+                    </h2>
                     <p className="mt-2 text-sm leading-6 text-text-muted">
-                      Verifica que el contenido y los importes sean correctos antes de avanzar.
+                      Verifica que el contenido y los importes sean correctos
+                      antes de avanzar.
                     </p>
                   </div>
                   <div className="rounded-2xl border border-border bg-bg px-4 py-3 text-left sm:text-right">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-text-muted">Items</p>
-                    <p className="text-2xl font-black text-text">{cart?.itemCount ?? 0}</p>
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-text-muted">
+                      Items
+                    </p>
+                    <p className="text-2xl font-black text-text">
+                      {cart?.itemCount ?? 0}
+                    </p>
                   </div>
                 </div>
 
@@ -850,27 +990,43 @@ export function CheckoutPage() {
 
                 <div className="mt-6 grid gap-4 rounded-3xl border border-border bg-bg p-5 sm:grid-cols-3">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Subtotal</p>
-                    <p className="mt-2 text-xl font-bold text-text">{formatCurrency(subtotal)}</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">
+                      Subtotal
+                    </p>
+                    <p className="mt-2 text-xl font-bold text-text">
+                      {formatCurrency(subtotal)}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Impuestos</p>
-                    <p className="mt-2 text-xl font-bold text-text">{formatCurrency(tax)}</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">
+                      Impuestos
+                    </p>
+                    <p className="mt-2 text-xl font-bold text-text">
+                      {formatCurrency(tax)}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Total estimado</p>
-                    <p className="mt-2 text-2xl font-black text-metallicgold-700">{formatCurrency(estimatedTotal)}</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">
+                      Total estimado
+                    </p>
+                    <p className="mt-2 text-2xl font-black text-metallicgold-700">
+                      {formatCurrency(estimatedTotal)}
+                    </p>
                   </div>
                 </div>
 
                 <div className="mt-6 rounded-3xl border border-border bg-bg p-5">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Voucher</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">
+                    Voucher
+                  </p>
                   <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-end">
                     <div className="min-w-0 flex-1">
                       <InputText
                         label="Código de voucher"
                         value={voucherCode}
-                        onChange={(event) => handleVoucherCodeChange(event.target.value)}
+                        onChange={(event) =>
+                          handleVoucherCodeChange(event.target.value)
+                        }
                         maxLength={100}
                         autoComplete="off"
                         placeholder="Ingresa tu código"
@@ -882,18 +1038,27 @@ export function CheckoutPage() {
                       disabled={voucherValidationLoading}
                       className="inline-flex items-center justify-center rounded-full border border-babyblue-300 bg-babyblue-600 px-5 py-3 font-semibold text-white transition hover:bg-babyblue-700 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {voucherValidationLoading ? 'Validando...' : 'Aplicar voucher'}
+                      {voucherValidationLoading
+                        ? 'Validando...'
+                        : 'Aplicar voucher'}
                     </button>
                   </div>
-                  {voucherValidationError && <p className="mt-3 text-sm text-red-600">{voucherValidationError}</p>}
+                  {voucherValidationError && (
+                    <p className="mt-3 text-sm text-red-600">
+                      {voucherValidationError}
+                    </p>
+                  )}
                   {voucherValidation && (
                     <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
                       <p className="font-semibold">Voucher aplicado</p>
                       <p className="mt-1 leading-6">
-                        Código {voucherValidation.code} · {voucherValidation.discountPercentage}% de descuento · vence el {formatDate(voucherValidation.expiresAt)}
+                        Código {voucherValidation.code} ·{' '}
+                        {voucherValidation.discountPercentage}% de descuento ·
+                        vence el {formatDate(voucherValidation.expiresAt)}
                       </p>
                       <p className="mt-1 leading-6">
-                        Descuento estimado: {formatCurrency(voucherDiscountAmount)}
+                        Descuento estimado:{' '}
+                        {formatCurrency(voucherDiscountAmount)}
                       </p>
                     </div>
                   )}
@@ -919,25 +1084,32 @@ export function CheckoutPage() {
 
             {currentStep === 2 && (
               <section className="rounded-4xl border border-border bg-bg-secondary p-6 shadow-sm sm:p-8">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Paso 2</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">
+                  Paso 2
+                </p>
                 <h2 className="mt-2 text-2xl font-bold text-text">Entrega</h2>
                 <p className="mt-2 text-sm leading-6 text-text-muted">
-                  Elige envío a domicilio o recogida en tienda antes de pasar al pago.
+                  Elige envío a domicilio o recogida en tienda antes de pasar al
+                  pago.
                 </p>
 
                 <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                  {([
-                    {
-                      value: 'homeDelivery',
-                      title: 'Envío a domicilio',
-                      description: 'Recibe el pedido en la dirección que cargues en el checkout.',
-                    },
-                    {
-                      value: 'storePickup',
-                      title: 'Recoger en tienda',
-                      description: 'Retira tu compra en una sucursal con stock disponible.',
-                    },
-                  ] as const).map((option) => {
+                  {(
+                    [
+                      {
+                        value: 'homeDelivery',
+                        title: 'Envío a domicilio',
+                        description:
+                          'Recibe el pedido en la dirección que cargues en el checkout.',
+                      },
+                      {
+                        value: 'storePickup',
+                        title: 'Recoger en tienda',
+                        description:
+                          'Retira tu compra en una sucursal con stock disponible.',
+                      },
+                    ] as const
+                  ).map((option) => {
                     const isActive = deliveryMode === option.value;
 
                     return (
@@ -956,15 +1128,23 @@ export function CheckoutPage() {
                           <span
                             className={[
                               'mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2',
-                              isActive ? 'border-babyblue-600 bg-babyblue-600' : 'border-border bg-bg',
+                              isActive
+                                ? 'border-babyblue-600 bg-babyblue-600'
+                                : 'border-border bg-bg',
                             ].join(' ')}
                             aria-hidden="true"
                           >
-                            {isActive && <span className="h-2.5 w-2.5 rounded-full bg-white" />}
+                            {isActive && (
+                              <span className="h-2.5 w-2.5 rounded-full bg-white" />
+                            )}
                           </span>
                           <div>
-                            <p className="text-base font-bold text-text">{option.title}</p>
-                            <p className="mt-1 text-sm leading-6 text-text-muted">{option.description}</p>
+                            <p className="text-base font-bold text-text">
+                              {option.title}
+                            </p>
+                            <p className="mt-1 text-sm leading-6 text-text-muted">
+                              {option.description}
+                            </p>
                           </div>
                         </div>
                       </button>
@@ -979,31 +1159,45 @@ export function CheckoutPage() {
                         <InputText
                           label="Nombre y apellido del destinatario"
                           value={addressForm.fullName}
-                          onChange={(event) => updateAddressField('fullName', event.target.value)}
+                          onChange={(event) =>
+                            updateAddressField('fullName', event.target.value)
+                          }
                           autoComplete="name"
                           maxLength={80}
                           required
                         />
-                        {fieldErrors.fullName && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.fullName}</p>}
+                        {fieldErrors.fullName && (
+                          <p className="-mt-3 mb-3 text-sm text-red-600">
+                            {fieldErrors.fullName}
+                          </p>
+                        )}
                       </div>
 
                       <div className="sm:col-span-2">
                         <InputText
                           label="Dirección de entrega"
                           value={addressForm.street}
-                          onChange={(event) => updateAddressField('street', event.target.value)}
+                          onChange={(event) =>
+                            updateAddressField('street', event.target.value)
+                          }
                           autoComplete="street-address"
                           maxLength={120}
                           required
                         />
-                        {fieldErrors.street && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.street}</p>}
+                        {fieldErrors.street && (
+                          <p className="-mt-3 mb-3 text-sm text-red-600">
+                            {fieldErrors.street}
+                          </p>
+                        )}
                       </div>
 
                       <div className="sm:col-span-2">
                         <LocationPicker
                           label="Ubicación"
                           value={addressForm.location}
-                          onChange={(location) => updateAddressField('location', location)}
+                          onChange={(location) =>
+                            updateAddressField('location', location)
+                          }
                           error={fieldErrors.location}
                         />
                       </div>
@@ -1012,43 +1206,64 @@ export function CheckoutPage() {
                         <InputText
                           label="Código postal"
                           value={addressForm.postalCode}
-                          onChange={(event) => updateAddressField('postalCode', event.target.value)}
+                          onChange={(event) =>
+                            updateAddressField('postalCode', event.target.value)
+                          }
                           autoComplete="postal-code"
                           maxLength={5}
                           inputMode="numeric"
                           required
                         />
-                        {fieldErrors.postalCode && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.postalCode}</p>}
+                        {fieldErrors.postalCode && (
+                          <p className="-mt-3 mb-3 text-sm text-red-600">
+                            {fieldErrors.postalCode}
+                          </p>
+                        )}
                       </div>
 
                       <div className="sm:col-span-2">
                         <InputTextarea
                           label="Indicaciones opcionales"
                           value={addressForm.notes}
-                          onChange={(event) => updateAddressField('notes', event.target.value)}
+                          onChange={(event) =>
+                            updateAddressField('notes', event.target.value)
+                          }
                           maxLength={255}
                         />
                       </div>
                     </div>
 
                     <div className="mt-4 rounded-2xl border border-border bg-bg p-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Vista previa</p>
-                      <p className="mt-2 text-sm leading-6 text-text">{shippingAddress || 'Completa los campos para ver la dirección formateada.'}</p>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">
+                        Vista previa
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-text">
+                        {shippingAddress ||
+                          'Completa los campos para ver la dirección formateada.'}
+                      </p>
                     </div>
                   </>
                 ) : (
                   <div className="mt-6 space-y-4">
                     <div className="rounded-3xl border border-babyblue-200 bg-babyblue-50/70 p-4 text-sm text-babyblue-900">
-                      <p className="font-semibold">Selecciona una tienda con stock suficiente</p>
+                      <p className="font-semibold">
+                        Selecciona una tienda con stock suficiente
+                      </p>
                       <p className="mt-1 leading-6">
-                        Solo podrás confirmar la compra en una sucursal que cubra todo el carrito. Si no hay una opción válida,
-                        te sugerimos cambiar a envío a domicilio.
+                        Solo podrás confirmar la compra en una sucursal que
+                        cubra todo el carrito. Si no hay una opción válida, te
+                        sugerimos cambiar a envío a domicilio.
                       </p>
                     </div>
 
                     {pickupStoresLoading ? (
                       <div className="rounded-3xl border border-border bg-bg p-6">
-                        <Spinner size="md" tone="calm" label="Buscando tiendas disponibles..." fullScreen={false} />
+                        <Spinner
+                          size="md"
+                          tone="calm"
+                          label="Buscando tiendas disponibles..."
+                          fullScreen={false}
+                        />
                       </div>
                     ) : pickupStoresError ? (
                       <div className="rounded-3xl border border-danger-200 bg-danger-50 p-4 text-sm text-danger-800">
@@ -1056,19 +1271,25 @@ export function CheckoutPage() {
                       </div>
                     ) : pickupStores.length === 0 ? (
                       <div className="rounded-3xl border border-border bg-bg p-5 text-sm text-text-muted">
-                        No encontramos tiendas con stock para recoger este carrito. Puedes continuar con envío a domicilio.
+                        No encontramos tiendas con stock para recoger este
+                        carrito. Puedes continuar con envío a domicilio.
                       </div>
                     ) : (
                       <>
-                        {pickupStores.some((store) => !store.isFullyAvailable) && (
+                        {pickupStores.some(
+                          (store) => !store.isFullyAvailable,
+                        ) && (
                           <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                            Algunas tiendas tienen stock parcial. Las marcadas en rojo no cubren todo el carrito y no se pueden seleccionar.
+                            Algunas tiendas tienen stock parcial. Las marcadas
+                            en rojo no cubren todo el carrito y no se pueden
+                            seleccionar.
                           </div>
                         )}
 
                         <div className="grid gap-3 lg:grid-cols-2">
                           {pickupStores.map((store) => {
-                            const isSelected = selectedPickupStore?.storeId === store.storeId;
+                            const isSelected =
+                              selectedPickupStore?.storeId === store.storeId;
                             const isSelectable = store.isFullyAvailable;
 
                             return (
@@ -1091,34 +1312,48 @@ export function CheckoutPage() {
                               >
                                 <div className="flex items-start justify-between gap-3">
                                   <div>
-                                    <p className="text-base font-bold text-text">{store.name}</p>
-                                    <p className="mt-1 text-sm text-text-muted">{store.address}</p>
-                                    <p className="text-sm text-text-muted">{store.city}</p>
+                                    <p className="text-base font-bold text-text">
+                                      {store.name}
+                                    </p>
+                                    <p className="mt-1 text-sm text-text-muted">
+                                      {store.address}
+                                    </p>
+                                    <p className="text-sm text-text-muted">
+                                      {store.city}
+                                    </p>
                                   </div>
                                   <span
                                     className={[
                                       'rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]',
-                                      isSelectable ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700',
+                                      isSelectable
+                                        ? 'bg-emerald-100 text-emerald-700'
+                                        : 'bg-red-100 text-red-700',
                                     ].join(' ')}
                                   >
-                                    {isSelectable ? 'Disponible' : 'Sin stock suficiente'}
+                                    {isSelectable
+                                      ? 'Disponible'
+                                      : 'Sin stock suficiente'}
                                   </span>
                                 </div>
 
                                 <div className="mt-4 flex flex-wrap gap-2 text-xs">
                                   <span className="rounded-full bg-bg px-3 py-1 text-text-muted">
-                                    {store.coveredBooks}/{store.totalBooks} libros cubiertos
+                                    {store.coveredBooks}/{store.totalBooks}{' '}
+                                    libros cubiertos
                                   </span>
                                   <span className="rounded-full bg-bg px-3 py-1 text-text-muted">
-                                    {store.totalAvailableQuantity} unidades disponibles
+                                    {store.totalAvailableQuantity} unidades
+                                    disponibles
                                   </span>
                                 </div>
 
-                                {!isSelectable && store.missingBooks.length > 0 && (
-                                  <div className="mt-4 rounded-2xl border border-red-200 bg-white/80 p-3 text-sm text-red-700">
-                                    Falta stock para: {store.missingBooks.join(', ')}
-                                  </div>
-                                )}
+                                {!isSelectable &&
+                                  store.missingBooks.length > 0 && (
+                                    <div className="mt-4 rounded-2xl border border-red-200 bg-white/80 p-3 text-sm text-red-700">
+                                      Falta stock para:{' '}
+                                      {store.missingBooks.join(', ')}
+                                    </div>
+                                  )}
                               </button>
                             );
                           })}
@@ -1126,11 +1361,17 @@ export function CheckoutPage() {
 
                         {!fullyAvailablePickupStores.length && (
                           <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                            No hay ninguna tienda que cubra todo el carrito. Te sugerimos cambiar a envío a domicilio para continuar.
+                            No hay ninguna tienda que cubra todo el carrito. Te
+                            sugerimos cambiar a envío a domicilio para
+                            continuar.
                           </div>
                         )}
 
-                        {fieldErrors.pickupStoreId && <p className="text-sm text-red-600">{fieldErrors.pickupStoreId}</p>}
+                        {fieldErrors.pickupStoreId && (
+                          <p className="text-sm text-red-600">
+                            {fieldErrors.pickupStoreId}
+                          </p>
+                        )}
                       </>
                     )}
                   </div>
@@ -1157,10 +1398,15 @@ export function CheckoutPage() {
 
             {currentStep === 3 && (
               <section className="rounded-4xl border border-border bg-bg-secondary p-6 shadow-sm sm:p-8">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Paso 3</p>
-                <h2 className="mt-2 text-2xl font-bold text-text">Método de pago</h2>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">
+                  Paso 3
+                </p>
+                <h2 className="mt-2 text-2xl font-bold text-text">
+                  Método de pago
+                </h2>
                 <p className="mt-2 text-sm leading-6 text-text-muted">
-                  Elige si usarás una tarjeta registrada o si vas a cargar una nueva tarjeta para este pedido.
+                  Elige si usarás una tarjeta registrada o si vas a cargar una
+                  nueva tarjeta para este pedido.
                 </p>
 
                 {registeredCardsError && (
@@ -1173,7 +1419,9 @@ export function CheckoutPage() {
                   {PAYMENT_METHODS.map((method) => {
                     const isActive = paymentChoice === method.value;
                     const isRegisteredMethod = method.value === 'registered';
-                    const isDisabled = isRegisteredMethod && (registeredCardsLoading || !registeredCards.length);
+                    const isDisabled =
+                      isRegisteredMethod &&
+                      (registeredCardsLoading || !registeredCards.length);
 
                     return (
                       <button
@@ -1199,11 +1447,17 @@ export function CheckoutPage() {
                             ].join(' ')}
                             aria-hidden="true"
                           >
-                            {isActive && <span className="h-2.5 w-2.5 rounded-full bg-white" />}
+                            {isActive && (
+                              <span className="h-2.5 w-2.5 rounded-full bg-white" />
+                            )}
                           </span>
                           <div>
-                            <p className="text-base font-bold text-text">{method.title}</p>
-                            <p className="mt-1 text-sm leading-6 text-text-muted">{method.description}</p>
+                            <p className="text-base font-bold text-text">
+                              {method.title}
+                            </p>
+                            <p className="mt-1 text-sm leading-6 text-text-muted">
+                              {method.description}
+                            </p>
                             {isRegisteredMethod && (
                               <p className="mt-2 text-xs font-medium text-text-muted">
                                 {registeredCardsLoading
@@ -1226,51 +1480,75 @@ export function CheckoutPage() {
                       <InputText
                         label="Titular de la tarjeta"
                         value={paymentForm.cardholder}
-                        onChange={(event) => updatePaymentField('cardholder', event.target.value)}
+                        onChange={(event) =>
+                          updatePaymentField('cardholder', event.target.value)
+                        }
                         autoComplete="cc-name"
                         maxLength={80}
                         required
                       />
-                      {fieldErrors.cardholder && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.cardholder}</p>}
+                      {fieldErrors.cardholder && (
+                        <p className="-mt-3 mb-3 text-sm text-red-600">
+                          {fieldErrors.cardholder}
+                        </p>
+                      )}
                     </div>
 
                     <div className="sm:col-span-2">
                       <InputText
                         label="Número de tarjeta"
                         value={paymentForm.cardNumber}
-                        onChange={(event) => updatePaymentField('cardNumber', event.target.value)}
+                        onChange={(event) =>
+                          updatePaymentField('cardNumber', event.target.value)
+                        }
                         autoComplete="cc-number"
                         maxLength={19}
                         inputMode="numeric"
                         required
                       />
-                      {fieldErrors.cardNumber && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.cardNumber}</p>}
+                      {fieldErrors.cardNumber && (
+                        <p className="-mt-3 mb-3 text-sm text-red-600">
+                          {fieldErrors.cardNumber}
+                        </p>
+                      )}
                     </div>
 
                     <div>
                       <InputText
                         label="Vencimiento"
                         value={paymentForm.expiry}
-                        onChange={(event) => updatePaymentField('expiry', event.target.value)}
+                        onChange={(event) =>
+                          updatePaymentField('expiry', event.target.value)
+                        }
                         placeholder="MM/AA"
                         autoComplete="cc-exp"
                         maxLength={5}
                         required
                       />
-                      {fieldErrors.expiry && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.expiry}</p>}
+                      {fieldErrors.expiry && (
+                        <p className="-mt-3 mb-3 text-sm text-red-600">
+                          {fieldErrors.expiry}
+                        </p>
+                      )}
                     </div>
 
                     <div>
                       <InputText
                         label="CVV"
                         value={paymentForm.cvv}
-                        onChange={(event) => updatePaymentField('cvv', event.target.value)}
+                        onChange={(event) =>
+                          updatePaymentField('cvv', event.target.value)
+                        }
                         autoComplete="cc-csc"
                         maxLength={4}
                         inputMode="numeric"
                         required
                       />
-                      {fieldErrors.cvv && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.cvv}</p>}
+                      {fieldErrors.cvv && (
+                        <p className="-mt-3 mb-3 text-sm text-red-600">
+                          {fieldErrors.cvv}
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1283,17 +1561,21 @@ export function CheckoutPage() {
                       </div>
                     ) : registeredCards.length === 0 ? (
                       <div className="rounded-3xl border border-border bg-bg p-5 text-sm text-text-muted">
-                        No tienes tarjetas registradas. Puedes agregarlas desde tu perfil.
+                        No tienes tarjetas registradas. Puedes agregarlas desde
+                        tu perfil.
                       </div>
                     ) : (
                       registeredCards.map((card) => {
-                        const isSelected = selectedRegisteredCardId === card.cardId;
+                        const isSelected =
+                          selectedRegisteredCardId === card.cardId;
 
                         return (
                           <button
                             key={card.cardId}
                             type="button"
-                            onClick={() => setSelectedRegisteredCardId(card.cardId)}
+                            onClick={() =>
+                              setSelectedRegisteredCardId(card.cardId)
+                            }
                             className={[
                               'w-full rounded-3xl border p-4 text-left transition',
                               isSelected
@@ -1305,32 +1587,53 @@ export function CheckoutPage() {
                               <span
                                 className={[
                                   'mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2',
-                                  isSelected ? 'border-emerald-600 bg-emerald-600' : 'border-border bg-bg',
+                                  isSelected
+                                    ? 'border-emerald-600 bg-emerald-600'
+                                    : 'border-border bg-bg',
                                 ].join(' ')}
                                 aria-hidden="true"
                               >
-                                {isSelected && <span className="h-2.5 w-2.5 rounded-full bg-white" />}
+                                {isSelected && (
+                                  <span className="h-2.5 w-2.5 rounded-full bg-white" />
+                                )}
                               </span>
                               <div className="min-w-0">
-                                <p className="text-base font-bold text-text">{card.maskedNumber}</p>
-                                <p className="mt-1 text-sm text-text-muted">
-                                  {card.cardType === 'credit' ? 'Crédito' : 'Débito'} · Expira {formatDate(card.expirationDate)}
+                                <p className="text-base font-bold text-text">
+                                  {card.maskedNumber}
                                 </p>
-                                <p className="mt-1 text-sm text-text-muted">{card.cardHolder}</p>
+                                <p className="mt-1 text-sm text-text-muted">
+                                  {card.cardType === 'credit'
+                                    ? 'Crédito'
+                                    : 'Débito'}{' '}
+                                  · Expira {formatDate(card.expirationDate)}
+                                </p>
+                                <p className="mt-1 text-sm text-text-muted">
+                                  {card.cardHolder}
+                                </p>
                               </div>
                             </div>
                           </button>
                         );
                       })
                     )}
-                    {fieldErrors.registeredCardId && <p className="text-sm text-red-600">{fieldErrors.registeredCardId}</p>}
+                    {fieldErrors.registeredCardId && (
+                      <p className="text-sm text-red-600">
+                        {fieldErrors.registeredCardId}
+                      </p>
+                    )}
                   </div>
                 )}
 
                 <div className="mt-6 rounded-3xl border border-border bg-bg p-5">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Método seleccionado</p>
-                  <p className="mt-2 text-sm font-semibold text-text">{paymentMethodLabel}</p>
-                  <p className="mt-1 text-sm leading-6 text-text-muted">{paymentSummary}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">
+                    Método seleccionado
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-text">
+                    {paymentMethodLabel}
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-text-muted">
+                    {paymentSummary}
+                  </p>
                 </div>
 
                 <div className="mt-6 flex flex-col gap-3 sm:flex-row">
@@ -1355,33 +1658,54 @@ export function CheckoutPage() {
 
             {currentStep === 4 && purchase && (
               <section className="overflow-hidden rounded-4xl border border-emerald-300/70 bg-emerald-50 p-6 shadow-sm sm:p-8">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Paso 4</p>
-                <h2 className="mt-3 text-3xl font-black text-emerald-900">Compra confirmada</h2>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
+                  Paso 4
+                </p>
+                <h2 className="mt-3 text-3xl font-black text-emerald-900">
+                  Compra confirmada
+                </h2>
                 <p className="mt-3 max-w-2xl text-sm leading-6 text-emerald-800 sm:text-base">
-                  Tu pedido se procesó correctamente y recibirás la factura por correo.
+                  Tu pedido se procesó correctamente y recibirás la factura por
+                  correo.
                 </p>
 
                 <div className="mt-6 grid gap-4 sm:grid-cols-3">
                   <div className="rounded-3xl border border-emerald-200 bg-white/70 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Número de pedido</p>
-                    <p className="mt-2 text-2xl font-black text-emerald-900">#{purchase.purchaseId}</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+                      Número de pedido
+                    </p>
+                    <p className="mt-2 text-2xl font-black text-emerald-900">
+                      #{purchase.purchaseId}
+                    </p>
                   </div>
                   <div className="rounded-3xl border border-emerald-200 bg-white/70 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Total abonado</p>
-                    <p className="mt-2 text-2xl font-black text-emerald-900">{formatCurrency(purchase.totalAmount)}</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+                      Total abonado
+                    </p>
+                    <p className="mt-2 text-2xl font-black text-emerald-900">
+                      {formatCurrency(purchase.totalAmount)}
+                    </p>
                   </div>
                   <div className="rounded-3xl border border-emerald-200 bg-white/70 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Estado</p>
-                    <p className="mt-2 text-2xl font-black text-emerald-900">En preparación</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+                      Estado
+                    </p>
+                    <p className="mt-2 text-2xl font-black text-emerald-900">
+                      En preparación
+                    </p>
                   </div>
                 </div>
 
                 <div className="mt-6 rounded-3xl border border-emerald-200 bg-white/70 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Resumen del pago</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+                    Resumen del pago
+                  </p>
                   <p className="mt-2 text-sm leading-6 text-emerald-800">
                     {paymentMethodLabel} · {paymentSummary}
                   </p>
-                  <p className="mt-2 text-sm leading-6 text-emerald-800">{purchase.shippingAddress || deliverySummary}</p>
+                  <p className="mt-2 text-sm leading-6 text-emerald-800">
+                    {purchase.shippingAddress || deliverySummary}
+                  </p>
                 </div>
 
                 <div className="mt-6 flex flex-col gap-3 sm:flex-row">
@@ -1404,24 +1728,40 @@ export function CheckoutPage() {
 
           <div className="space-y-6">
             <section className="rounded-4xl border border-border bg-bg-secondary p-6 shadow-sm sm:p-8">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Vista previa</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">
+                Vista previa
+              </p>
               <div className="mt-4 space-y-4">
                 <div className="rounded-3xl border border-border bg-bg p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">
-                    {deliveryMode === 'homeDelivery' ? 'Dirección' : 'Tienda seleccionada'}
+                    {deliveryMode === 'homeDelivery'
+                      ? 'Dirección'
+                      : 'Tienda seleccionada'}
                   </p>
                   <p className="mt-2 text-sm leading-6 text-text">
-                    {deliveryMode === 'homeDelivery' ? shippingAddress || 'Aún no completada' : deliverySummary}
+                    {deliveryMode === 'homeDelivery'
+                      ? shippingAddress || 'Aún no completada'
+                      : deliverySummary}
                   </p>
                 </div>
                 <div className="rounded-3xl border border-border bg-bg p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Pago</p>
-                  <p className="mt-2 text-sm font-semibold text-text">{paymentMethodLabel}</p>
-                  <p className="mt-1 text-sm leading-6 text-text-muted">{paymentSummary}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">
+                    Pago
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-text">
+                    {paymentMethodLabel}
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-text-muted">
+                    {paymentSummary}
+                  </p>
                 </div>
                 <div className="rounded-3xl border border-border bg-bg p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Total a cobrar</p>
-                  <p className="mt-2 text-3xl font-black text-metallicgold-700">{formatCurrency(total)}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">
+                    Total a cobrar
+                  </p>
+                  <p className="mt-2 text-3xl font-black text-metallicgold-700">
+                    {formatCurrency(total)}
+                  </p>
                 </div>
               </div>
             </section>
@@ -1429,9 +1769,18 @@ export function CheckoutPage() {
             <section className="rounded-4xl border border-border bg-bg-secondary p-6 shadow-sm sm:p-8">
               <h3 className="text-lg font-bold text-text">Ayuda rápida</h3>
               <ul className="mt-3 space-y-3 text-sm leading-6 text-text-muted">
-                <li>• Si el stock cambia antes de confirmar, verás un error al procesar.</li>
-                <li>• La compra queda en estado <span className="font-semibold text-text">inPreparation</span>.</li>
-                <li>• La factura se envía por correo apenas se confirma el pedido.</li>
+                <li>
+                  • Si el stock cambia antes de confirmar, verás un error al
+                  procesar.
+                </li>
+                <li>
+                  • La compra queda en estado{' '}
+                  <span className="font-semibold text-text">inPreparation</span>
+                  .
+                </li>
+                <li>
+                  • La factura se envía por correo apenas se confirma el pedido.
+                </li>
               </ul>
             </section>
           </div>
@@ -1440,7 +1789,12 @@ export function CheckoutPage() {
         {isSubmitting && (
           <div className="fixed inset-0 z-9998 flex items-center justify-center bg-black/45 px-4 backdrop-blur-sm">
             <div className="w-full max-w-md rounded-4xl border border-border bg-bg-secondary/95 px-6 py-8 shadow-2xl">
-              <Spinner size="lg" tone="calm" label="Procesando tu compra..." fullScreen={false} />
+              <Spinner
+                size="lg"
+                tone="calm"
+                label="Procesando tu compra..."
+                fullScreen={false}
+              />
             </div>
           </div>
         )}

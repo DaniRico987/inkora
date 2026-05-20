@@ -12,7 +12,8 @@ api.interceptors.request.use((config) => {
     if (!config.headers) {
       config.headers = {} as never;
     }
-    (config.headers as { Authorization?: string }).Authorization = `Bearer ${token}`;
+    (config.headers as { Authorization?: string }).Authorization =
+      `Bearer ${token}`;
   }
   return config;
 });
@@ -38,11 +39,15 @@ export const getWallet = async (): Promise<Wallet> => {
 };
 
 export const getWalletTransactions = async (): Promise<WalletTransaction[]> => {
-  const { data } = await api.get<WalletTransactionsApiResponse>('/wallet/transactions');
+  const { data } = await api.get<WalletTransactionsApiResponse>(
+    '/wallet/transactions',
+  );
   return data.items;
 };
 
-export const topUpWallet = async (payload: WalletTopUpPayload): Promise<Wallet> => {
+export const topUpWallet = async (
+  payload: WalletTopUpPayload,
+): Promise<Wallet> => {
   const { data } = await api.post<WalletApiResponse>('/wallet/top-up', payload);
   return {
     balance: data.availableBalance,

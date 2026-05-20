@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AdminLayout } from '../Components/AdminLayout';
-import { DataTable, type DataTableAction, type DataTableColumn } from '../Components/DataTable';
+import {
+  DataTable,
+  type DataTableAction,
+  type DataTableColumn,
+} from '../Components/DataTable';
 import { ConfirmationModal } from '../Components/ConfirmationModal';
 import { RejectionModal } from '../Components/RejectionModal';
 import { Spinner } from '../Components/Spinner';
@@ -95,7 +99,9 @@ export function ReturnsManagementPage() {
         row.clientName.toLowerCase().includes(normalizedQuery) ||
         row.clientEmail.toLowerCase().includes(normalizedQuery) ||
         row.reasonLabel.toLowerCase().includes(normalizedQuery) ||
-        (row.additionalDescription || '').toLowerCase().includes(normalizedQuery)
+        (row.additionalDescription || '')
+          .toLowerCase()
+          .includes(normalizedQuery)
       );
     });
 
@@ -182,10 +188,17 @@ export function ReturnsManagementPage() {
         render: (_, row) => (
           <div className="space-y-2">
             {row.items.slice(0, 2).map((item) => (
-              <div key={item.purchaseItemId} className="flex items-center gap-2">
+              <div
+                key={item.purchaseItemId}
+                className="flex items-center gap-2"
+              >
                 <div className="h-11 w-8 shrink-0 overflow-hidden rounded border border-border bg-bg">
                   {item.coverUrl ? (
-                    <img src={item.coverUrl} alt={item.title} className="h-full w-full object-cover" />
+                    <img
+                      src={item.coverUrl}
+                      alt={item.title}
+                      className="h-full w-full object-cover"
+                    />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-[10px] text-text-muted">
                       N/A
@@ -193,13 +206,19 @@ export function ReturnsManagementPage() {
                   )}
                 </div>
                 <div className="min-w-0">
-                  <p className="line-clamp-1 text-xs font-semibold text-text">{item.title}</p>
-                  <p className="text-[11px] text-text-muted">x{item.quantity}</p>
+                  <p className="line-clamp-1 text-xs font-semibold text-text">
+                    {item.title}
+                  </p>
+                  <p className="text-[11px] text-text-muted">
+                    x{item.quantity}
+                  </p>
                 </div>
               </div>
             ))}
             {row.items.length > 2 ? (
-              <p className="text-[11px] text-text-muted">+{row.items.length - 2} item(s)</p>
+              <p className="text-[11px] text-text-muted">
+                +{row.items.length - 2} item(s)
+              </p>
             ) : null}
           </div>
         ),
@@ -210,8 +229,12 @@ export function ReturnsManagementPage() {
         width: '17%',
         render: (_, row) => (
           <div>
-            <p className="text-xs text-text-muted">{formatDate(row.requestDate)}</p>
-            <p className="text-xs font-semibold text-text">{formatCurrency(row.totalAmount)}</p>
+            <p className="text-xs text-text-muted">
+              {formatDate(row.requestDate)}
+            </p>
+            <p className="text-xs font-semibold text-text">
+              {formatCurrency(row.totalAmount)}
+            </p>
           </div>
         ),
       },
@@ -241,9 +264,12 @@ export function ReturnsManagementPage() {
       <div className="space-y-6">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-text">Solicitudes de devolucion</h1>
+            <h1 className="text-3xl font-bold text-text">
+              Solicitudes de devolucion
+            </h1>
             <p className="mt-2 text-text-muted">
-              Gestiona devoluciones pendientes y revisa evidencia visual de los libros.
+              Gestiona devoluciones pendientes y revisa evidencia visual de los
+              libros.
             </p>
           </div>
           <button

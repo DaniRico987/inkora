@@ -364,10 +364,7 @@ function AppContent() {
           />
 
           {/* Fallback por rol */}
-          <Route
-            path="*"
-            element={<PublicHomeRoute />}
-          />
+          <Route path="*" element={<PublicHomeRoute />} />
         </Routes>
       </main>
     </div>

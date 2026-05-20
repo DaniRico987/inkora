@@ -1,14 +1,14 @@
-import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { InputPassword } from "../Components/Inputs";
-import { Button } from "../Components/Button";
-import { AuthHomeButton } from "../Components/AuthHomeButton";
-import { useTheme } from "../theme/useTheme";
-import { resetPassword } from "../api/auth";
+import { useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { InputPassword } from '../Components/Inputs';
+import { Button } from '../Components/Button';
+import { AuthHomeButton } from '../Components/AuthHomeButton';
+import { useTheme } from '../theme/useTheme';
+import { resetPassword } from '../api/auth';
 
 const passwordPolicy = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/;
 
-type Strength = "débil" | "media" | "fuerte";
+type Strength = 'débil' | 'media' | 'fuerte';
 
 function getPasswordStrength(password: string): Strength {
   let score = 0;
@@ -17,9 +17,9 @@ function getPasswordStrength(password: string): Strength {
   if (/[0-9]/.test(password)) score++;
   if (/[^A-Za-z0-9]/.test(password)) score++;
 
-  if (score <= 1) return "débil";
-  if (score === 2 || score === 3) return "media";
-  return "fuerte";
+  if (score <= 1) return 'débil';
+  if (score === 2 || score === 3) return 'media';
+  return 'fuerte';
 }
 
 export function ResetPasswordPage() {
@@ -28,53 +28,55 @@ export function ResetPasswordPage() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
 
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   const strength = getPasswordStrength(password);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMessage("");
-    setSuccessMessage("");
+    setErrorMessage('');
+    setSuccessMessage('');
 
     if (!password || !confirmPassword) {
-      setErrorMessage("Por favor completa ambos campos de contraseña.");
+      setErrorMessage('Por favor completa ambos campos de contraseña.');
       return;
     }
     if (password.length < 8) {
-      setErrorMessage("La contraseña debe tener al menos 8 caracteres.");
+      setErrorMessage('La contraseña debe tener al menos 8 caracteres.');
       return;
     }
     if (!passwordPolicy.test(password)) {
-      setErrorMessage("La contraseña debe incluir mayúsculas, minúsculas y números.");
+      setErrorMessage(
+        'La contraseña debe incluir mayúsculas, minúsculas y números.',
+      );
       return;
     }
     if (password !== confirmPassword) {
-      setErrorMessage("Las contraseñas no coinciden.");
+      setErrorMessage('Las contraseñas no coinciden.');
       return;
     }
 
     if (!token) {
-      setErrorMessage("El enlace de restablecimiento no es válido.");
+      setErrorMessage('El enlace de restablecimiento no es válido.');
       return;
     }
 
     setLoading(true);
     try {
       // reCAPTCHA está desactivado en el backend por ahora, enviamos un placeholder
-      await resetPassword(token, password, "captcha-ok");
+      await resetPassword(token, password, 'captcha-ok');
 
-      setSuccessMessage("Tu contraseña ha sido restablecida con éxito.");
+      setSuccessMessage('Tu contraseña ha sido restablecida con éxito.');
       setTimeout(() => {
-        navigate("/login");
+        navigate('/login');
       }, 2000);
     } catch {
       setErrorMessage(
-        "El enlace de restablecimiento es inválido o ha expirado. Por favor solicita uno nuevo."
+        'El enlace de restablecimiento es inválido o ha expirado. Por favor solicita uno nuevo.',
       );
     } finally {
       setLoading(false);
@@ -82,11 +84,11 @@ export function ResetPasswordPage() {
   };
 
   const strengthColor =
-    strength === "fuerte"
-      ? "bg-emerald-500"
-      : strength === "media"
-        ? "bg-amber-500"
-        : "bg-red-500";
+    strength === 'fuerte'
+      ? 'bg-emerald-500'
+      : strength === 'media'
+        ? 'bg-amber-500'
+        : 'bg-red-500';
 
   return (
     <div className="w-full flex items-center justify-center px-4">
@@ -115,16 +117,16 @@ export function ResetPasswordPage() {
                 className={`h-full ${strengthColor} transition-all duration-300`}
                 style={{
                   width:
-                    strength === "fuerte"
-                      ? "100%"
-                      : strength === "media"
-                        ? "66%"
-                        : "33%",
+                    strength === 'fuerte'
+                      ? '100%'
+                      : strength === 'media'
+                        ? '66%'
+                        : '33%',
                 }}
               />
             </div>
             <span className="text-text-muted">
-              Fortaleza:{" "}
+              Fortaleza:{' '}
               <span className="font-medium capitalize">{strength}</span>
             </span>
           </div>
@@ -161,4 +163,3 @@ export function ResetPasswordPage() {
     </div>
   );
 }
-

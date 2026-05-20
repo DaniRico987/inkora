@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from './Button';
 import { InputDate, InputSelect, InputText } from './Inputs';
 import { LocationPicker } from './LocationPicker';
@@ -9,16 +9,12 @@ import { useSnackbar } from './SnackbarProvider';
 import { MyHistoryView } from './profile/MyHistoryView';
 import { MyReservationsView } from './profile/MyReservationsView';
 import {
-  createClientCard,
-  deleteClientCard,
   getClientProfile,
   updateClientProfile,
-  type ClientCardType,
   type ClientProfile,
 } from '../api/clients';
 import { getCategories, type Category } from '../api/categories';
 import { subscribeToCategory, unsubscribeFromCategory } from '../api/subscriptions';
-import { formatCardNumberInput, maskCardNumber, normalizeCardNumber } from '../utils/cardNumber';
 import { validateDateValue } from '../utils/dateValidation';
 
 interface UserProfileModalProps {
@@ -27,20 +23,6 @@ interface UserProfileModalProps {
 }
 
 type ProfileSection = 'personal' | 'preferences' | 'cards' | 'reservations' | 'history';
-
-type CardFormState = {
-  number: string;
-  cardHolder: string;
-  expirationDate: string;
-  cardType: ClientCardType;
-};
-
-const initialCardForm: CardFormState = {
-  number: '',
-  cardHolder: '',
-  expirationDate: '',
-  cardType: 'credit',
-};
 
 function formatDate(isoDate: string): string {
   const date = new Date(isoDate);
@@ -57,9 +39,7 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
-  const [savingCard, setSavingCard] = useState(false);
   const [processingCategoryId, setProcessingCategoryId] = useState<number | null>(null);
-  const [deletingCardId, setDeletingCardId] = useState<number | null>(null);
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -71,7 +51,6 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
     address: '',
     gender: '',
   });
-  const [cardForm, setCardForm] = useState<CardFormState>(initialCardForm);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -205,56 +184,6 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
       snackbar.error(message);
     } finally {
       setProcessingCategoryId(null);
-    }
-  };
-
-  const handleAddCard = async () => {
-    if (normalizeCardNumber(cardForm.number).length !== 16) {
-      snackbar.warning('Ingresa un número de tarjeta válido');
-      return;
-    }
-
-    const expirationDateError = validateDateValue(cardForm.expirationDate, 'cardExpiration');
-    if (expirationDateError) {
-      snackbar.warning(expirationDateError);
-      return;
-    }
-
-    try {
-      setSavingCard(true);
-      const updated = await createClientCard({
-        maskedNumber: maskCardNumber(cardForm.number),
-        cardType: cardForm.cardType,
-        expirationDate: cardForm.expirationDate,
-        cardHolder: cardForm.cardHolder.trim(),
-      });
-      setProfile(updated);
-      setCardForm(initialCardForm);
-      snackbar.success('Tarjeta agregada correctamente');
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'No se pudo agregar la tarjeta';
-      snackbar.error(message);
-    } finally {
-      setSavingCard(false);
-    }
-  };
-
-  const handleDeleteCard = async (cardId: number) => {
-    if (!profile) return;
-
-    const previousCards = profile.cards;
-    setProfile({ ...profile, cards: previousCards.filter((card) => card.cardId !== cardId) });
-    setDeletingCardId(cardId);
-
-    try {
-      await deleteClientCard(cardId);
-      snackbar.success('Tarjeta eliminada');
-    } catch (err) {
-      setProfile({ ...profile, cards: previousCards });
-      const message = err instanceof Error ? err.message : 'No se pudo eliminar la tarjeta';
-      snackbar.error(message);
-    } finally {
-      setDeletingCardId(null);
     }
   };
 
@@ -449,88 +378,47 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
               )}
 
               {activeSection === 'cards' && (
-                <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(300px,0.85fr)]">
-                  <div className="rounded-3xl border border-border bg-bg p-5 shadow-sm sm:p-6">
-                    <h3 className="text-lg font-semibold text-text">Tarjetas registradas</h3>
+                <section className="rounded-3xl border border-border bg-bg p-5 shadow-sm sm:p-6">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold text-text">Tarjetas registradas</h3>
+                      <p className="mt-1 text-sm text-text-muted">
+                        Vista previa de tus tarjetas y acceso directo al monedero virtual.
+                      </p>
+                    </div>
+                    <Link
+                      to="/wallet"
+                      onClick={onClose}
+                      className="sm:ml-auto inline-flex shrink-0 items-center justify-center rounded-full bg-primary-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-400/40"
+                    >
+                      Ir al monedero virtual
+                    </Link>
+                  </div>
+
+                  <div className="mt-5 rounded-2xl border border-border bg-bg-secondary p-4">
+                    <p className="text-sm font-semibold text-text">
+                      {profile.cards.length} tarjeta{profile.cards.length !== 1 ? 's' : ''} registrada
+                      {profile.cards.length !== 1 ? 's' : ''}
+                    </p>
+                    <p className="mt-1 text-xs text-text-muted">
+                      El saldo y las recargas se administran desde el monedero virtual.
+                    </p>
+
                     {profile.cards.length === 0 ? (
-                      <p className="mt-3 text-sm text-text-muted">No tienes tarjetas registradas.</p>
+                      <p className="mt-4 text-sm text-text-muted">No tienes tarjetas registradas.</p>
                     ) : (
                       <div className="mt-4 space-y-3">
                         {profile.cards.map((card) => (
-                          <article key={card.cardId} className="rounded-2xl border border-border bg-bg-secondary p-4">
-                            <div className="flex items-center justify-between gap-3">
-                              <div>
-                                <p className="text-sm font-semibold text-text">{card.maskedNumber}</p>
-                                <p className="mt-1 text-xs text-text-muted">
-                                  {card.cardType === 'credit' ? 'Crédito' : 'Débito'} · Expira{' '}
-                                  {formatDate(card.expirationDate)}
-                                </p>
-                                <p className="mt-1 text-xs text-text-muted">{card.cardHolder}</p>
-                              </div>
-                              <Button
-                                variant="destructive"
-                                size="auto"
-                                loading={deletingCardId === card.cardId}
-                                className="rounded-full px-3 py-1 text-xs"
-                                onClick={() => handleDeleteCard(card.cardId)}
-                              >
-                                Eliminar
-                              </Button>
-                            </div>
+                          <article key={card.cardId} className="rounded-2xl border border-border bg-bg p-4">
+                            <p className="text-sm font-semibold text-text">{card.maskedNumber}</p>
+                            <p className="mt-1 text-xs text-text-muted">
+                              {card.cardType === 'credit' ? 'Crédito' : 'Débito'} · Expira {formatDate(card.expirationDate)}
+                            </p>
+                            <p className="mt-1 text-xs text-text-muted">{card.cardHolder}</p>
                           </article>
                         ))}
                       </div>
                     )}
-                  </div>
-
-                  <div className="rounded-3xl border border-border bg-bg p-5 shadow-sm sm:p-6">
-                    <h3 className="text-lg font-semibold text-text">Agregar nueva tarjeta</h3>
-                    <InputText
-                      label="Número de tarjeta"
-                      value={cardForm.number}
-                      maxLength={19}
-                      inputMode="numeric"
-                      autoComplete="cc-number"
-                      hideLabelOnFocus
-                      onChange={(event) =>
-                        setCardForm((prev) => ({ ...prev, number: formatCardNumberInput(event.target.value) }))
-                      }
-                    />
-                    <InputText
-                      label="Titular"
-                      value={cardForm.cardHolder}
-                      validationType="name"
-                      hideLabelOnFocus
-                      onChange={(event) => setCardForm((prev) => ({ ...prev, cardHolder: event.target.value }))}
-                    />
-                    <InputDate
-                      label="Fecha de expiración"
-                      value={cardForm.expirationDate}
-                      dateValidationMode="cardExpiration"
-                      datePickerMode="monthYear"
-                      hideLabelOnFocus
-                      onChange={(event) => setCardForm((prev) => ({ ...prev, expirationDate: event.target.value }))}
-                    />
-                    <InputSelect
-                      label="Tipo de tarjeta"
-                      value={cardForm.cardType}
-                      options={[
-                        { label: 'Crédito', value: 'credit' },
-                        { label: 'Débito', value: 'debit' },
-                      ]}
-                      onChange={(event) =>
-                        setCardForm((prev) => ({ ...prev, cardType: event.target.value as ClientCardType }))
-                      }
-                    />
-                    <Button
-                      variant="primary"
-                      size="full"
-                      loading={savingCard}
-                      className="rounded-full py-2 text-sm"
-                      onClick={handleAddCard}
-                    >
-                      Guardar tarjeta
-                    </Button>
                   </div>
                 </section>
               )}

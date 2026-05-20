@@ -122,7 +122,9 @@ export function OrderTrackingPage() {
           <div className="inline-flex rounded-full bg-danger-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-danger-700">
             Seguimiento no disponible
           </div>
-          <h1 className="mt-4 text-3xl font-bold text-text">No pudimos abrir tu pedido</h1>
+          <h1 className="mt-4 text-3xl font-bold text-text">
+            No pudimos abrir tu pedido
+          </h1>
           <p className="mt-3 text-sm leading-6 text-text-muted sm:text-base">
             {error || 'No encontramos informacion para este pedido.'}
           </p>
@@ -208,9 +210,12 @@ export function OrderTrackingPage() {
               totalAmount={purchase.totalAmount}
             />
             <section className="rounded-3xl border border-border bg-bg-secondary p-5 shadow-sm sm:p-6">
-              <h3 className="text-base font-bold text-text">Necesitas ayuda con tu pedido?</h3>
+              <h3 className="text-base font-bold text-text">
+                Necesitas ayuda con tu pedido?
+              </h3>
               <p className="mt-2 text-sm leading-6 text-text-muted">
-                Si detectas alguna inconsistencia, contacta soporte y te ayudaremos con prioridad.
+                Si detectas alguna inconsistencia, contacta soporte y te
+                ayudaremos con prioridad.
               </p>
               <div className="mt-4 flex flex-col gap-3">
                 {canRequestReturn ? (
