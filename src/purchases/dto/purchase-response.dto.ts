@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DeliveryMode, PurchaseStatus } from '@prisma/client';
 import { PurchaseItemResponseDto } from './purchase-item-response.dto';
 import { ReturnResponseDto } from '../../returns/dto/return-response.dto';
+import { RefundResponseDto } from '../../refunds/dto/refund-response.dto';
 
 export class PurchaseResponseDto {
   @ApiProperty({ example: 15 })
@@ -45,4 +46,7 @@ export class PurchaseResponseDto {
 
   @ApiPropertyOptional({ type: () => ReturnResponseDto })
   returnBook?: ReturnResponseDto | null;
+
+  @ApiPropertyOptional({ type: () => RefundResponseDto })
+  refund?: RefundResponseDto | null;
 }

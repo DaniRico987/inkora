@@ -112,11 +112,6 @@ export class PurchasesService {
     clientId: number,
     dto: CreatePurchaseDto,
   ): Promise<PurchaseResponseDto> {
-    if (dto.deliveryMode === DeliveryMode.storePickup && !dto.pickupStoreId) {
-      throw new BadRequestException(
-        'pickupStoreId es obligatorio cuando deliveryMode es storePickup',
-      );
-    }
 
     if (dto.currency && dto.currency !== 'COP') {
       throw new BadRequestException('Solo se acepta la moneda COP');
@@ -356,6 +351,10 @@ export class PurchasesService {
           },
         },
         returnBook: true,
+        refunds: {
+          orderBy: { requestDate: 'desc' },
+          take: 1,
+        },
       },
     });
 
@@ -409,6 +408,10 @@ export class PurchasesService {
               },
             },
           },
+        },
+        refunds: {
+          orderBy: { requestDate: 'desc' },
+          take: 1,
         },
       },
     });
@@ -474,6 +477,10 @@ export class PurchasesService {
               },
             },
           },
+        },
+        refunds: {
+          orderBy: { requestDate: 'desc' },
+          take: 1,
         },
       },
     });
@@ -585,6 +592,15 @@ export class PurchasesService {
         author: string;
       };
     }>;
+    refunds?: Array<{
+      refundId: number;
+      returnId: number;
+      purchaseId: number;
+      amount: unknown;
+      refundMethod: string | null;
+      requestDate: Date;
+      status: any;
+    }>;
     returnBook?: {
       returnBookId: number;
       purchaseId: number;
@@ -636,6 +652,17 @@ export class PurchasesService {
             approvalDate: purchase.returnBook.approvalDate ?? null,
             adminNote: purchase.returnBook.adminNote ?? null,
             decisionDate: purchase.returnBook.decisionDate ?? null,
+          }
+        : null,
+      refund: purchase.refunds?.[0]
+        ? {
+            refundId: purchase.refunds[0].refundId,
+            returnId: purchase.refunds[0].returnId,
+            purchaseId: purchase.refunds[0].purchaseId,
+            amount: toNumber(purchase.refunds[0].amount),
+            refundMethod: purchase.refunds[0].refundMethod,
+            requestDate: purchase.refunds[0].requestDate,
+            status: purchase.refunds[0].status,
           }
         : null,
     };

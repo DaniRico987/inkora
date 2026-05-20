@@ -312,6 +312,8 @@ export function ReturnsManagementPage() {
         cancelText="Cancelar"
         onConfirm={handleApproveConfirm}
         onCancel={() => setApprovalConfirm({ isOpen: false })}
+        isConfirmLoading={isLoading}
+        closeOnBackdropClick={!isLoading}
       />
       <RejectionModal
         isOpen={rejectionConfirm.isOpen}

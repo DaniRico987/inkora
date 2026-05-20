@@ -14,6 +14,7 @@ import { MailService } from '../mail/mail.service';
 import { AdminReturnRequestDto } from './dto/admin-return-request.dto';
 import { CreateReturnRequestDto } from './dto/create-return-request.dto';
 import { ReturnResponseDto } from './dto/return-response.dto';
+import { RefundsService } from '../refunds/refunds.service';
 
 const DEFAULT_RETURN_WINDOW_DAYS = 30;
 
@@ -25,6 +26,7 @@ export class ReturnsService {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly mailService: MailService,
+    private readonly refundsService: RefundsService,
   ) {}
 
   async createReturnRequest(
@@ -204,6 +206,13 @@ export class ReturnsService {
         approvalDate: new Date(),
         qrCodeUrl: qrCodeDataUrl,
       },
+    });
+
+    await this.refundsService.createAutomaticRefund(approved.returnBookId).catch((error) => {
+      this.logger.error(
+        `No se pudo generar el reembolso automatico para devolucion ${approved.returnBookId}: ${String(error)}`,
+      );
+      throw error;
     });
 
     await this.mailService
