@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, TransactionType } from '@prisma/client';
 import { PrismaService } from 'prisma/prisma/prisma.service';
+import { CreateWalletTopUpDto } from './dto/create-wallet-top-up.dto';
 import { GetWalletTransactionsQueryDto } from './dto/get-wallet-transactions-query.dto';
 import { WalletSummaryDto } from './dto/wallet-summary.dto';
 import { WalletTransactionDto } from './dto/wallet-transaction.dto';
@@ -17,6 +18,8 @@ const toNumber = (value: unknown): number => {
 
   return Number.parseFloat(String(value));
 };
+
+const TOP_UP_TRANSACTION_TYPE = 'topUp' as TransactionType;
 
 type WalletMovementInput = {
   clientId: number;
@@ -145,6 +148,39 @@ export class WalletService {
     });
   }
 
+  async topUpWallet(clientId: number, payload: CreateWalletTopUpDto): Promise<WalletSummaryDto> {
+    if (!Number.isFinite(payload.amount) || payload.amount <= 0) {
+      throw new BadRequestException('amount debe ser mayor a cero');
+    }
+
+    const card = await this.prisma.paymentCard.findFirst({
+      where: {
+        cardId: payload.cardId,
+        clientId,
+        isActive: true,
+      },
+      select: {
+        cardId: true,
+        maskedNumber: true,
+      },
+    });
+
+    if (!card) {
+      throw new NotFoundException('Tarjeta no encontrada');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await this.recordMovement(tx, {
+        clientId,
+        amount: payload.amount,
+        transactionType: TOP_UP_TRANSACTION_TYPE,
+        gatewayReference: `recarga con tarjeta terminada en ${card.maskedNumber.slice(-4)}`,
+      });
+    });
+
+    return this.getWallet(clientId);
+  }
+
   private async recordMovement(
     tx: Prisma.TransactionClient,
     input: WalletMovementInput & { transactionType: TransactionType },
@@ -153,12 +189,13 @@ export class WalletService {
       throw new BadRequestException('amount debe ser mayor a cero');
     }
 
+    const shouldDecrement = input.transactionType === TransactionType.payment;
+
     const nextWalletBalance = await tx.client.update({
       where: { clientId: input.clientId },
-      data:
-        input.transactionType === TransactionType.payment
-          ? { walletBalance: { decrement: input.amount } }
-          : { walletBalance: { increment: input.amount } },
+      data: shouldDecrement
+        ? { walletBalance: { decrement: input.amount } }
+        : { walletBalance: { increment: input.amount } },
       select: { walletBalance: true },
     });
 

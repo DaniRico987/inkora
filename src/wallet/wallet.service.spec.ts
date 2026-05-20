@@ -11,6 +11,9 @@ describe('WalletService', () => {
       findUnique: jest.Mock;
       update: jest.Mock;
     };
+    paymentCard: {
+      findFirst: jest.Mock;
+    };
     transaction: {
       findFirst: jest.Mock;
       count: jest.Mock;
@@ -18,6 +21,7 @@ describe('WalletService', () => {
       findMany: jest.Mock;
       create: jest.Mock;
     };
+    $transaction: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -26,6 +30,9 @@ describe('WalletService', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
       },
+      paymentCard: {
+        findFirst: jest.fn(),
+      },
       transaction: {
         findFirst: jest.fn(),
         count: jest.fn(),
@@ -33,6 +40,7 @@ describe('WalletService', () => {
         findMany: jest.fn(),
         create: jest.fn(),
       },
+      $transaction: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -174,5 +182,50 @@ describe('WalletService', () => {
     await expect(service.getWallet(10)).rejects.toBeInstanceOf(
       NotFoundException,
     );
+  });
+
+  it('debe recargar el monedero usando una tarjeta activa', async () => {
+    prisma.paymentCard.findFirst.mockResolvedValue({
+      cardId: 3,
+      maskedNumber: '**** **** **** 1234',
+    });
+    prisma.$transaction.mockImplementation(async (callback: any) =>
+      callback({
+        client: {
+          update: jest.fn().mockResolvedValue({ walletBalance: '42500' }),
+        },
+        transaction: {
+          create: jest.fn().mockResolvedValue({}),
+        },
+      }),
+    );
+    prisma.client.findUnique.mockResolvedValue({
+      clientId: 10,
+      walletBalance: '42500',
+      paymentCards: [{ cardId: 3 }],
+    });
+    prisma.transaction.findFirst.mockResolvedValue(null);
+    prisma.transaction.count.mockResolvedValue(0);
+    prisma.transaction.aggregate.mockResolvedValueOnce({ _sum: { amount: '0' } });
+    prisma.transaction.aggregate.mockResolvedValueOnce({ _sum: { amount: '0' } });
+
+    const result = await service.topUpWallet(10, {
+      amount: 15000,
+      cardId: 3,
+    });
+
+    expect(prisma.paymentCard.findFirst).toHaveBeenCalledWith({
+      where: {
+        cardId: 3,
+        clientId: 10,
+        isActive: true,
+      },
+      select: {
+        cardId: true,
+        maskedNumber: true,
+      },
+    });
+    expect(result.availableBalance).toBe(42500);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 });

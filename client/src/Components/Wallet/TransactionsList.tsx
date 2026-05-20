@@ -16,16 +16,16 @@ interface TransactionsListProps {
   transactions: WalletTransaction[];
 }
 
-const getStatusChip = (status: WalletTransaction['status']) => {
-  switch (status) {
-    case 'completed':
-      return <Chip label="Completado" color="success" />;
-    case 'pending':
-      return <Chip label="Pendiente" color="warning" />;
-    case 'failed':
-      return <Chip label="Fallido" color="error" />;
+const getTransactionChip = (type: WalletTransaction['transactionType']) => {
+  switch (type) {
+    case 'payment':
+      return <Chip label="Pago" color="error" variant="outlined" />;
+    case 'refund':
+      return <Chip label="Reembolso" color="success" variant="outlined" />;
+    case 'topUp':
+      return <Chip label="Recarga" color="primary" variant="outlined" />;
     default:
-      return <Chip label={status} />;
+      return <Chip label={type} />;
   }
 };
 
@@ -44,15 +44,22 @@ const TransactionsList: React.FC<TransactionsListProps> = ({
               <TableCell>Fecha</TableCell>
               <TableCell>Tipo</TableCell>
               <TableCell>Monto</TableCell>
-              <TableCell>Estado</TableCell>
+              <TableCell>Saldo después</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
+            {transactions.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={4} align="center">
+                  No hay movimientos registrados todavía.
+                </TableCell>
+              </TableRow>
+            )}
             {transactions.map((tx) => (
-              <TableRow key={tx.id}>
-                <TableCell>{new Date(tx.date).toLocaleDateString()}</TableCell>
+              <TableRow key={tx.transactionId}>
+                <TableCell>{new Date(tx.transactionDate).toLocaleDateString()}</TableCell>
                 <TableCell>
-                  {tx.type === 'purchase' ? 'Compra' : 'Reembolso'}
+                  {getTransactionChip(tx.transactionType)}
                 </TableCell>
                 <TableCell>
                   {new Intl.NumberFormat('es-CO', {
@@ -60,7 +67,12 @@ const TransactionsList: React.FC<TransactionsListProps> = ({
                     currency: 'COP',
                   }).format(tx.amount)}
                 </TableCell>
-                <TableCell>{getStatusChip(tx.status)}</TableCell>
+                <TableCell>
+                  {new Intl.NumberFormat('es-CO', {
+                    style: 'currency',
+                    currency: 'COP',
+                  }).format(tx.balanceAfter)}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

@@ -82,6 +82,7 @@ enum CardType {
 enum TransactionType {
   payment
   refund
+  topUp
 }
 
 enum CartStatus {

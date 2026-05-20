@@ -1,8 +1,9 @@
-import { Controller, ForbiddenException, Get, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiForbiddenResponse,
+  ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
   ApiQuery,
@@ -11,6 +12,7 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
+import { CreateWalletTopUpDto } from './dto/create-wallet-top-up.dto';
 import { GetWalletTransactionsQueryDto } from './dto/get-wallet-transactions-query.dto';
 import { WalletSummaryDto } from './dto/wallet-summary.dto';
 import { WalletTransactionsResponseDto } from './dto/wallet-transactions-response.dto';
@@ -67,5 +69,27 @@ export class WalletController {
     }
 
     return this.walletService.getWalletTransactions(req.user.clientId, query);
+  }
+
+  @Post('top-up')
+  @ApiOperation({
+    summary: 'Recargar saldo del monedero usando una tarjeta registrada',
+  })
+  @ApiCreatedResponse({
+    description: 'Saldo recargado exitosamente',
+    type: WalletSummaryDto,
+  })
+  @ApiBadRequestResponse({ description: 'Monto o tarjeta inválidos' })
+  @ApiUnauthorizedResponse({ description: 'Token JWT invalido o expirado' })
+  @ApiForbiddenResponse({ description: 'Solo los clientes pueden recargar su monedero' })
+  async topUpWallet(
+    @Req() req: { user: AuthenticatedUser },
+    @Body() payload: CreateWalletTopUpDto,
+  ): Promise<WalletSummaryDto> {
+    if (!req.user.clientId) {
+      throw new ForbiddenException('Solo los clientes pueden recargar su monedero');
+    }
+
+    return this.walletService.topUpWallet(req.user.clientId, payload);
   }
 }

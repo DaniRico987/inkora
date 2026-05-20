@@ -1,21 +1,47 @@
+import { useEffect, useState } from 'react';
 import {
+  Alert,
+  CircularProgress,
   Container,
   Grid,
   Paper,
   Typography,
-  CircularProgress,
-  Alert,
 } from '@mui/material';
+import { getClientProfile, type ClientCard } from '../../api/clients';
 import WalletBalance from '../../Components/Wallet/WalletBalance';
 import TransactionsList from '../../Components/Wallet/TransactionsList';
 import RegisteredCards from '../../Components/Wallet/RegisteredCards';
-import AddCardForm from '../../Components/Wallet/AddCardForm';
+import WalletTopUpForm from '../../Components/Wallet/WalletTopUpForm';
 import { useWallet } from '../../hooks/useWallet';
 
 const WalletPage = () => {
   const { wallet, transactions, loading, error, refetch } = useWallet();
+  const [cards, setCards] = useState<ClientCard[]>([]);
+  const [cardsLoading, setCardsLoading] = useState(true);
+  const [cardsError, setCardsError] = useState<string | null>(null);
 
-  if (loading) {
+  const loadCards = async () => {
+    try {
+      setCardsLoading(true);
+      const profile = await getClientProfile();
+      setCards(profile.cards);
+      setCardsError(null);
+    } catch (cardError) {
+      setCardsError(cardError instanceof Error ? cardError.message : 'No se pudieron cargar las tarjetas');
+    } finally {
+      setCardsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadCards();
+  }, []);
+
+  const handleTopUpCompleted = async () => {
+    await refetch();
+  };
+
+  if (loading || cardsLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
         <CircularProgress />
@@ -23,10 +49,10 @@ const WalletPage = () => {
     );
   }
 
-  if (error) {
+  if (error || cardsError) {
     return (
       <div className="p-4">
-        <Alert severity="error">{error}</Alert>
+        <Alert severity="error">{error ?? cardsError}</Alert>
       </div>
     );
   }
@@ -46,14 +72,12 @@ const WalletPage = () => {
         </Grid>
         <Grid size={{ xs: 12, md: 8 }}>
           <Paper className="p-4">
-            <AddCardForm onCardAdded={refetch} />
+            <WalletTopUpForm cards={cards} onTopUpCompleted={handleTopUpCompleted} />
           </Paper>
         </Grid>
         <Grid size={{ xs: 12 }}>
           <Paper className="p-4">
-            {wallet && (
-              <RegisteredCards cards={wallet.cards} onCardDeleted={refetch} />
-            )}
+            <RegisteredCards cards={cards} onCardDeleted={loadCards} />
           </Paper>
         </Grid>
         <Grid size={{ xs: 12 }}>
