@@ -6,6 +6,13 @@ export type CreatePurchasePayload = {
   deliveryMode: 'homeDelivery' | 'storePickup';
   pickupStoreId?: number;
   paymentMethod?: string;
+  registeredCardId?: number;
+  newCard?: {
+    cardholder: string;
+    cardNumber: string;
+    expiry: string;
+    cvv: string;
+  };
   shippingAddress?: string;
   voucherCode?: string;
 };
@@ -54,14 +61,26 @@ apiClient.interceptors.request.use((config) => {
 
 function normalizeApiError(error: unknown, fallback: string): Error {
   if (axios.isAxiosError(error)) {
-    const payload = error.response?.data as { message?: string | string[] } | undefined;
+    const payload = error.response?.data as { message?: string | string[]; code?: string } | undefined;
     const message = payload?.message;
-    if (Array.isArray(message)) {
-      return new Error(message.join(', '));
+    const err = new Error(
+      Array.isArray(message)
+        ? message.join(', ')
+        : typeof message === 'string' && message.trim().length > 0
+        ? message
+        : fallback,
+    );
+
+    // Attach additional info from the response for higher-level callers
+    try {
+      (err as any).status = error.response?.status;
+      (err as any).data = error.response?.data;
+      if (payload?.code) (err as any).code = payload.code;
+    } catch {
+      // ignore
     }
-    if (typeof message === 'string' && message.trim().length > 0) {
-      return new Error(message);
-    }
+
+    return err;
   }
 
   if (error instanceof Error) {

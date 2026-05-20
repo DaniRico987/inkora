@@ -20,6 +20,73 @@ import {
   normalizeCardNumber,
 } from '../utils/cardNumber';
 
+// Configurable map: ajusta estos valores según los códigos que devuelva tu backend.
+const PAYMENT_ERROR_MAP: Record<
+  string,
+  { type: 'insufficient_funds' | 'card_declined' | 'other'; message: string }
+> = {
+  // Insufficient funds
+  insufficient_funds: { type: 'insufficient_funds', message: 'Pago rechazado: fondos insuficientes' },
+  card_error_insufficient_funds: { type: 'insufficient_funds', message: 'Pago rechazado: fondos insuficientes' },
+
+  // Declined / generic card issues
+  card_declined: { type: 'card_declined', message: 'Pago rechazado: tarjeta denegada' },
+  card_error_declined: { type: 'card_declined', message: 'Pago rechazado: tarjeta denegada' },
+
+  // Expired / invalid card data
+  expired_card: { type: 'card_declined', message: 'Pago rechazado: tarjeta vencida' },
+  card_error_expired_card: { type: 'card_declined', message: 'Pago rechazado: tarjeta vencida' },
+  invalid_cvv: { type: 'card_declined', message: 'CVV inválido' },
+  invalid_cvc: { type: 'card_declined', message: 'CVV inválido' },
+  incorrect_number: { type: 'card_declined', message: 'Número de tarjeta inválido' },
+  invalid_number: { type: 'card_declined', message: 'Número de tarjeta inválido' },
+
+  // Authentication / 3DS
+  authentication_required: { type: 'other', message: 'Se requiere autenticación adicional para completar el pago' },
+  three_d_secure_required: { type: 'other', message: 'Se requiere autenticación 3D Secure' },
+
+  // Fraud / processing
+  fraud_detected: { type: 'other', message: 'Pago rechazado por posible fraude' },
+  processing_error: { type: 'other', message: 'Error al procesar el pago' },
+
+  // Lost/stolen
+  stolen_card: { type: 'card_declined', message: 'Tarjeta reportada como robada' },
+  lost_card: { type: 'card_declined', message: 'Tarjeta reportada como perdida' },
+};
+
+function mapPaymentError(errAny: any) {
+  // Prefer explicit codes coming from backend
+  const codeCandidates: string[] = [];
+
+  if (typeof errAny?.code === 'string') codeCandidates.push(errAny.code);
+  if (typeof errAny?.data?.code === 'string') codeCandidates.push(errAny.data.code);
+  if (typeof errAny?.data?.error_code === 'string') codeCandidates.push(errAny.data.error_code);
+  if (typeof errAny?.data?.type === 'string') codeCandidates.push(errAny.data.type);
+
+  for (const c of codeCandidates) {
+    const normalized = c.trim().toLowerCase();
+    if (PAYMENT_ERROR_MAP[normalized]) return PAYMENT_ERROR_MAP[normalized];
+  }
+
+  // Fallbacks based on HTTP status or message content
+  const status = errAny?.status;
+  const message = (errAny?.message || errAny?.data?.message || '') as string;
+
+  if (status === 402) {
+    return PAYMENT_ERROR_MAP['insufficient_funds'] ?? { type: 'other', message: 'Pago rechazado' };
+  }
+
+  if (/insufficient/i.test(message)) {
+    return PAYMENT_ERROR_MAP['insufficient_funds'] ?? { type: 'insufficient_funds', message };
+  }
+
+  if (/declin|card_declined|card declined/i.test(message)) {
+    return PAYMENT_ERROR_MAP['card_declined'] ?? { type: 'card_declined', message };
+  }
+
+  return { type: 'other' as const, message: message || 'No se pudo confirmar la compra' };
+}
+
 type CheckoutStep = 1 | 2 | 3 | 4;
 type PaymentChoice = 'registered' | 'new';
 type DeliveryChoice = 'homeDelivery' | 'storePickup';
@@ -377,6 +444,10 @@ export function CheckoutPage() {
   >(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [paymentErrorType, setPaymentErrorType] = useState<
+    'insufficient_funds' | 'card_declined' | 'other' | null
+  >(null);
   const [purchase, setPurchase] = useState<Purchase | null>(null);
   const cartItems = cart?.items ?? [];
   const subtotal = cart?.subtotal ?? 0;
@@ -610,6 +681,8 @@ export function CheckoutPage() {
   };
 
   const updatePaymentField = (field: keyof PaymentFormState, value: string) => {
+    setPaymentError(null);
+    setPaymentErrorType(null);
     if (field === 'cardNumber') {
       setPaymentForm((prev) => ({
         ...prev,
@@ -733,6 +806,8 @@ export function CheckoutPage() {
 
   const handlePaymentChoiceChange = (choice: PaymentChoice) => {
     setPaymentChoice(choice);
+    setPaymentError(null);
+    setPaymentErrorType(null);
     if (choice === 'registered') {
       setFieldErrors((prev) => {
         const next = { ...prev };
@@ -781,7 +856,7 @@ export function CheckoutPage() {
 
     setIsSubmitting(true);
     try {
-      const createdPurchase = await createPurchase({
+      const payload = {
         deliveryMode,
         pickupStoreId:
           deliveryMode === 'storePickup'
@@ -791,7 +866,20 @@ export function CheckoutPage() {
           deliveryMode === 'homeDelivery' ? shippingAddress : undefined,
         paymentMethod: paymentMethodLabel,
         voucherCode: voucherCode.trim() || undefined,
-      });
+        registeredCardId:
+          paymentChoice === 'registered' ? selectedRegisteredCard?.cardId : undefined,
+        newCard:
+          paymentChoice === 'new'
+            ? {
+                cardholder: paymentForm.cardholder,
+                cardNumber: normalizeCardNumber(paymentForm.cardNumber),
+                expiry: paymentForm.expiry,
+                cvv: paymentForm.cvv,
+              }
+            : undefined,
+      };
+
+      const createdPurchase = await createPurchase(payload);
 
       setPurchase(createdPurchase);
       setCurrentStep(4);
@@ -806,10 +894,25 @@ export function CheckoutPage() {
         `Compra confirmada. Pedido #${createdPurchase.purchaseId}`,
       );
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'No se pudo confirmar la compra';
+      // Default message
+      let message = 'No se pudo confirmar la compra';
+
+      if (error instanceof Error) {
+        const anyErr = error as any;
+        // Prefer structured errors from backend (array of errors)
+        if (anyErr?.data && Array.isArray(anyErr.data.errors) && anyErr.data.errors.length) {
+          message = anyErr.data.errors.map((e: any) => e.message || e).join(', ');
+        } else {
+          const mapped = mapPaymentError(anyErr);
+          message = mapped.message || anyErr.message || message;
+          setPaymentErrorType(mapped.type);
+        }
+
+        setPaymentError(message);
+      } else {
+        setPaymentError(message);
+      }
+
       snackbar.error(message);
     } finally {
       setIsSubmitting(false);
@@ -950,6 +1053,45 @@ export function CheckoutPage() {
                     </strong>
                   </div>
                 </div>
+                {paymentError && (
+                  <div className="mt-4 rounded-2xl border border-danger-200 bg-danger-50 p-4 text-sm text-danger-800">
+                    <p>{paymentError}</p>
+                    <div className="mt-3 flex gap-3">
+                      {paymentErrorType === 'insufficient_funds' && (
+                        <Link
+                          to="/wallet"
+                          className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2 font-semibold text-white transition hover:bg-emerald-700"
+                        >
+                          Recargar monedero
+                        </Link>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPaymentError(null);
+                          setPaymentErrorType(null);
+                          setPaymentChoice('registered');
+                          setSelectedRegisteredCardId(null);
+                        }}
+                        className="inline-flex items-center justify-center rounded-full border border-border bg-bg px-4 py-2 font-semibold text-text transition hover:border-babyblue-300"
+                      >
+                        Usar otra tarjeta
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPaymentError(null);
+                          setPaymentErrorType(null);
+                          setPaymentChoice('new');
+                        }}
+                        className="inline-flex items-center justify-center rounded-full border border-border bg-bg px-4 py-2 font-semibold text-text transition hover:border-babyblue-300"
+                      >
+                        Ingresar tarjeta nueva
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1573,9 +1715,11 @@ export function CheckoutPage() {
                           <button
                             key={card.cardId}
                             type="button"
-                            onClick={() =>
-                              setSelectedRegisteredCardId(card.cardId)
-                            }
+                            onClick={() => {
+                              setPaymentError(null);
+                              setPaymentErrorType(null);
+                              setSelectedRegisteredCardId(card.cardId);
+                            }}
                             className={[
                               'w-full rounded-3xl border p-4 text-left transition',
                               isSelected
@@ -1647,7 +1791,7 @@ export function CheckoutPage() {
                   <button
                     type="button"
                     onClick={submitPurchase}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || !!paymentError}
                     className="inline-flex items-center justify-center rounded-full bg-metallicgold-600 px-5 py-3 font-semibold text-white transition hover:bg-metallicgold-700 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isSubmitting ? 'Procesando compra...' : 'Confirmar compra'}
