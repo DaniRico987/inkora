@@ -7,6 +7,7 @@ import {
   IsPositive,
   IsString,
   MaxLength,
+  IsIn,
 } from 'class-validator';
 
 export class CreatePurchaseDto {
@@ -28,6 +29,12 @@ export class CreatePurchaseDto {
   @IsString({ message: 'paymentMethod debe ser texto' })
   @MaxLength(50, { message: 'paymentMethod no puede superar 50 caracteres' })
   paymentMethod?: string;
+
+  @ApiPropertyOptional({ example: 'COP', description: 'Moneda de la transacción. Solo se acepta COP actualmente.' })
+  @IsOptional()
+  @IsString({ message: 'currency debe ser texto' })
+  @IsIn(['COP'], { message: 'Solo se acepta la moneda COP' })
+  currency?: string;
 
   @ApiPropertyOptional({ example: 'Av. Siempre Viva 742, Springfield' })
   @IsOptional()

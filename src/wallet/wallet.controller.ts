@@ -13,6 +13,7 @@ import {
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { CreateWalletTopUpDto } from './dto/create-wallet-top-up.dto';
+import CreateWalletTopUpWithCardDto from './dto/create-wallet-top-up-with-card.dto';
 import { GetWalletTransactionsQueryDto } from './dto/get-wallet-transactions-query.dto';
 import { WalletSummaryDto } from './dto/wallet-summary.dto';
 import { WalletTransactionsResponseDto } from './dto/wallet-transactions-response.dto';
@@ -91,5 +92,20 @@ export class WalletController {
     }
 
     return this.walletService.topUpWallet(req.user.clientId, payload);
+  }
+
+  @Post('top-up-with-card')
+  @ApiOperation({ summary: 'Recargar saldo del monedero usando datos de tarjeta (sin registrar)' })
+  @ApiCreatedResponse({ description: 'Saldo recargado exitosamente', type: WalletSummaryDto })
+  async topUpWalletWithCard(
+    @Req() req: { user: AuthenticatedUser },
+    @Body() payload: CreateWalletTopUpWithCardDto,
+  ): Promise<WalletSummaryDto> {
+    if (!req.user.clientId) {
+      throw new ForbiddenException('Solo los clientes pueden recargar su monedero');
+    }
+
+    // Delegate to service which validates currency and records movement
+    return this.walletService.topUpWalletWithCard(req.user.clientId, payload as any);
   }
 }

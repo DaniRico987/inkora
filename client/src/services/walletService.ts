@@ -29,6 +29,7 @@ type WalletTransactionsApiResponse = {
 export type WalletTopUpPayload = {
   amount: number;
   cardId: number;
+  currency?: string;
 };
 
 export const getWallet = async (): Promise<Wallet> => {
@@ -48,7 +49,33 @@ export const getWalletTransactions = async (): Promise<WalletTransaction[]> => {
 export const topUpWallet = async (
   payload: WalletTopUpPayload,
 ): Promise<Wallet> => {
-  const { data } = await api.post<WalletApiResponse>('/wallet/top-up', payload);
+  const { data } = await api.post<WalletApiResponse>('/wallet/top-up', {
+    ...payload,
+    currency: payload.currency ?? 'COP',
+  });
+  return {
+    balance: data.availableBalance,
+  };
+};
+
+export type WalletTopUpWithCardPayload = {
+  amount: number;
+  newCard: {
+    cardholder: string;
+    cardNumber: string;
+    expiry: string;
+    cvv: string;
+  };
+  currency?: string;
+};
+
+export const topUpWalletWithCard = async (
+  payload: WalletTopUpWithCardPayload,
+): Promise<Wallet> => {
+  const { data } = await api.post<WalletApiResponse>(
+    '/wallet/top-up-with-card',
+    { ...payload, currency: payload.currency ?? 'COP' },
+  );
   return {
     balance: data.availableBalance,
   };

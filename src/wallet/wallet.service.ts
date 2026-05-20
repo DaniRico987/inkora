@@ -153,6 +153,10 @@ export class WalletService {
       throw new BadRequestException('amount debe ser mayor a cero');
     }
 
+    if (payload.currency && payload.currency !== 'COP') {
+      throw new BadRequestException('Solo se acepta la moneda COP');
+    }
+
     const card = await this.prisma.paymentCard.findFirst({
       where: {
         cardId: payload.cardId,
@@ -175,6 +179,31 @@ export class WalletService {
         amount: payload.amount,
         transactionType: TOP_UP_TRANSACTION_TYPE,
         gatewayReference: `recarga con tarjeta terminada en ${card.maskedNumber.slice(-4)}`,
+      });
+    });
+
+    return this.getWallet(clientId);
+  }
+
+  async topUpWalletWithCard(clientId: number, payload: { amount: number; newCard: { cardholder: string; cardNumber: string; expiry: string; cvv: string }; currency?: string }): Promise<WalletSummaryDto> {
+    if (!Number.isFinite(payload.amount) || payload.amount <= 0) {
+      throw new BadRequestException('amount debe ser mayor a cero');
+    }
+
+    if (payload.currency && payload.currency !== 'COP') {
+      throw new BadRequestException('Solo se acepta la moneda COP');
+    }
+
+    // For now we do not persist raw card PAN/CVV. We only use the last 4 digits for gateway reference.
+    const cardNumber = String(payload.newCard.cardNumber || '');
+    const last4 = cardNumber.replace(/\s+/g, '').slice(-4);
+
+    await this.prisma.$transaction(async (tx) => {
+      await this.recordMovement(tx, {
+        clientId,
+        amount: payload.amount,
+        transactionType: TOP_UP_TRANSACTION_TYPE,
+        gatewayReference: `recarga con tarjeta terminada en ${last4}`,
       });
     });
 

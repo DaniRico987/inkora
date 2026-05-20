@@ -279,10 +279,10 @@ const PAYMENT_METHODS: Array<{
 ];
 
 function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('es-AR', {
+  return new Intl.NumberFormat('es-CO', {
     style: 'currency',
-    currency: 'ARS',
-    minimumFractionDigits: 2,
+    currency: 'COP',
+    maximumFractionDigits: 0,
   }).format(value);
 }
 
@@ -448,6 +448,9 @@ export function CheckoutPage() {
   const [paymentErrorType, setPaymentErrorType] = useState<
     'insufficient_funds' | 'card_declined' | 'other' | null
   >(null);
+  const [topUpAmount, setTopUpAmount] = useState('');
+  const [topUpLoading, setTopUpLoading] = useState(false);
+  const [topUpError, setTopUpError] = useState<string | null>(null);
   const [purchase, setPurchase] = useState<Purchase | null>(null);
   const cartItems = cart?.items ?? [];
   const subtotal = cart?.subtotal ?? 0;
@@ -866,6 +869,7 @@ export function CheckoutPage() {
           deliveryMode === 'homeDelivery' ? shippingAddress : undefined,
         paymentMethod: paymentMethodLabel,
         voucherCode: voucherCode.trim() || undefined,
+        currency: 'COP',
         registeredCardId:
           paymentChoice === 'registered' ? selectedRegisteredCard?.cardId : undefined,
         newCard:
@@ -916,6 +920,42 @@ export function CheckoutPage() {
       snackbar.error(message);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleTopUpWithNewCard = async () => {
+    setTopUpError(null);
+    const parsed = Number.parseInt(topUpAmount, 10);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      setTopUpError('Ingresa un monto válido mayor a cero');
+      return;
+    }
+
+    setTopUpLoading(true);
+    try {
+      // Lazy import to avoid circulars
+      const { topUpWalletWithCard } = await import('../services/walletService');
+
+      await topUpWalletWithCard({
+        amount: parsed,
+        newCard: {
+          cardholder: paymentForm.cardholder,
+          cardNumber: normalizeCardNumber(paymentForm.cardNumber),
+          expiry: paymentForm.expiry,
+          cvv: paymentForm.cvv,
+        },
+      });
+
+      snackbar.success('Recarga realizada correctamente');
+      setTopUpAmount('');
+      setPaymentError(null);
+      setPaymentErrorType(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'No se pudo recargar';
+      setTopUpError(message);
+      snackbar.error(message);
+    } finally {
+      setTopUpLoading(false);
     }
   };
 
@@ -1691,6 +1731,29 @@ export function CheckoutPage() {
                           {fieldErrors.cvv}
                         </p>
                       )}
+                    </div>
+                    <div className="sm:col-span-2">
+                      <InputText
+                        label="Monto para recargar con esta tarjeta"
+                        value={topUpAmount}
+                        onChange={(e) => setTopUpAmount(e.target.value)}
+                        placeholder="0"
+                        inputMode="numeric"
+                        maxLength={10}
+                      />
+                      {topUpError && (
+                        <p className="-mt-3 mb-3 text-sm text-red-600">{topUpError}</p>
+                      )}
+                      <div className="mt-3">
+                        <button
+                          type="button"
+                          onClick={handleTopUpWithNewCard}
+                          disabled={topUpLoading}
+                          className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2 font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60"
+                        >
+                          {topUpLoading ? 'Recargando...' : 'Recargar con esta tarjeta'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}

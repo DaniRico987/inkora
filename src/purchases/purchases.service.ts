@@ -118,6 +118,10 @@ export class PurchasesService {
       );
     }
 
+    if (dto.currency && dto.currency !== 'COP') {
+      throw new BadRequestException('Solo se acepta la moneda COP');
+    }
+
     if (
       dto.deliveryMode === DeliveryMode.homeDelivery &&
       !dto.shippingAddress
