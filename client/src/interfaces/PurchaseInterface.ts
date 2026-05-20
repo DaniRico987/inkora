@@ -18,6 +18,18 @@ export interface PurchaseItem {
   subtotal: number;
 }
 
+export type RefundStatus = 'pending' | 'processed' | 'rejected';
+
+export interface PurchaseRefund {
+  refundId: number;
+  returnId: number;
+  purchaseId: number;
+  amount: number;
+  refundMethod: string | null;
+  requestDate: string;
+  status: RefundStatus;
+}
+
 export interface Purchase {
   purchaseId: number;
   clientId: number;
@@ -43,7 +55,9 @@ export interface Purchase {
     approvalDate: string | null;
     adminNote?: string | null;
     decisionDate?: string | null;
+    refund?: PurchaseRefund | null;
   } | null;
+  refund?: PurchaseRefund | null;
 }
 
 export interface PurchaseStatusMeta {

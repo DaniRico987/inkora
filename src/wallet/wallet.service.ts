@@ -19,7 +19,7 @@ const toNumber = (value: unknown): number => {
   return Number.parseFloat(String(value));
 };
 
-const TOP_UP_TRANSACTION_TYPE = 'topUp' as TransactionType;
+const TOP_UP_TRANSACTION_TYPE = TransactionType.topUp;
 
 type WalletMovementInput = {
   clientId: number;

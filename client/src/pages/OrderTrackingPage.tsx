@@ -7,6 +7,7 @@ import { OrderItemsSummary } from '../Components/OrderItemsSummary';
 import { OrderReturnModal } from '../Components/OrderReturnModal';
 import { OrderStatusStepper } from '../Components/OrderStatusStepper';
 import { Spinner } from '../Components/Spinner';
+import { StatusBadge } from '../Components/StatusBadge';
 import { useSnackbar } from '../Components/SnackbarProvider';
 import {
   createReturnRequest,
@@ -14,6 +15,20 @@ import {
   type ReturnReason,
 } from '../api/purchases';
 import { usePurchaseTracking } from '../hooks/usePurchaseTracking';
+
+const REFUND_WINDOW_DAYS = 7;
+
+function getRefundTone(status: 'pending' | 'processed' | 'rejected') {
+  if (status === 'processed') return 'success' as const;
+  if (status === 'rejected') return 'danger' as const;
+  return 'warning' as const;
+}
+
+function getRefundLabel(status: 'pending' | 'processed' | 'rejected') {
+  if (status === 'processed') return 'Procesado';
+  if (status === 'rejected') return 'Rechazado';
+  return 'Pendiente';
+}
 
 export function OrderTrackingPage() {
   const params = useParams<{ id: string }>();
@@ -33,6 +48,21 @@ export function OrderTrackingPage() {
   const currentShippingAddress = useMemo(
     () => purchase?.shippingAddress?.trim() || '',
     [purchase?.shippingAddress],
+  );
+  const refundDeadline = useMemo(() => {
+    if (!purchase?.purchaseDate) return null;
+
+    const deadline = new Date(purchase.purchaseDate);
+    deadline.setDate(deadline.getDate() + REFUND_WINDOW_DAYS);
+    return deadline;
+  }, [purchase?.purchaseDate]);
+  const refund = purchase?.refund ?? purchase?.returnBook?.refund ?? null;
+  const isRefundWindowOpen = useMemo(() => {
+    if (!refundDeadline) return false;
+    return Date.now() <= refundDeadline.getTime();
+  }, [refundDeadline]);
+  const refundWindowExpired = Boolean(
+    purchase?.returnBook?.status === 'approved' && !refund && !isRefundWindowOpen,
   );
 
   const openAddressModal = () => {
@@ -209,6 +239,81 @@ export function OrderTrackingPage() {
               items={purchase.items}
               totalAmount={purchase.totalAmount}
             />
+            <section className="rounded-3xl border border-border bg-bg-secondary p-5 shadow-sm sm:p-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">
+                    Reembolsos
+                  </p>
+                  <h3 className="mt-2 text-lg font-bold text-text">
+                    Estado del reembolso
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-text-muted">
+                    {refund
+                      ? 'Seguimiento del reembolso asociado a tu devolucion.'
+                      : refundWindowExpired
+                      ? `El plazo de ${REFUND_WINDOW_DAYS} dias ya vencio para este pedido.`
+                      : purchase?.returnBook?.status === 'approved'
+                      ? `Puedes solicitar el reembolso dentro de los ${REFUND_WINDOW_DAYS} dias posteriores a la compra.`
+                      : 'Primero debe aprobarse la devolucion para poder solicitar el reembolso.'}
+                  </p>
+                </div>
+
+                {refund ? (
+                  <StatusBadge
+                    label={getRefundLabel(refund.status)}
+                    tone={getRefundTone(refund.status)}
+                  />
+                ) : refundWindowExpired ? (
+                  <div className="rounded-full border border-danger-300/60 bg-danger-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-danger-700">
+                    Plazo vencido
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <article className="rounded-2xl border border-border bg-bg p-4">
+                  <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">
+                    Fecha limite
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-text">
+                    {refundDeadline
+                      ? refundDeadline.toLocaleDateString('es-AR')
+                      : 'No disponible'}
+                  </p>
+                </article>
+                <article className="rounded-2xl border border-border bg-bg p-4">
+                  <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">
+                    Medio original
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-text">
+                    {refund?.refundMethod || purchase?.paymentMethod || 'Monedero / medio original'}
+                  </p>
+                </article>
+              </div>
+
+              {refund?.status === 'processed' ? (
+                <p className="mt-4 rounded-2xl border border-emerald-300/60 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+                  El reembolso ya fue procesado correctamente.
+                </p>
+              ) : refund?.status === 'pending' ? (
+                <p className="mt-4 rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-700">
+                  Tu reembolso esta en proceso. Te notificaremos cuando cambie de estado.
+                </p>
+              ) : refund?.status === 'rejected' ? (
+                <p className="mt-4 rounded-2xl border border-danger-300/60 bg-danger-50 px-4 py-3 text-sm font-medium text-danger-700">
+                  El reembolso fue rechazado por administracion.
+                </p>
+              ) : null}
+
+              <div className="mt-4 rounded-2xl border border-border bg-bg px-4 py-3 text-sm text-text-muted">
+                {refund
+                  ? 'El reembolso se genera automaticamente al aprobar la devolucion y se acredita al medio de pago original.'
+                  : refundWindowExpired
+                  ? `No es posible generar el reembolso porque el plazo de ${REFUND_WINDOW_DAYS} dias ya vencio.`
+                  : 'Cuando la devolucion quede aprobada, el reembolso se generara automaticamente.'}
+              </div>
+            </section>
             <section className="rounded-3xl border border-border bg-bg-secondary p-5 shadow-sm sm:p-6">
               <h3 className="text-base font-bold text-text">
                 Necesitas ayuda con tu pedido?

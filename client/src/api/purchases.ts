@@ -6,7 +6,6 @@ export type CreatePurchasePayload = {
   deliveryMode: 'homeDelivery' | 'storePickup';
   pickupStoreId?: number;
   paymentMethod?: string;
-  registeredCardId?: number;
   newCard?: {
     cardholder: string;
     cardNumber: string;

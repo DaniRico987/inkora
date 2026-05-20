@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { PurchaseStatus, ReturnStatus } from '@prisma/client';
 import { PrismaService } from 'prisma/prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
+import { RefundsService } from '../refunds/refunds.service';
 import { ReturnsService } from './returns.service';
 import * as QRCode from 'qrcode';
 
@@ -31,6 +32,9 @@ describe('ReturnsService', () => {
   let mailService: {
     sendReturnApprovedEmail: jest.Mock;
   };
+  let refundsService: {
+    createAutomaticRefund: jest.Mock;
+  };
 
   beforeEach(async () => {
     jest.useFakeTimers();
@@ -50,6 +54,18 @@ describe('ReturnsService', () => {
 
     mailService = {
       sendReturnApprovedEmail: jest.fn().mockResolvedValue(undefined),
+    };
+
+    refundsService = {
+      createAutomaticRefund: jest.fn().mockResolvedValue({
+        refundId: 7,
+        returnId: 4,
+        purchaseId: 15,
+        amount: 54990,
+        refundMethod: 'Tarjeta de credito',
+        requestDate: new Date('2026-05-16T12:00:00.000Z'),
+        status: ReturnStatus.approved,
+      }),
     };
 
     (QRCode.toDataURL as jest.Mock).mockResolvedValue(
@@ -74,6 +90,10 @@ describe('ReturnsService', () => {
         {
           provide: MailService,
           useValue: mailService,
+        },
+        {
+          provide: RefundsService,
+          useValue: refundsService,
         },
       ],
     }).compile();
@@ -304,6 +324,7 @@ describe('ReturnsService', () => {
         qrCodeDataUrl: 'data:image/png;base64,ZmFrZS1xci1kYXRh',
       }),
     );
+    expect(refundsService.createAutomaticRefund).toHaveBeenCalledWith(4);
     expect(result.status).toBe(ReturnStatus.approved);
   });
 });

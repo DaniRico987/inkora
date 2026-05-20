@@ -21,6 +21,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ClientsModule } from './clients/clients.module';
 import { WalletModule } from './wallet/wallet.module';
 import { ReturnsModule } from './returns/returns.module';
+import { RefundsModule } from './refunds/refunds.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { ReturnsModule } from './returns/returns.module';
     ClientsModule,
     WalletModule,
     ReturnsModule,
+    RefundsModule,
     TasksModule,
     SubscriptionsModule,
     NotificationsModule,

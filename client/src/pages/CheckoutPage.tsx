@@ -866,8 +866,6 @@ export function CheckoutPage() {
           deliveryMode === 'homeDelivery' ? shippingAddress : undefined,
         paymentMethod: paymentMethodLabel,
         voucherCode: voucherCode.trim() || undefined,
-        registeredCardId:
-          paymentChoice === 'registered' ? selectedRegisteredCard?.cardId : undefined,
         newCard:
           paymentChoice === 'new'
             ? {
