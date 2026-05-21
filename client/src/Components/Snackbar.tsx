@@ -75,8 +75,12 @@ export function SnackbarItem({
   const lastTickRef = useRef<number | null>(null);
 
   useEffect(() => {
-    setRemainingMs(durationMs);
     lastTickRef.current = null;
+    const timeoutId = window.setTimeout(() => {
+      setRemainingMs(durationMs);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [durationMs, id]);
 
   useEffect(() => {

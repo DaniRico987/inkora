@@ -23,15 +23,15 @@ export default function ItemGallery({ items, title }: ItemGalleryProps) {
   const PAGE_SIZE = 16;
   const [searchParams] = useSearchParams();
   const [isGrid, setIsGrid] = useState(true);
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  const [searchValue, setSearchValue] = useState("");
+  const [selectedTag, setSelectedTag] = useState<string | null>(() => searchParams.get('tag') || null);
+  const [searchValue, setSearchValue] = useState(() => searchParams.get('q') || '');
   const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedAuthor, setSelectedAuthor] = useState("");
   const [publicationYearFrom, setPublicationYearFrom] = useState("");
   const [publicationYearTo, setPublicationYearTo] = useState("");
-  const [selectedGenre, setSelectedGenre] = useState("");
+  const [selectedGenre, setSelectedGenre] = useState(() => searchParams.get('genre') || '');
   const [selectedStatus, setSelectedStatus] = useState("");
   const [selectedLanguage, setSelectedLanguage] = useState("");
 
@@ -42,16 +42,6 @@ export default function ItemGallery({ items, title }: ItemGalleryProps) {
     media.addEventListener("change", updateMedia);
     return () => media.removeEventListener("change", updateMedia);
   }, []);
-
-  useEffect(() => {
-    const tagParam = searchParams.get('tag');
-    const genreParam = searchParams.get('genre');
-    const queryParam = searchParams.get('q');
-
-    setSelectedTag(tagParam || null);
-    setSelectedGenre(genreParam || '');
-    setSearchValue(queryParam || '');
-  }, [searchParams]);
 
   const availableTags = useMemo(
     () => Array.from(new Set(items.map((item) => item.tag).filter(Boolean))),
@@ -146,21 +136,12 @@ export default function ItemGallery({ items, title }: ItemGalleryProps) {
   }, [items, selectedTag, selectedAuthor, publicationYearFrom, publicationYearTo, selectedGenre, selectedStatus, selectedLanguage, queryTokens, hasInvalidSearchOnly]);
 
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
 
   const paginatedItems = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
+    const start = (safeCurrentPage - 1) * PAGE_SIZE;
     return filteredItems.slice(start, start + PAGE_SIZE);
-  }, [filteredItems, currentPage]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [selectedTag, searchValue, selectedAuthor, publicationYearFrom, publicationYearTo, selectedGenre, selectedStatus, selectedLanguage, items]);
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
+  }, [filteredItems, safeCurrentPage]);
 
   const clearAdvancedFilters = () => {
     setSelectedAuthor("");
@@ -169,6 +150,42 @@ export default function ItemGallery({ items, title }: ItemGalleryProps) {
     setSelectedGenre("");
     setSelectedStatus("");
     setSelectedLanguage("");
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchValue(value);
+    setCurrentPage(1);
+  };
+
+  const handleAuthorChange = (value: string) => {
+    setSelectedAuthor(value);
+    setCurrentPage(1);
+  };
+
+  const handlePublicationYearFromChange = (value: string) => {
+    setPublicationYearFrom(value);
+    setCurrentPage(1);
+  };
+
+  const handlePublicationYearToChange = (value: string) => {
+    setPublicationYearTo(value);
+    setCurrentPage(1);
+  };
+
+  const handleGenreChange = (value: string) => {
+    setSelectedGenre(value);
+    setCurrentPage(1);
+  };
+
+  const handleStatusChange = (value: string) => {
+    setSelectedStatus(value);
+    setCurrentPage(1);
+  };
+
+  const handleLanguageChange = (value: string) => {
+    setSelectedLanguage(value);
+    setCurrentPage(1);
   };
 
   return (
@@ -189,12 +206,12 @@ export default function ItemGallery({ items, title }: ItemGalleryProps) {
           selectedLanguage={selectedLanguage}
           onClose={() => setShowMoreFilters(false)}
           onClear={clearAdvancedFilters}
-          onAuthorChange={setSelectedAuthor}
-          onPublicationYearFromChange={setPublicationYearFrom}
-          onPublicationYearToChange={setPublicationYearTo}
-          onGenreChange={setSelectedGenre}
-          onStatusChange={setSelectedStatus}
-          onLanguageChange={setSelectedLanguage}
+          onAuthorChange={handleAuthorChange}
+          onPublicationYearFromChange={handlePublicationYearFromChange}
+          onPublicationYearToChange={handlePublicationYearToChange}
+          onGenreChange={handleGenreChange}
+          onStatusChange={handleStatusChange}
+          onLanguageChange={handleLanguageChange}
         />
 
         <div className="flex-1 min-w-0">
@@ -230,7 +247,7 @@ export default function ItemGallery({ items, title }: ItemGalleryProps) {
                 <InputSearch
                   value={searchValue}
                   placeholder="Buscar por título, autor o tag"
-                  onChange={(event) => setSearchValue(event.target.value)}
+                  onChange={(event) => handleSearchChange(event.target.value)}
                 />
               </div>
               <Button
@@ -269,25 +286,25 @@ export default function ItemGallery({ items, title }: ItemGalleryProps) {
             {filteredItems.length > 0 && (
               <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
                 <p className="text-sm text-text-muted">
-                  Mostrando {(currentPage - 1) * PAGE_SIZE + 1} - {Math.min(currentPage * PAGE_SIZE, filteredItems.length)} de {filteredItems.length}
+                  Mostrando {(safeCurrentPage - 1) * PAGE_SIZE + 1} - {Math.min(safeCurrentPage * PAGE_SIZE, filteredItems.length)} de {filteredItems.length}
                 </p>
                 <div className="flex items-center gap-2">
                   <Button
                     variant="secondary"
                     size="auto"
                     onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1}
+                    disabled={safeCurrentPage === 1}
                   >
                     Anterior
                   </Button>
                   <span className="text-sm text-text-muted px-2">
-                    Pagina {currentPage} de {totalPages}
+                    Pagina {safeCurrentPage} de {totalPages}
                   </span>
                   <Button
                     variant="secondary"
                     size="auto"
                     onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                    disabled={currentPage === totalPages}
+                    disabled={safeCurrentPage === totalPages}
                   >
                     Siguiente
                   </Button>

@@ -102,10 +102,12 @@ export function SnackbarProvider({
     [dedupeWindowMs, maxQueue, maxVisible],
   );
 
-  const makeQuick =
+  const makeQuick = useCallback(
     (status: SnackbarStatus) =>
-    (message: string, opts?: Omit<ShowSnackbarInput, "message" | "status">) =>
-      showSnackbar({ message, status, ...opts });
+      (message: string, opts?: Omit<ShowSnackbarInput, "message" | "status">) =>
+        showSnackbar({ message, status, ...opts }),
+    [showSnackbar],
+  );
 
   const value = useMemo<SnackbarContextValue>(
     () => ({
@@ -115,7 +117,7 @@ export function SnackbarProvider({
       warning: makeQuick("warning"),
       error: makeQuick("error"),
     }),
-    [showSnackbar],
+    [makeQuick, showSnackbar],
   );
 
   const visible = snacks.slice(Math.max(0, snacks.length - maxVisible));
@@ -139,6 +141,7 @@ export function SnackbarProvider({
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useSnackbar() {
   const ctx = useContext(SnackbarContext);
   if (!ctx) throw new Error("useSnackbar debe usarse dentro de <SnackbarProvider />");

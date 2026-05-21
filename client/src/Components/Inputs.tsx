@@ -42,7 +42,7 @@ const validators: Record<InputValidationType, (value: string) => string> = {
   // Para direcciones: letras, números, guiones, puntos, numerales, espacios
   address: (value) => {
     // Solo permitir: letras, números, guiones, puntos, numerales (#), comas, espacios
-    let cleaned = value.replace(/[^a-zA-Z0-9\-\.#,\s]/g, "");
+    let cleaned = value.replace(/[^a-zA-Z0-9.#,\-\s]/g, "");
 
     // Remover espacios dobles
     cleaned = cleaned.replace(/\s+/g, " ");

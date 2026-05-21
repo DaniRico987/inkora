@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { AxiosHeaders } from 'axios';
 import { getAccessToken } from '../auth/session';
 
 export type HistoryPurchaseStatus = 'inPreparation' | 'shipped' | 'delivered' | 'cancelled' | string;
@@ -50,10 +51,15 @@ const apiClient = axios.create({
 apiClient.interceptors.request.use((config) => {
   const token = getAccessToken();
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+    config.headers = AxiosHeaders.from(config.headers);
+    config.headers.set('Authorization', `Bearer ${token}`);
   }
   return config;
 });
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
 
 function normalizeApiError(error: unknown, fallback: string): Error {
   if (axios.isAxiosError(error)) {
@@ -106,16 +112,17 @@ export async function getClientHistory(options: GetClientHistoryOptions = {}): P
       const reservations: HistoryReservation[] = [];
 
       for (const entry of data) {
-        const type = asString((entry as any).type, '');
-        const transactionDate = (entry as any).transactionDate;
+        const entryRecord = isRecord(entry) ? entry : {};
+        const type = asString(entryRecord.type, '');
+        const transactionDate = entryRecord.transactionDate;
 
         if (type === 'purchase') {
-          const itemsRaw = asArray<Record<string, unknown>>((entry as any).items);
+          const itemsRaw = asArray<Record<string, unknown>>(entryRecord.items);
           purchases.push({
-            purchaseId: asNumber((entry as any).transactionId),
-            purchaseDate: asString(transactionDate ? (transactionDate as any).toString() : ''),
-            totalAmount: asNumber((entry as any).totalAmount),
-            status: asString((entry as any).status, 'inPreparation'),
+            purchaseId: asNumber(entryRecord.transactionId),
+            purchaseDate: asString(typeof transactionDate === 'string' ? transactionDate : ''),
+            totalAmount: asNumber(entryRecord.totalAmount),
+            status: asString(entryRecord.status, 'inPreparation'),
             items: itemsRaw.map((item, idx) => ({
               purchaseItemId: asNumber(item.purchaseItemId ?? idx),
               bookId: asNumber(item.bookId),
@@ -127,12 +134,12 @@ export async function getClientHistory(options: GetClientHistoryOptions = {}): P
             })),
           });
         } else if (type === 'reservation') {
-          const itemsRaw = asArray<Record<string, unknown>>((entry as any).items);
+          const itemsRaw = asArray<Record<string, unknown>>(entryRecord.items);
           reservations.push({
-            reservationId: asNumber((entry as any).transactionId),
-            reservationDate: asString(transactionDate ? (transactionDate as any).toString() : ''),
-            expirationDate: (entry as any).expirationDate ? asString((entry as any).expirationDate) : null,
-            status: asString((entry as any).status, 'active'),
+            reservationId: asNumber(entryRecord.transactionId),
+            reservationDate: asString(typeof transactionDate === 'string' ? transactionDate : ''),
+            expirationDate: entryRecord.expirationDate ? asString(entryRecord.expirationDate) : null,
+            status: asString(entryRecord.status, 'active'),
             items: itemsRaw.map((item, idx) => ({
               reservationItemId: asNumber(item.reservationItemId ?? idx),
               bookId: asNumber(item.bookId),

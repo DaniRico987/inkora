@@ -29,16 +29,81 @@ export type PublicStore = {
   longitude: number | null;
 };
 
+export type StoreStatus = 'active' | 'inactive';
+
+export type StoreRecord = {
+  storeId: number;
+  name: string;
+  address: string;
+  city: string;
+  latitude: number | null;
+  longitude: number | null;
+  capacity: number | null;
+  status: StoreStatus;
+};
+
+export type StoreInventoryItem = {
+  bookId: number;
+  title: string;
+  author: string;
+  availableQuantity: number;
+  reservedQuantity: number;
+  totalQuantity: number;
+};
+
+export type StoreInventoryResponse = {
+  store: StoreRecord;
+  items: StoreInventoryItem[];
+  totalAvailableQuantity: number;
+  totalReservedQuantity: number;
+};
+
+export type StoreOrderStatus = 'inPreparation' | 'shipped' | 'delivered' | 'cancelled';
+
+export type StoreOrderClient = {
+  clientId: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+};
+
+export type StoreOrderItem = {
+  purchaseItemId: number;
+  bookId: number;
+  title: string;
+  author: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+};
+
+export type StoreOrder = {
+  purchaseId: number;
+  purchaseDate: string;
+  status: StoreOrderStatus;
+  totalAmount: number;
+  deliveryMode: 'storePickup' | 'homeDelivery' | null;
+  pickupStoreId: number | null;
+  dispatchDate: string | null;
+  client: StoreOrderClient;
+  items: StoreOrderItem[];
+};
+
+export type StoreOrdersResponse = {
+  store: StoreRecord;
+  orders: StoreOrder[];
+  totalOrders: number;
+  pendingOrders: number;
+};
+
 export async function getPublicStores(): Promise<PublicStore[]> {
   const response = await publicStoresClient.get<PublicStore[]>('/stores/public');
   return response.data;
 }
 
-export async function getStores(page: number = 1, limit: number = 10) {
+export async function getStores(): Promise<StoreRecord[]> {
   try {
-    const response = await apiClient.get('/stores', {
-      params: { page, limit },
-    });
+    const response = await apiClient.get<StoreRecord[]>('/stores');
     return response.data;
   } catch (error) {
     console.error('Error fetching stores:', error);
@@ -46,19 +111,9 @@ export async function getStores(page: number = 1, limit: number = 10) {
   }
 }
 
-export async function getStoreDetail(storeId: string) {
+export async function createStore(data: CreateStoreRequest): Promise<StoreRecord> {
   try {
-    const response = await apiClient.get(`/stores/${storeId}`);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching store detail:', error);
-    throw error;
-  }
-}
-
-export async function createStore(data: CreateStoreRequest) {
-  try {
-    const response = await apiClient.post('/stores', data);
+    const response = await apiClient.post<StoreRecord>('/stores', data);
     return response.data;
   } catch (error) {
     if (axios.isAxiosError(error) && error.response) {
@@ -75,11 +130,11 @@ export async function createStore(data: CreateStoreRequest) {
 }
 
 export async function updateStore(
-  storeId: string,
-  data: Partial<UpdateStoreRequest>
-) {
+  storeId: number,
+  data: Partial<UpdateStoreRequest>,
+): Promise<StoreRecord> {
   try {
-    const response = await apiClient.put(`/stores/${storeId}`, data);
+    const response = await apiClient.put<StoreRecord>(`/stores/${storeId}`, data);
     return response.data;
   } catch (error) {
     console.error('Error updating store:', error);
@@ -87,9 +142,9 @@ export async function updateStore(
   }
 }
 
-export async function deleteStore(storeId: string) {
+export async function deleteStore(storeId: number): Promise<{ id: number }> {
   try {
-    const response = await apiClient.delete(`/stores/${storeId}`);
+    const response = await apiClient.delete<{ id: number }>(`/stores/${storeId}`);
     return response.data;
   } catch (error) {
     console.error('Error deleting store:', error);
@@ -121,9 +176,9 @@ export async function getAvailableStores(bookId: number): Promise<AvailableStore
   }
 }
 
-export async function getStoreInventory(storeId: string) {
+export async function getStoreInventory(storeId: number): Promise<StoreInventoryResponse> {
   try {
-    const response = await apiClient.get(`/stores/${storeId}/inventory`);
+    const response = await apiClient.get<StoreInventoryResponse>(`/stores/${storeId}/inventory`);
     return response.data;
   } catch (error) {
     console.error('Error fetching store inventory:', error);
@@ -131,9 +186,9 @@ export async function getStoreInventory(storeId: string) {
   }
 }
 
-export async function getStoreOrders(storeId: string) {
+export async function getStoreOrders(storeId: number): Promise<StoreOrdersResponse> {
   try {
-    const response = await apiClient.get(`/stores/${storeId}/orders`);
+    const response = await apiClient.get<StoreOrdersResponse>(`/stores/${storeId}/orders`);
     return response.data;
   } catch (error) {
     console.error('Error fetching store orders:', error);

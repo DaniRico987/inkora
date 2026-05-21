@@ -5,7 +5,7 @@ import { Spinner } from './Spinner';
 export interface DataTableColumn<T> {
   key: keyof T;
   label: string;
-  render?: (value: any, row: T) => ReactNode;
+  render?: (value: T[keyof T], row: T) => ReactNode;
   width?: string;
 }
 
@@ -32,7 +32,7 @@ export interface DataTableProps<T> {
   emptyMessage?: string;
 }
 
-export function DataTable<T extends Record<string, any>>({
+export function DataTable<T extends Record<string, unknown>>({
   columns,
   data,
   actions = [],

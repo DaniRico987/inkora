@@ -18,7 +18,7 @@ export const useWallet = () => {
       setWallet(walletData);
       setTransactions(transactionsData);
       setError(null);
-    } catch (err) {
+    } catch {
       setError('Failed to fetch wallet data');
     } finally {
       setLoading(false);

@@ -88,11 +88,12 @@ export function RootAdminCreationPage() {
       setFormErrors({});
       // Redirect to admins management page
       navigate('/admin/admins');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error creating admin:', err);
+      const errorObject = err as { response?: { data?: { message?: string } }; message?: string } | null;
       const errorMessage =
-        err?.response?.data?.message ||
-        err?.message ||
+        errorObject?.response?.data?.message ||
+        errorObject?.message ||
         'No se pudo crear el administrador';
       error(errorMessage);
     } finally {

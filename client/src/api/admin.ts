@@ -79,9 +79,9 @@ export async function getAdminStats(): Promise<AdminStats> {
     if (Array.isArray(adminsData?.data)) {
       totalAdmins = adminsData.data.length;
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching admins stats:', error);
-    if (error?.response?.status === 403 || error?.response?.status === 401) {
+    if (axios.isAxiosError(error) && (error.response?.status === 403 || error.response?.status === 401)) {
       // Si no es root, al menos mostramos 1 admin (actual) y no dejamos 0
       totalAdmins = 1;
     }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ErrorInlineProps } from '../interfaces/ErrorInlineInterface';
 
 function pad2(n: number) {
@@ -23,35 +23,37 @@ export function ErrorInLine({
   countdownLabel = 'Tiempo restante:',
   onExpire,
 }: ErrorInlineProps) {
-  const initialSeconds = useMemo(() => {
-    if (!countdown) return null;
-    if (typeof (countdown as { seconds?: unknown }).seconds === 'number') {
-      return Math.max(
-        0,
-        Math.floor((countdown as { seconds: number }).seconds),
-      );
-    }
-    if (
-      typeof (countdown as { expiresAtMs?: unknown }).expiresAtMs === 'number'
-    ) {
-      const delta = Math.ceil(
-        ((countdown as { expiresAtMs: number }).expiresAtMs - Date.now()) /
-          1000,
-      );
-      return Math.max(0, delta);
-    }
-    return null;
-  }, [countdown]);
-
-  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(
-    initialSeconds,
-  );
+  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
   const expiredRef = useRef(false);
 
   useEffect(() => {
-    setRemainingSeconds(initialSeconds);
     expiredRef.current = false;
-  }, [initialSeconds]);
+
+    const resolveInitialSeconds = () => {
+      if (!countdown) return null;
+
+      if (typeof (countdown as { seconds?: unknown }).seconds === 'number') {
+        return Math.max(0, Math.floor((countdown as { seconds: number }).seconds));
+      }
+
+      if (typeof (countdown as { expiresAtMs?: unknown }).expiresAtMs === 'number') {
+        const delta = Math.ceil(
+          ((countdown as { expiresAtMs: number }).expiresAtMs - Date.now()) / 1000,
+        );
+        return Math.max(0, delta);
+      }
+
+      return null;
+    };
+
+    const timeoutId = window.setTimeout(() => {
+      setRemainingSeconds(resolveInitialSeconds());
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [countdown]);
 
   useEffect(() => {
     if (remainingSeconds === null) return;

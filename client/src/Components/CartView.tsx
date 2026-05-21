@@ -12,11 +12,17 @@ import { listMappings } from '../utils/reservationCart';
  */
 export const CartView: React.FC = () => {
   const { cart, loading, error, removeItem, resetError } = useCart();
-  const [nowMs, setNowMs] = React.useState<number>(Date.now());
+  const [nowMs, setNowMs] = React.useState<number>(0);
 
   React.useEffect(() => {
-    const intervalId = window.setInterval(() => {
+    const updateNow = () => {
       setNowMs(Date.now());
+    };
+
+    updateNow();
+
+    const intervalId = window.setInterval(() => {
+      updateNow();
     }, 1000);
 
     return () => {

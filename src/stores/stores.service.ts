@@ -45,6 +45,36 @@ type StoreSummarySelect = {
   status: StoreStatus;
 };
 
+type StoreOrderItemSelect = {
+  purchaseItemId: number;
+  bookId: number;
+  quantity: number;
+  unitPrice: unknown;
+  book: {
+    title: string;
+    author: string;
+  };
+};
+
+type StoreOrderSelect = {
+  purchaseId: number;
+  purchaseDate: Date;
+  status: PurchaseStatus;
+  totalAmount: unknown;
+  deliveryMode: null | 'homeDelivery' | 'storePickup';
+  pickupStoreId: number | null;
+  dispatchDate: Date | null;
+  client: {
+    clientId: number;
+    user: {
+      firstName: string;
+      lastName: string;
+      email: string;
+    };
+  };
+  purchaseItems: StoreOrderItemSelect[];
+};
+
 const toNullableNumber = (value: unknown): number | null => {
   if (value === null || value === undefined) {
     return null;
@@ -56,7 +86,7 @@ const toNullableNumber = (value: unknown): number | null => {
 
 @Injectable()
 export class StoresService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async findAvailableByBook(bookId: number): Promise<StoreAvailabilityDto[]> {
     const inventories = await this.prisma.inventory.findMany({
@@ -367,12 +397,12 @@ export class StoresService {
       .then((store) =>
         store
           ? {
-              storeId: store.storeId,
-              name: store.name,
-              city: store.city,
-              latitude: toNullableNumber(store.latitude),
-              longitude: toNullableNumber(store.longitude),
-            }
+            storeId: store.storeId,
+            name: store.name,
+            city: store.city,
+            latitude: toNullableNumber(store.latitude),
+            longitude: toNullableNumber(store.longitude),
+          }
           : null,
       );
   }

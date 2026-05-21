@@ -63,11 +63,7 @@ export function useCart(): UseCartReturn {
         setError(null);
         await addToCart(bookId, quantity);
         await loadCart(); // Refrescar carrito completo
-        try {
-          window.dispatchEvent(new Event('cart:refresh'));
-        } catch {
-          // noop
-        }
+        window.dispatchEvent(new Event('cart:refresh'));
       } catch (err) {
         const message =
           err instanceof Error ? err.message : 'Error al agregar al carrito';
@@ -91,9 +87,7 @@ export function useCart(): UseCartReturn {
         setError(null);
         await updateCartItem(cartItemId, quantity);
         await loadCart(); // Refrescar carrito completo
-        try {
-          window.dispatchEvent(new Event('cart:refresh'));
-        } catch { }
+        window.dispatchEvent(new Event('cart:refresh'));
       } catch (err) {
         const message =
           err instanceof Error
@@ -142,9 +136,7 @@ export function useCart(): UseCartReturn {
             itemCount: updatedItems.length,
           };
         });
-        try {
-          window.dispatchEvent(new Event('cart:refresh'));
-        } catch { }
+        window.dispatchEvent(new Event('cart:refresh'));
       } catch (err) {
         const message =
           err instanceof Error ? err.message : 'Error al eliminar item';
@@ -152,7 +144,7 @@ export function useCart(): UseCartReturn {
         console.error('Error removing item:', err);
       }
     },
-    [],
+    [removeItem],
   );
 
   // ======================== CLEAR ITEMS ========================
@@ -172,7 +164,7 @@ export function useCart(): UseCartReturn {
         });
         try {
           window.dispatchEvent(new Event('cart:refresh'));
-        } catch { }
+        } catch {}
       }
     } catch (err) {
       const message =

@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { AdminLayout } from '../Components/AdminLayout';
 import {
   DataTable,
@@ -8,39 +9,26 @@ import {
 } from '../Components/DataTable';
 import { FormModal } from '../Components/FormModal';
 import { ConfirmationModal } from '../Components/ConfirmationModal';
-import { LocationPicker } from '../Components/LocationPicker';
+import { DataTable, type DataTableAction, type DataTableColumn } from '../Components/DataTable';
+import { FormModal } from '../Components/FormModal';
+import { Spinner } from '../Components/Spinner';
 import { StoreMapPicker } from '../Components/StoreMapPicker';
 import { useSnackbar } from '../Components/SnackbarProvider';
-import { getRoleFromToken, getAccessToken } from '../auth/session';
+import { getAccessToken, getRoleFromToken } from '../auth/session';
 import {
-  getStores,
-  deleteStore,
   createStore,
-  updateStore,
+  deleteStore,
   getStoreInventory,
   getStoreOrders,
+  getStores,
+  updateStore,
+  type StoreInventoryResponse,
+  type StoreOrdersResponse,
+  type StoreRecord,
 } from '../api/stores';
-import type { Store, StoreInventoryResponse, StoreOrdersResponse } from '../interfaces/admin';
+import type { CreateStoreRequest } from '../interfaces/admin';
 
-const normalizeStoreName = (value: string) =>
-  value
-    .replace(/[^\p{L}\p{N}\s]/gu, '')
-    .replace(/\s+/g, ' ')
-    .replace(/^\s+/, '');
-
-const normalizeStoreAddress = (value: string) =>
-  value
-    .replace(/[^\p{L}\p{N}\s#.,\-/]/gu, '')
-    .replace(/\s+/g, ' ')
-    .replace(/^\s+/, '');
-
-const normalizeStoreLocation = (value: string) =>
-  value
-    .replace(/[^\p{L}\p{N}\s#.,\-/]/gu, '')
-    .replace(/\s+/g, ' ')
-    .replace(/^\s+/, '');
-
-type StoreFormState = {
+type StoreFormValues = {
   name: string;
   address: string;
   city: string;
@@ -50,7 +38,7 @@ type StoreFormState = {
   status: 'active' | 'inactive';
 };
 
-const initialStoreForm: StoreFormState = {
+const INITIAL_FORM_VALUES: StoreFormValues = {
   name: '',
   address: '',
   city: '',
@@ -60,57 +48,205 @@ const initialStoreForm: StoreFormState = {
   status: 'active',
 };
 
-const extractCityName = (value: string) => value.split(',')[0]?.trim() || '';
+const ACTIVE_ORDER_STATUSES = new Set(['inPreparation', 'shipped']);
+
+const STORE_STATUS_LABELS: Record<'active' | 'inactive', string> = {
+  active: 'Activa',
+  inactive: 'Inactiva',
+};
+
+const ORDER_STATUS_LABELS: Record<string, string> = {
+  inPreparation: 'En preparación',
+  shipped: 'Enviado',
+  delivered: 'Entregado',
+  cancelled: 'Cancelado',
+};
+
+function formatCoordinates(latitude: number | null, longitude: number | null) {
+  if (latitude == null || longitude == null) {
+    return 'Sin coordenadas';
+  }
+
+  return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+}
+
+function formatMoney(value: number) {
+  return value.toLocaleString('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    maximumFractionDigits: 0,
+  });
+}
+
+function formatDate(value?: string | null) {
+  if (!value) {
+    return 'Sin fecha';
+  }
+
+  return new Date(value).toLocaleString('es-CO', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+}
+
+function getStoreStatusClass(status: 'active' | 'inactive') {
+  return status === 'active'
+    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+    : 'border-amber-200 bg-amber-50 text-amber-700';
+}
+
+function getOrderStatusClass(status: string) {
+  if (status === 'delivered') {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+  }
+
+  if (status === 'cancelled') {
+    return 'border-rose-200 bg-rose-50 text-rose-700';
+  }
+
+  if (status === 'shipped') {
+    return 'border-sky-200 bg-sky-50 text-sky-700';
+  }
+
+  return 'border-amber-200 bg-amber-50 text-amber-700';
+}
+
+function normalizeNumber(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function validateForm(values: StoreFormValues) {
+  const name = values.name.trim();
+  const address = values.address.trim();
+  const city = values.city.trim();
+  const latitude = normalizeNumber(values.latitude);
+  const longitude = normalizeNumber(values.longitude);
+  const capacity = normalizeNumber(values.capacity);
+
+  if (!name) {
+    return 'El nombre de la tienda es obligatorio.';
+  }
+
+  if (!address) {
+    return 'La dirección es obligatoria.';
+  }
+
+  if (!city) {
+    return 'La ciudad es obligatoria.';
+  }
+
+  if (latitude == null || longitude == null) {
+    return 'Debes indicar las coordenadas de la tienda.';
+  }
+
+  if (latitude < -90 || latitude > 90) {
+    return 'La latitud debe estar entre -90 y 90.';
+  }
+
+  if (longitude < -180 || longitude > 180) {
+    return 'La longitud debe estar entre -180 y 180.';
+  }
+
+  if (capacity == null || capacity <= 0 || !Number.isInteger(capacity)) {
+    return 'La capacidad debe ser un número entero mayor a cero.';
+  }
+
+  return null;
+}
+
+function toFormValues(store: StoreRecord): StoreFormValues {
+  return {
+    name: store.name,
+    address: store.address,
+    city: store.city,
+    latitude: store.latitude != null ? String(store.latitude) : '',
+    longitude: store.longitude != null ? String(store.longitude) : '',
+    capacity: store.capacity != null ? String(store.capacity) : '',
+    status: store.status,
+  };
+}
+
+type SummaryCardProps = {
+  label: string;
+  value: string | number;
+  helper?: string;
+};
+
+function SummaryCard({ label, value, helper }: SummaryCardProps) {
+  return (
+    <div className="rounded-2xl border border-border bg-bg-secondary px-4 py-3 shadow-sm">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">{label}</p>
+      <p className="mt-1 text-2xl font-semibold text-text">{value}</p>
+      {helper ? <p className="mt-1 text-sm text-text-muted">{helper}</p> : null}
+    </div>
+  );
+}
 
 export function StoresManagementPage() {
   const navigate = useNavigate();
   const token = getAccessToken();
   const role = getRoleFromToken(token);
+  const queryClient = useQueryClient();
+  const { success, error: showError } = useSnackbar();
 
-  const { success, error } = useSnackbar();
-  const [stores, setStores] = useState<Store[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingStore, setEditingStore] = useState<Store | null>(null);
-  const [storeForm, setStoreForm] = useState<StoreFormState>(initialStoreForm);
-  const [deleteConfirm, setDeleteConfirm] = useState<{
-    isOpen: boolean;
-    storeId?: string;
-  }>({ isOpen: false });
-  const [inventoryData, setInventoryData] = useState<StoreInventoryResponse | null>(null);
-  const [isInventoryOpen, setIsInventoryOpen] = useState(false);
-  const [ordersData, setOrdersData] = useState<StoreOrdersResponse | null>(null);
-  const [isOrdersOpen, setIsOrdersOpen] = useState(false);
+  const [editingStore, setEditingStore] = useState<StoreRecord | null>(null);
+  const [formValues, setFormValues] = useState<StoreFormValues>(INITIAL_FORM_VALUES);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  // Redirect root users
+  const [inventoryModalOpen, setInventoryModalOpen] = useState(false);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [inventoryData, setInventoryData] = useState<StoreInventoryResponse | null>(null);
+
+  const [ordersModalOpen, setOrdersModalOpen] = useState(false);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersData, setOrdersData] = useState<StoreOrdersResponse | null>(null);
+
+  const [deleteTarget, setDeleteTarget] = useState<StoreRecord | null>(null);
+  const [deleteBlocked, setDeleteBlocked] = useState<{
+    store: StoreRecord;
+    pendingOrders: number;
+  } | null>(null);
+  const [deleteCheckLoading, setDeleteCheckLoading] = useState(false);
+
+  const storesQuery = useQuery({
+    queryKey: ['admin-stores'],
+    queryFn: getStores,
+    enabled: role !== 'root',
+  });
+
+  const saveStoreMutation = useMutation({
+    mutationFn: async (payload: { storeId?: number; data: CreateStoreRequest }) => {
+      if (payload.storeId != null) {
+        return updateStore(payload.storeId, payload.data);
+      }
+
+      return createStore(payload.data);
+    },
+  });
+
+  const deleteStoreMutation = useMutation({
+    mutationFn: deleteStore,
+  });
+
   useEffect(() => {
     if (role === 'root') {
       navigate('/admin/create-admin', { replace: true });
     }
-  }, [role, navigate]);
+  }, [navigate, role]);
 
-  // Fetch stores
-  useEffect(() => {
-    const fetchStores = async () => {
-      try {
-        setIsLoading(true);
-        const data = await getStores();
-        setStores(Array.isArray(data) ? data : []);
-        setTotalPages(1);
-      } catch (err) {
-        error('Error al cargar tiendas');
-        console.error(err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const stores = storesQuery.data ?? [];
 
-    fetchStores();
-  }, [currentPage, error]);
+  const filteredStores = useMemo(() => {
+    const query = search.trim().toLowerCase();
 
-  const handleSearch = async (query: string) => {
     if (!query) {
       setCurrentPage(1);
       return;
@@ -137,81 +273,91 @@ export function StoresManagementPage() {
     }
   };
 
-  const handleViewInventory = async (storeId: string) => {
+  const openInventoryModal = async (store: StoreRecord) => {
+    setInventoryData(null);
+    setInventoryLoading(true);
+    setInventoryModalOpen(true);
+
     try {
-      setIsLoading(true);
-      const data = await getStoreInventory(storeId);
+      const data = await fetchStoreInventory(store.storeId);
       setInventoryData(data);
-      setIsInventoryOpen(true);
     } catch (err) {
-      error('Error al cargar inventario');
-      console.error(err);
+      const message = err instanceof Error ? err.message : 'No se pudo cargar el inventario de la tienda';
+      showError(message);
+      setInventoryModalOpen(false);
     } finally {
-      setIsLoading(false);
+      setInventoryLoading(false);
     }
   };
 
-  const handleViewOrders = async (storeId: string) => {
+  const openOrdersModal = async (store: StoreRecord) => {
+    setOrdersData(null);
+    setOrdersLoading(true);
+    setOrdersModalOpen(true);
+
     try {
-      setIsLoading(true);
-      const data = await getStoreOrders(storeId);
+      const data = await fetchStoreOrders(store.storeId);
       setOrdersData(data);
-      setIsOrdersOpen(true);
     } catch (err) {
-      error('Error al cargar pedidos');
-      console.error(err);
+      const message = err instanceof Error ? err.message : 'No se pudieron cargar los pedidos de la tienda';
+      showError(message);
+      setOrdersModalOpen(false);
     } finally {
-      setIsLoading(false);
+      setOrdersLoading(false);
     }
   };
 
-  const handleAddStore = () => {
-    setEditingStore(null);
-    setStoreForm(initialStoreForm);
-    setIsFormOpen(true);
-  };
+  const handleDeleteClick = async (store: StoreRecord) => {
+    setDeleteCheckLoading(true);
 
-  const handleEditStore = (store: Store) => {
-    setEditingStore(store);
-    setStoreForm({
-      name: store.name,
-      address: store.address,
-      city: store.city,
-      latitude: store.latitude != null ? String(store.latitude) : '',
-      longitude: store.longitude != null ? String(store.longitude) : '',
-      capacity: store.capacity != null ? String(store.capacity) : '',
-      status: store.status ?? 'active',
-    });
-    setIsFormOpen(true);
-  };
-
-  const handleDeleteClick = async (storeId: string) => {
     try {
-      setIsLoading(true);
-      const orders = await getStoreOrders(storeId);
-      if (orders.pendingOrders > 0) {
-        error('No se puede eliminar la tienda porque tiene pedidos pendientes (en preparación o enviados).');
+      const data = await fetchStoreOrders(store.storeId);
+      setOrdersData(data);
+
+      if (data.pendingOrders > 0) {
+        setDeleteBlocked({ store, pendingOrders: data.pendingOrders });
         return;
       }
-      setDeleteConfirm({ isOpen: true, storeId });
+
+      setDeleteTarget(store);
     } catch (err) {
-      error('Error al verificar pedidos');
-      console.error(err);
+      const message = err instanceof Error ? err.message : 'No se pudo validar si la tienda puede eliminarse';
+      showError(message);
     } finally {
-      setIsLoading(false);
+      setDeleteCheckLoading(false);
     }
   };
 
-  const handleDeleteConfirm = async () => {
-    if (!deleteConfirm.storeId) return;
+  const handleSaveStore = async () => {
+    const validationMessage = validateForm(formValues);
+
+    if (validationMessage) {
+      setFormError(validationMessage);
+      return;
+    }
+
+    const payload: CreateStoreRequest = {
+      name: formValues.name.trim(),
+      address: formValues.address.trim(),
+      city: formValues.city.trim(),
+      latitude: Number(formValues.latitude),
+      longitude: Number(formValues.longitude),
+      capacity: Number(formValues.capacity),
+      status: formValues.status,
+    };
+
+    setFormError(null);
 
     try {
-      setIsLoading(true);
-      await deleteStore(deleteConfirm.storeId);
-      success('Tienda eliminada exitosamente');
-      setCurrentPage(1);
-      setDeleteConfirm({ isOpen: false });
-      window.location.reload();
+      await saveStoreMutation.mutateAsync({
+        storeId: editingStore?.storeId,
+        data: payload,
+      });
+
+      await queryClient.invalidateQueries({ queryKey: ['admin-stores'] });
+
+      success(editingStore ? 'Tienda actualizada' : 'Tienda creada');
+      closeFormModal();
     } catch (err) {
       error('Error al eliminar tienda');
       console.error(err);
@@ -279,28 +425,47 @@ export function StoresManagementPage() {
       setStoreForm(initialStoreForm);
       setEditingStore(null);
     } catch (err) {
-      error('Error al guardar tienda');
-      console.error(err);
-    } finally {
-      setIsLoading(false);
+      const message = err instanceof Error ? err.message : 'No se pudo eliminar la tienda';
+      showError(message);
     }
   };
 
-  const columns: DataTableColumn<Store>[] = [
+  if (role === 'root') {
+    return <Navigate to="/admin/create-admin" replace />;
+  }
+
+  const columns: DataTableColumn<StoreRecord>[] = [
+    {
+      key: 'storeId',
+      label: 'ID',
+      width: '88px',
+    },
     {
       key: 'name',
-      label: 'Nombre',
-      width: '25%',
+      label: 'Tienda',
+      width: '240px',
+      render: (_, store) => (
+        <div className="space-y-1">
+          <p className="font-semibold text-text">{store.name}</p>
+          <p className="text-xs text-text-muted">{store.city}</p>
+        </div>
+      ),
     },
     {
       key: 'address',
       label: 'Dirección',
-      width: '25%',
+      width: '260px',
     },
     {
       key: 'city',
       label: 'Ciudad',
-      width: '20%',
+      width: '170px',
+    },
+    {
+      key: 'latitude',
+      label: 'Coordenadas',
+      width: '180px',
+      render: (_, store) => <span>{formatCoordinates(store.latitude, store.longitude)}</span>,
     },
     {
       key: 'capacity',
@@ -312,175 +477,158 @@ export function StoresManagementPage() {
     {
       key: 'status',
       label: 'Estado',
-      width: '15%',
-      render: (value) => String(value).toUpperCase(),
+      width: '130px',
+      render: (_, store) => (
+        <span
+          className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStoreStatusClass(store.status)}`}
+        >
+          {STORE_STATUS_LABELS[store.status]}
+        </span>
+      ),
     },
   ];
 
-  const actions: DataTableAction<Store>[] = [
+  const actions: DataTableAction<StoreRecord>[] = [
     {
       label: 'Inventario',
-      icon: '📦',
-      onClick: (store) => handleViewInventory(store.storeId),
       variant: 'secondary',
+      onClick: (store) => {
+        void openInventoryModal(store);
+      },
     },
     {
-      label: 'Pedidos',
-      icon: '🛒',
-      onClick: (store) => handleViewOrders(store.storeId),
+      label: 'Pedidos activos',
       variant: 'secondary',
+      onClick: (store) => {
+        void openOrdersModal(store);
+      },
     },
     {
       label: 'Editar',
-      icon: '✏️',
-      onClick: (store) => handleEditStore(store),
-      variant: 'secondary',
+      variant: 'primary',
+      onClick: openEditModal,
     },
     {
       label: 'Eliminar',
-      icon: '🗑️',
-      onClick: (store) => handleDeleteClick(store.storeId),
       variant: 'destructive',
+      onClick: (store) => {
+        void handleDeleteClick(store);
+      },
     },
   ];
 
   return (
     <AdminLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-text">Gestión de Tiendas</h1>
-            <p className="text-text-muted mt-2">
-              Administra las sucursales y ubicaciones de tiendas
+        <div className="flex flex-col gap-4 rounded-3xl border border-border bg-bg-secondary p-5 shadow-sm lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-2">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-text-muted">
+              Administración
+            </p>
+            <h1 className="text-3xl font-semibold tracking-tight text-text">Tiendas físicas</h1>
+            <p className="max-w-3xl text-sm text-text-muted">
+              Gestiona la red de tiendas, consulta inventario y pedidos activos, y mantiene las
+              ubicaciones listas para la operación diaria.
             </p>
           </div>
-          <div className="w-full md:w-auto">
-            <button
-              onClick={handleAddStore}
-              className="w-full md:w-auto px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors font-medium"
-            >
-              ➕ Agregar Tienda
-            </button>
-          </div>
+
+          <button
+            type="button"
+            onClick={openCreateModal}
+            className="inline-flex items-center justify-center rounded-xl bg-primary-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-600"
+          >
+            Nueva tienda
+          </button>
         </div>
 
-        {/* Data Table */}
-        <DataTable<Store>
+        <div className="grid gap-4 md:grid-cols-3">
+          <SummaryCard label="Tiendas totales" value={totalStores} helper="Registradas en el sistema" />
+          <SummaryCard label="Tiendas activas" value={activeStores} helper="Disponibles para operación" />
+          <SummaryCard
+            label="Con coordenadas"
+            value={storesWithCoordinates}
+            helper="Ubicaciones listas para mapa y georreferenciación"
+          />
+        </div>
+
+        {storesQuery.error ? (
+          <div className="rounded-2xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700">
+            {storesQuery.error instanceof Error
+              ? storesQuery.error.message
+              : 'No se pudieron cargar las tiendas'}
+          </div>
+        ) : null}
+
+        {deleteCheckLoading ? (
+          <div className="flex items-center gap-3 rounded-2xl border border-border bg-bg-secondary px-4 py-3 text-sm text-text-muted">
+            <Spinner />
+            Verificando si la tienda puede eliminarse...
+          </div>
+        ) : null}
+
+        <DataTable
           columns={columns}
-          data={stores}
+          data={filteredStores}
           actions={actions}
-          isLoading={isLoading}
-          onSearch={handleSearch}
-          searchPlaceholder="Buscar por nombre, dirección o ciudad..."
-          pagination={{
-            currentPage,
-            totalPages,
-            onPageChange: setCurrentPage,
-          }}
-          emptyMessage="No hay tiendas disponibles"
+          isLoading={storesQuery.isLoading}
+          onSearch={setSearch}
+          searchPlaceholder="Buscar por nombre, ciudad o dirección"
+          emptyMessage={
+            search.trim()
+              ? 'No hay tiendas que coincidan con la búsqueda.'
+              : 'No hay tiendas registradas todavía.'
+          }
         />
       </div>
 
-      {/* Form Modal */}
       <FormModal
         isOpen={isFormOpen}
-        title={editingStore ? 'Editar Tienda' : 'Crear Tienda'}
-        onClose={() => {
-          setIsFormOpen(false);
-          setEditingStore(null);
-          setStoreForm(initialStoreForm);
+        title={editingStore ? 'Editar tienda' : 'Nueva tienda'}
+        onClose={closeFormModal}
+        onSubmit={async () => {
+          await handleSaveStore();
         }}
-        onSubmit={handleFormSubmit}
-        isLoading={isLoading}
-        submitText={editingStore ? 'Actualizar' : 'Crear'}
+        isLoading={saveStoreMutation.isPending}
+        submitText={editingStore ? 'Guardar cambios' : 'Crear tienda'}
         size="lg"
       >
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-text mb-2">
-              Nombre de la Tienda
+          {formError ? (
+            <div className="rounded-2xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700">
+              {formError}
+            </div>
+          ) : null}
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="space-y-2 text-sm font-medium text-text">
+              <span>Nombre</span>
+              <input
+                type="text"
+                value={formValues.name}
+                onChange={(event) =>
+                  setFormValues((current) => ({ ...current, name: event.target.value }))
+                }
+                className="w-full rounded-xl border border-border bg-bg px-4 py-2.5 text-text outline-none transition focus:border-primary-400"
+                placeholder="Sucursal Centro"
+              />
             </label>
-            <input
-              type="text"
-              name="name"
-              required
-              value={storeForm.name}
-              placeholder="Nombre de la tienda"
-              onChange={(event) => {
-                const nextValue = normalizeStoreName(
-                  event.currentTarget.value,
-                );
-                event.currentTarget.value = nextValue;
-                setStoreForm((prev) => ({ ...prev, name: nextValue }));
-              }}
-              title="Solo letras, números y espacios"
-              className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
-            />
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium text-text mb-2">
-              Dirección
+            <label className="space-y-2 text-sm font-medium text-text">
+              <span>Ciudad</span>
+              <input
+                type="text"
+                value={formValues.city}
+                onChange={(event) =>
+                  setFormValues((current) => ({ ...current, city: event.target.value }))
+                }
+                className="w-full rounded-xl border border-border bg-bg px-4 py-2.5 text-text outline-none transition focus:border-primary-400"
+                placeholder="Pereira"
+              />
             </label>
-            <input
-              type="text"
-              name="address"
-              required
-              defaultValue={editingStore?.address || ''}
-              placeholder="Dirección completa"
-              onInput={(event) => {
-                event.currentTarget.value = normalizeStoreAddress(
-                  event.currentTarget.value,
-                );
-              }}
-              title="Solo letras, números, espacios y signos de dirección básicos"
-              className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
-            />
           </div>
 
-          <div>
-            {editingStore ? (
-              <>
-                <label className="block text-sm font-medium text-text mb-2">
-                  Ciudad
-                </label>
-                <input
-                  type="text"
-                  name="city"
-                  required
-                  value={storeForm.city}
-                  placeholder="Ciudad"
-                  onChange={(event) => {
-                    const nextValue = normalizeStoreLocation(
-                      event.currentTarget.value,
-                    );
-                    event.currentTarget.value = nextValue;
-                    setStoreForm((prev) => ({ ...prev, city: nextValue }));
-                  }}
-                  title="Solo letras, números y espacios"
-                  className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
-                />
-              </>
-            ) : (
-              <>
-                <LocationPicker
-                  label="Ciudad"
-                  value={storeForm.city}
-                  onChange={(value) => setStoreForm((prev) => ({ ...prev, city: extractCityName(value) }))}
-                />
-                <input
-                  type="hidden"
-                  name="city"
-                  value={storeForm.city}
-                  readOnly
-                />
-              </>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-text mb-2">Dirección</label>
+          <label className="space-y-2 text-sm font-medium text-text">
+            <span>Dirección</span>
             <input
               type="text"
               name="address"
@@ -519,24 +667,43 @@ export function StoresManagementPage() {
               </label>
               <input
                 type="number"
-                name="longitude"
-                step="0.000001"
-                value={storeForm.longitude}
-                onChange={(event) => setStoreForm((prev) => ({ ...prev, longitude: event.target.value }))}
-                placeholder="-70.6693"
-                className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
+                min="1"
+                step="1"
+                value={formValues.capacity}
+                onChange={(event) =>
+                  setFormValues((current) => ({ ...current, capacity: event.target.value }))
+                }
+                className="w-full rounded-xl border border-border bg-bg px-4 py-2.5 text-text outline-none transition focus:border-primary-400"
+                placeholder="120"
               />
-            </div>
-          </div>*/}
+            </label>
+          </div>
+
+          <label className="space-y-2 text-sm font-medium text-text">
+            <span>Estado</span>
+            <select
+              value={formValues.status}
+              onChange={(event) =>
+                setFormValues((current) => ({
+                  ...current,
+                  status: event.target.value === 'inactive' ? 'inactive' : 'active',
+                }))
+              }
+              className="w-full rounded-xl border border-border bg-bg px-4 py-2.5 text-text outline-none transition focus:border-primary-400"
+            >
+              <option value="active">Activa</option>
+              <option value="inactive">Inactiva</option>
+            </select>
+          </label>
 
           <StoreMapPicker
-            address={storeForm.address}
-            city={storeForm.city}
-            latitude={storeForm.latitude.trim() ? Number(storeForm.latitude) : null}
-            longitude={storeForm.longitude.trim() ? Number(storeForm.longitude) : null}
+            address={formValues.address}
+            city={formValues.city}
+            latitude={formValues.latitude ? Number(formValues.latitude) : null}
+            longitude={formValues.longitude ? Number(formValues.longitude) : null}
             onCoordinatesChange={(coordinates) => {
-              setStoreForm((prev) => ({
-                ...prev,
+              setFormValues((current) => ({
+                ...current,
                 latitude: coordinates ? String(coordinates.latitude) : '',
                 longitude: coordinates ? String(coordinates.longitude) : '',
               }));
@@ -581,144 +748,188 @@ export function StoresManagementPage() {
         </div>
       </FormModal>
 
-      {/* Delete Confirmation Modal */}
+      <FormModal
+        isOpen={inventoryModalOpen}
+        title={inventoryData ? `Inventario de ${inventoryData.store.name}` : 'Inventario de tienda'}
+        onClose={() => setInventoryModalOpen(false)}
+        onSubmit={async () => {
+          setInventoryModalOpen(false);
+        }}
+        isLoading={inventoryLoading && inventoryData == null}
+        submitText="Cerrar"
+        size="lg"
+      >
+        {inventoryData ? (
+          <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-3">
+              <SummaryCard
+                label="Disponibles"
+                value={inventoryData.totalAvailableQuantity}
+                helper="Unidades listas para vender"
+              />
+              <SummaryCard
+                label="Reservados"
+                value={inventoryData.totalReservedQuantity}
+                helper="Unidades apartadas en pedidos"
+              />
+              <SummaryCard
+                label="Ítems"
+                value={inventoryData.items.length}
+                helper="Libros con inventario registrado"
+              />
+            </div>
+
+            <div className="rounded-2xl border border-border bg-bg-secondary overflow-x-auto">
+              <table className="w-full">
+                <thead className="border-b border-border bg-bg">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-text">Libro</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-text">Autor</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-text">Disponible</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-text">Reservado</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-text">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {inventoryData.items.map((item) => (
+                    <tr key={item.bookId} className="hover:bg-bg">
+                      <td className="px-4 py-3 text-sm text-text">{item.title}</td>
+                      <td className="px-4 py-3 text-sm text-text-muted">{item.author}</td>
+                      <td className="px-4 py-3 text-sm text-text">{item.availableQuantity}</td>
+                      <td className="px-4 py-3 text-sm text-text">{item.reservedQuantity}</td>
+                      <td className="px-4 py-3 text-sm text-text">{item.totalQuantity}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {inventoryData.items.length === 0 ? (
+              <p className="text-sm text-text-muted">No hay inventario registrado para esta tienda.</p>
+            ) : null}
+          </div>
+        ) : inventoryLoading ? (
+          <div className="flex justify-center py-12">
+            <Spinner />
+          </div>
+        ) : null}
+      </FormModal>
+
+      <FormModal
+        isOpen={ordersModalOpen}
+        title={ordersData ? `Pedidos activos de ${ordersData.store.name}` : 'Pedidos activos de tienda'}
+        onClose={() => setOrdersModalOpen(false)}
+        onSubmit={async () => {
+          setOrdersModalOpen(false);
+        }}
+        isLoading={ordersLoading && ordersData == null}
+        submitText="Cerrar"
+        size="lg"
+      >
+        {ordersData ? (
+          <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-3">
+              <SummaryCard
+                label="Activos"
+                value={inventoryActiveOrders.length}
+                helper="Pedidos en preparación o en despacho"
+              />
+              <SummaryCard
+                label="Totales"
+                value={ordersData.totalOrders}
+                helper="Pedidos consultados para esta tienda"
+              />
+              <SummaryCard
+                label="Pendientes"
+                value={ordersData.pendingOrders}
+                helper="Bloquean la eliminación de la tienda"
+              />
+            </div>
+
+            <div className="rounded-2xl border border-border bg-bg-secondary overflow-x-auto">
+              <table className="w-full">
+                <thead className="border-b border-border bg-bg">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-text">Pedido</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-text">Cliente</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-text">Fecha</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-text">Estado</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-text">Total</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-text">Artículos</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {inventoryActiveOrders.map((order) => {
+                    const clientName = `${order.client.firstName} ${order.client.lastName}`.trim();
+
+                    return (
+                      <tr key={order.purchaseId} className="hover:bg-bg">
+                        <td className="px-4 py-3 text-sm font-medium text-text">#{order.purchaseId}</td>
+                        <td className="px-4 py-3 text-sm text-text-muted">{clientName || order.client.email}</td>
+                        <td className="px-4 py-3 text-sm text-text-muted">{formatDate(order.purchaseDate)}</td>
+                        <td className="px-4 py-3 text-sm text-text">
+                          <span
+                            className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getOrderStatusClass(order.status)}`}
+                          >
+                            {ORDER_STATUS_LABELS[order.status] ?? order.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-text">{formatMoney(order.totalAmount)}</td>
+                        <td className="px-4 py-3 text-sm text-text">{order.items.length}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {inventoryActiveOrders.length === 0 ? (
+              <p className="text-sm text-text-muted">No hay pedidos activos para esta tienda.</p>
+            ) : null}
+          </div>
+        ) : ordersLoading ? (
+          <div className="flex justify-center py-12">
+            <Spinner />
+          </div>
+        ) : null}
+      </FormModal>
+
       <ConfirmationModal
-        isOpen={deleteConfirm.isOpen}
-        title="Confirmar eliminación"
-        message="¿Estás seguro de que deseas eliminar esta tienda? Esta acción no se puede deshacer."
-        confirmText="Eliminar"
-        cancelText="Cancelar"
-        onConfirm={handleDeleteConfirm}
-        onCancel={() => setDeleteConfirm({ isOpen: false })}
-        isConfirmLoading={isLoading}
+        isOpen={deleteBlocked != null}
+        title="Eliminación no permitida"
+        message={
+          deleteBlocked
+            ? `No puedes eliminar ${deleteBlocked.store.name} porque tiene ${deleteBlocked.pendingOrders} pedido(s) pendiente(s) en preparación o despacho.`
+            : ''
+        }
+        cancelText="Cerrar"
+        confirmText="Ver pedidos activos"
+        onCancel={() => setDeleteBlocked(null)}
+        onConfirm={async () => {
+          if (!deleteBlocked) {
+            return;
+          }
+
+          const store = deleteBlocked.store;
+          setDeleteBlocked(null);
+          await openOrdersModal(store);
+        }}
       />
 
-      {/* Inventory Modal */}
-      <FormModal
-        isOpen={isInventoryOpen}
-        title={`Inventario: ${inventoryData?.store.name || ''}`}
-        onClose={() => setIsInventoryOpen(false)}
-        onSubmit={async () => setIsInventoryOpen(false)}
-        submitText="Cerrar"
-        size="lg"
-        isLoading={false}
-      >
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="bg-bg p-4 rounded-lg border border-border">
-              <p className="text-sm text-text-muted">Total Disponible</p>
-              <p className="text-2xl font-bold text-primary-500">{inventoryData?.totalAvailableQuantity || 0}</p>
-            </div>
-            <div className="bg-bg p-4 rounded-lg border border-border">
-              <p className="text-sm text-text-muted">Total Reservado</p>
-              <p className="text-2xl font-bold text-orange-500">{inventoryData?.totalReservedQuantity || 0}</p>
-            </div>
-          </div>
-          
-          <div className="overflow-x-auto border border-border rounded-lg">
-            <table className="w-full text-left text-sm text-text">
-              <thead className="bg-bg-secondary border-b border-border">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Libro</th>
-                  <th className="px-4 py-3 font-medium text-center">Disponible</th>
-                  <th className="px-4 py-3 font-medium text-center">Reservado</th>
-                  <th className="px-4 py-3 font-medium text-center">Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {!inventoryData?.items || inventoryData.items.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-8 text-center text-text-muted">No hay inventario en esta tienda</td>
-                  </tr>
-                ) : (
-                  inventoryData.items.map((item) => (
-                    <tr key={item.bookId} className="hover:bg-bg-secondary/50">
-                      <td className="px-4 py-3">
-                        <p className="font-medium">{item.title}</p>
-                        <p className="text-xs text-text-muted">{item.author}</p>
-                      </td>
-                      <td className="px-4 py-3 text-center">{item.availableQuantity}</td>
-                      <td className="px-4 py-3 text-center">{item.reservedQuantity}</td>
-                      <td className="px-4 py-3 text-center font-medium">{item.totalQuantity}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </FormModal>
-
-      {/* Orders Modal */}
-      <FormModal
-        isOpen={isOrdersOpen}
-        title={`Pedidos: ${ordersData?.store.name || ''}`}
-        onClose={() => setIsOrdersOpen(false)}
-        onSubmit={async () => setIsOrdersOpen(false)}
-        submitText="Cerrar"
-        size="lg"
-        isLoading={false}
-      >
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="bg-bg p-4 rounded-lg border border-border">
-              <p className="text-sm text-text-muted">Total Pedidos</p>
-              <p className="text-2xl font-bold text-primary-500">{ordersData?.totalOrders || 0}</p>
-            </div>
-            <div className="bg-bg p-4 rounded-lg border border-border">
-              <p className="text-sm text-text-muted">Pedidos Pendientes</p>
-              <p className="text-2xl font-bold text-orange-500">{ordersData?.pendingOrders || 0}</p>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto border border-border rounded-lg max-h-[400px]">
-            <table className="w-full text-left text-sm text-text">
-              <thead className="bg-bg-secondary border-b border-border sticky top-0">
-                <tr>
-                  <th className="px-4 py-3 font-medium">ID Pedido</th>
-                  <th className="px-4 py-3 font-medium">Cliente</th>
-                  <th className="px-4 py-3 font-medium">Estado</th>
-                  <th className="px-4 py-3 font-medium text-right">Monto</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {!ordersData?.orders || ordersData.orders.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-8 text-center text-text-muted">No hay pedidos para esta tienda</td>
-                  </tr>
-                ) : (
-                  ordersData.orders.map((order) => (
-                    <tr key={order.purchaseId} className="hover:bg-bg-secondary/50">
-                      <td className="px-4 py-3 font-medium">#{order.purchaseId}</td>
-                      <td className="px-4 py-3">
-                        <p>{order.client.firstName} {order.client.lastName}</p>
-                        <p className="text-xs text-text-muted">{order.client.email}</p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          ['inPreparation', 'shipped'].includes(order.status)
-                            ? 'bg-orange-100 text-orange-800'
-                            : order.status === 'delivered'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}>
-                          {order.status === 'inPreparation' ? 'En Preparación' : 
-                           order.status === 'shipped' ? 'Enviado' : 
-                           order.status === 'delivered' ? 'Entregado' : 
-                           order.status === 'cancelled' ? 'Cancelado' : 'Pendiente'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right font-medium">
-                        ${order.totalAmount.toLocaleString()}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </FormModal>
+      <ConfirmationModal
+        isOpen={deleteTarget != null}
+        title="Eliminar tienda"
+        message={
+          deleteTarget
+            ? `¿Seguro que deseas eliminar ${deleteTarget.name}? Esta acción no se puede deshacer.`
+            : ''
+        }
+        cancelText="Cancelar"
+        confirmText="Eliminar"
+        isConfirmLoading={deleteStoreMutation.isPending}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={handleConfirmDelete}
+      />
     </AdminLayout>
   );
 }

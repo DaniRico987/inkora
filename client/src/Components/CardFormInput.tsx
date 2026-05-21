@@ -52,13 +52,13 @@ export function CardFormInput({
     showCardProvider = true,
 }: CardFormInputProps) {
     const detectedProvider = useMemo(() => detectCardProvider(data.cardNumber), [data.cardNumber]);
-    const [remoteProviderName, setRemoteProviderName] = useState<string | null>(null);
+    const [remoteProvider, setRemoteProvider] = useState<{ bin: string; name: string } | null>(null);
+    const digits = data.cardNumber.replace(/\D/g, '');
+    const bin = digits.slice(0, 6);
+    const remoteProviderName = remoteProvider?.bin === bin ? remoteProvider.name : null;
 
     // Try BIN lookup when local detection is unknown and we have at least 6 digits
     useEffect(() => {
-        setRemoteProviderName(null);
-        const digits = data.cardNumber.replace(/\D/g, '');
-        const bin = digits.slice(0, 6);
         if (!bin || bin.length < 6) return;
 
         if (detectedProvider !== 'unknown') return;
@@ -71,7 +71,7 @@ export function CardFormInput({
                 const body = await res.json();
                 if (cancelled) return;
                 const name = body.scheme || body.brand || body.network || body.type || null;
-                if (name) setRemoteProviderName(String(name));
+                if (name) setRemoteProvider({ bin, name: String(name) });
             } catch {
                 // ignore network errors
             }
@@ -80,7 +80,7 @@ export function CardFormInput({
         return () => {
             cancelled = true;
         };
-    }, [data.cardNumber, detectedProvider]);
+    }, [bin, detectedProvider]);
 
     const handleCardNumberChange = (value: string) => {
         const formatted = formatCardNumber(value);

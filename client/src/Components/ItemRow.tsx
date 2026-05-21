@@ -1,25 +1,22 @@
 import type { ItemProps } from '../interfaces/ItemInterface';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 export default function ItemRow({ id, cuantity, image, title, author, tag, price }: ItemProps) {
-  const [imageFailed, setImageFailed] = useState(false);
-
-  useEffect(() => {
-    setImageFailed(false);
-  }, [image]);
+  const [failedImageSrc, setFailedImageSrc] = useState<string | null>(null);
+  const showImage = Boolean(image && failedImageSrc !== image);
 
   return (
     <Link to={`/books/${id}`}>
       <article className="group relative flex items-center gap-4 bg-bg-secondary rounded-xl border border-border shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-500 ease-in-out p-3 cursor-pointer overflow-hidden">
       {/* Miniatura */}
       <div className="relative shrink-0 w-18 h-18 rounded-xl overflow-hidden bg-babyblue-300">
-        {image && !imageFailed ? (
+        {showImage ? (
           <img
             src={image}
             alt={title}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-            onError={() => setImageFailed(true)}
+            onError={() => setFailedImageSrc(image ?? null)}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-text-muted">

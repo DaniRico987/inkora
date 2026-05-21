@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from './Button';
 
@@ -25,13 +25,34 @@ export function RejectionModal({
   onConfirm,
   isConfirmLoading = false,
 }: RejectionModalProps) {
-  const [note, setNote] = useState(initialNote || '');
-
-  useEffect(() => {
-    if (isOpen) setNote(initialNote || '');
-  }, [isOpen, initialNote]);
-
   if (!isOpen) return null;
+
+  return createPortal(
+    <RejectionModalContent
+      title={title}
+      message={message}
+      initialNote={initialNote}
+      confirmText={confirmText}
+      cancelText={cancelText}
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+      isConfirmLoading={isConfirmLoading}
+    />,
+    document.body,
+  );
+}
+
+function RejectionModalContent({
+  title,
+  message,
+  initialNote,
+  confirmText,
+  cancelText,
+  onCancel,
+  onConfirm,
+  isConfirmLoading,
+}: Omit<RejectionModalProps, 'isOpen'>) {
+  const [note, setNote] = useState(initialNote || '');
 
   return createPortal(
     <div className="fixed inset-0 z-9999 flex items-end justify-center px-3 py-3 sm:items-center sm:px-4" role="dialog" aria-modal="true">
