@@ -9,21 +9,21 @@ export default function ItemRow({ id, cuantity, image, title, author, tag, price
   return (
     <Link to={`/books/${id}`}>
       <article className="group relative flex items-center gap-4 bg-bg-secondary rounded-xl border border-border shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-500 ease-in-out p-3 cursor-pointer overflow-hidden">
-        {/* Miniatura */}
-        <div className="relative shrink-0 w-18 h-18 rounded-xl overflow-hidden bg-babyblue-300">
-          {showImage ? (
-            <img
-              src={image ?? undefined}
-              alt={title}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              onError={() => setFailedImageSrc(image ?? null)}
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-text-muted">
-              <img src='/inkoraICO.svg' alt='inkora' className='w-10' />
-            </div>
-          )}
-        </div>
+          {/* Miniatura */}
+          <div className="relative shrink-0 w-18 h-18 rounded-xl overflow-hidden bg-babyblue-300">
+            {showImage ? (
+              <img
+                src={image ?? undefined}
+                alt={title}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                onError={() => setFailedImageSrc(image ?? null)}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-text-muted">
+                <img src='/inkoraICO.svg' alt='inkora' className='w-10' />
+              </div>
+            )}
+          </div>
 
         {/* Info */}
         <div className="flex flex-col gap-1.5 min-w-0 flex-1">

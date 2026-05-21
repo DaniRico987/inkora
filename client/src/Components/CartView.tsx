@@ -243,20 +243,20 @@ export const CartView: React.FC = () => {
                   : null;
 
                 return (
-                <CartItem
-                  key={item.cartItemId}
-                  item={item}
-                  onRemove={removeItem}
-                  index={index}
-                  reservationCountdown={
-                    remainingMs !== null && reservation
-                      ? {
+                  <CartItem
+                    key={item.cartItemId}
+                    item={item}
+                    onRemove={removeItem}
+                    index={index}
+                    reservationCountdown={
+                      remainingMs !== null && reservation
+                        ? {
                           reservationId: reservation?.reservationId ?? 0,
                           remainingMs,
                         }
-                      : undefined
-                  }
-                />
+                        : undefined
+                    }
+                  />
                 );
               })}
             </div>

@@ -113,7 +113,7 @@ export default function ItemGallery({ items, title }: ItemGalleryProps) {
 
   const filteredItems = useMemo(() => {
     if (hasInvalidSearchOnly) return [];
-    
+
     return items.filter((item) => {
       if (selectedTag && item.tag !== selectedTag) return false;
       if (selectedAuthor && item.author !== selectedAuthor) return false;
@@ -265,7 +265,7 @@ export default function ItemGallery({ items, title }: ItemGalleryProps) {
           <div className="max-w-full mx-auto">
             {filteredItems.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border p-8 text-center text-text-muted">
-                {searchValue 
+                {searchValue
                   ? "No hay libros que coincidan con tu búsqueda."
                   : "No hay resultados para los filtros seleccionados."}
               </div>

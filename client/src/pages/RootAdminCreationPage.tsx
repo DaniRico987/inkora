@@ -167,8 +167,8 @@ export function RootAdminCreationPage() {
                   placeholder="admin@inkora.com"
                   className={`w-full px-4 py-3 rounded-lg border ${
                     formErrors.email
-                      ? 'border-red-500 bg-red-50 focus:bg-red-50'
-                      : 'border-border bg-bg focus:bg-bg-secondary'
+                    ? 'border-red-500 bg-red-50 focus:bg-red-50'
+                    : 'border-border bg-bg focus:bg-bg-secondary'
                   } text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all`}
                   disabled={isLoading}
                 />
