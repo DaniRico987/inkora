@@ -117,7 +117,11 @@ const WalletPage = () => {
             />
           </Grid>
           <Grid size={{ xs: 12 }}>
-            <RegisteredCards cards={cards} onCardDeleted={loadCards} />
+            <RegisteredCards
+              cards={cards}
+              onCardDeleted={loadCards}
+              onCardRegistered={loadCards}
+            />
           </Grid>
           <Grid size={{ xs: 12 }}>
             <TransactionsList transactions={transactions} />
