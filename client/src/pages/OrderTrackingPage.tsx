@@ -15,6 +15,7 @@ import {
   type ReturnReason,
 } from '../api/purchases';
 import { usePurchaseTracking } from '../hooks/usePurchaseTracking';
+import { suggestAddresses, validateAddress } from '../services/addressValidation';
 
 const REFUND_WINDOW_DAYS = 7;
 
@@ -85,6 +86,21 @@ export function OrderTrackingPage() {
 
   const handleAddressSubmit = async (nextAddress: string) => {
     if (!purchase) return;
+
+    if (!nextAddress.trim()) {
+      snackbar.warning('La dirección no puede estar vacía');
+      return;
+    }
+
+    const isAddressValid = await validateAddress(nextAddress, '');
+    if (!isAddressValid) {
+      const suggestions = await suggestAddresses(nextAddress, '');
+      const suggestionText = suggestions.length > 0
+        ? ` Sugerencias: ${suggestions.slice(0, 3).map((suggestion) => suggestion.label).join(' · ')}`
+        : '';
+      snackbar.warning(`No pudimos verificar la nueva dirección.${suggestionText}`);
+      return;
+    }
 
     setIsAddressSaving(true);
     try {

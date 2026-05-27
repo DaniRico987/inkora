@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from './Button';
+import { CardFormInput, type CardFormData } from './CardFormInput';
 import { InputDate, InputSelect, InputText } from './Inputs';
 import { LocationPicker } from './LocationPicker';
 import { Spinner } from './Spinner';
@@ -16,6 +17,7 @@ import {
 import { getCategories, type Category } from '../api/categories';
 import { subscribeToCategory, unsubscribeFromCategory } from '../api/subscriptions';
 import { validateDateValue } from '../utils/dateValidation';
+import { suggestAddresses, validateAddress } from '../services/addressValidation';
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -120,6 +122,21 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
     const birthDateError = validateDateValue(form.birthDate, 'birthDate');
     if (birthDateError) {
       snackbar.warning(birthDateError);
+      return;
+    }
+
+    if (!form.address.trim()) {
+      snackbar.warning('La dirección es obligatoria en tu perfil');
+      return;
+    }
+
+    const isAddressValid = await validateAddress(form.address, '');
+    if (!isAddressValid) {
+      const suggestions = await suggestAddresses(form.address, '');
+      const suggestionText = suggestions.length > 0
+        ? ` Sugerencias: ${suggestions.slice(0, 3).map((suggestion) => suggestion.label).join(' · ')}`
+        : '';
+      snackbar.warning(`No pudimos verificar la dirección ingresada.${suggestionText}`);
       return;
     }
 

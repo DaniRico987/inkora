@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { CardFormInput, type CardFormData } from '../Components/CardFormInput';
 import { InputText, InputTextarea } from '../Components/Inputs';
 import { LocationPicker } from '../Components/LocationPicker';
 import { Spinner } from '../Components/Spinner';
@@ -99,12 +100,7 @@ type AddressFormState = {
   notes: string;
 };
 
-type PaymentFormState = {
-  cardholder: string;
-  cardNumber: string;
-  expiry: string;
-  cvv: string;
-};
+type PaymentFormState = CardFormData;
 
 type FieldErrors = Partial<
   Record<
@@ -254,10 +250,11 @@ const initialAddressState: AddressFormState = {
 };
 
 const initialPaymentState: PaymentFormState = {
-  cardholder: '',
   cardNumber: '',
-  expiry: '',
+  cardholder: '',
+  expiryDate: '',
   cvv: '',
+  cardType: 'credit',
 };
 
 const PAYMENT_METHODS: Array<{
@@ -290,10 +287,6 @@ function formatDate(isoDate: string): string {
   const date = new Date(isoDate);
   if (Number.isNaN(date.getTime())) return 'Sin fecha';
   return date.toLocaleDateString('es-CO');
-}
-
-function formatCardNumber(value: string): string {
-  return formatCardNumberInput(value);
 }
 
 function composeShippingAddress(address: AddressFormState): string {
@@ -452,6 +445,8 @@ export function CheckoutPage() {
   const [topUpLoading, setTopUpLoading] = useState(false);
   const [topUpError, setTopUpError] = useState<string | null>(null);
   const [purchase, setPurchase] = useState<Purchase | null>(null);
+  const [userProfile, setUserProfile] = useState<{ firstName: string; lastName: string; address: string | null } | null>(null);
+  const [useDefaultAddress, setUseDefaultAddress] = useState(true);
   const cartItems = cart?.items ?? [];
   const subtotal = cart?.subtotal ?? 0;
   const total = cart?.total ?? 0;
@@ -508,6 +503,20 @@ export function CheckoutPage() {
         if (cancelled) return;
 
         setRegisteredCards(profile.cards);
+        setUserProfile({
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          address: profile.address,
+        });
+
+        // Pre-fill address form if user has a saved address
+        if (profile.address) {
+          setAddressForm((prev) => ({
+            ...prev,
+            fullName: `${profile.firstName} ${profile.lastName}`.trim(),
+            street: profile.address || '',
+          }));
+        }
       } catch (error) {
         if (!cancelled) {
           const message =
@@ -711,7 +720,7 @@ export function CheckoutPage() {
     setPaymentForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const validateAddressStep = (): boolean => {
+  const validateAddressStep = async (): Promise<boolean> => {
     const nextErrors: FieldErrors = {};
 
     if (addressForm.fullName.trim().length < 3) {
@@ -722,12 +731,27 @@ export function CheckoutPage() {
       nextErrors.street = 'La dirección debe incluir calle y altura';
     }
 
+    if (addressForm.notes.trim().length < 5) {
+      nextErrors.notes = 'Agrega una referencia adicional obligatoria';
+    }
+
     if (addressForm.location.trim().length < 3) {
       nextErrors.location = 'Selecciona una ubicación válida';
     }
 
     if (!/^\d{4,5}$/.test(addressForm.postalCode.trim())) {
       nextErrors.postalCode = 'El código postal debe tener 4 o 5 dígitos';
+    }
+
+    if (Object.keys(nextErrors).length === 0) {
+      const isAddressValid = await validateAddress(addressForm.street, addressForm.location);
+      if (!isAddressValid) {
+        const suggestions = await suggestAddresses(addressForm.street, addressForm.location);
+        const suggestionText = suggestions.length > 0
+          ? ` Sugerencias: ${suggestions.slice(0, 3).map((suggestion) => suggestion.label).join(' · ')}`
+          : '';
+        nextErrors.street = `No pudimos verificar la dirección ingresada.${suggestionText}`;
+      }
     }
 
     setFieldErrors((prev) => ({ ...prev, ...nextErrors }));
@@ -753,20 +777,19 @@ export function CheckoutPage() {
     const nextErrors: FieldErrors = {};
 
     if (paymentChoice === 'new') {
-      if (paymentForm.cardholder.trim().length < 3) {
-        nextErrors.cardholder = 'Ingresa el nombre como figura en la tarjeta';
-      }
+      const validation = validateCard(
+        paymentForm.cardNumber,
+        paymentForm.expiryDate,
+        paymentForm.cvv,
+        paymentForm.cardholder,
+        'credit', // one-time/new cards are treated as credit for authorization
+      );
 
-      if (normalizeCardNumber(paymentForm.cardNumber).length !== 16) {
-        nextErrors.cardNumber = 'El número de tarjeta no es válido';
-      }
-
-      if (!/^\d{2}\/\d{2}$/.test(paymentForm.expiry.trim())) {
-        nextErrors.expiry = 'Usa formato MM/AA';
-      }
-
-      if (!/^\d{3,4}$/.test(paymentForm.cvv.trim())) {
-        nextErrors.cvv = 'El CVV debe tener 3 o 4 dígitos';
+      if (!validation.isValid) {
+        if (validation.errors.cardNumber) nextErrors.cardNumber = validation.errors.cardNumber;
+        if (validation.errors.cardholder) nextErrors.cardholder = validation.errors.cardholder;
+        if (validation.errors.expiryDate) nextErrors.expiryDate = validation.errors.expiryDate;
+        if (validation.errors.cvv) nextErrors.cvv = validation.errors.cvv;
       }
     }
 
@@ -783,9 +806,9 @@ export function CheckoutPage() {
     setCurrentStep(2);
   };
 
-  const goToPaymentStep = () => {
+  const goToPaymentStep = async () => {
     if (deliveryMode === 'homeDelivery') {
-      if (!validateAddressStep()) {
+      if (!(await validateAddressStep())) {
         snackbar.error('Corrige la dirección de envío para continuar');
         return;
       }
@@ -816,7 +839,7 @@ export function CheckoutPage() {
         const next = { ...prev };
         delete next.cardholder;
         delete next.cardNumber;
-        delete next.expiry;
+        delete next.expiryDate;
         delete next.cvv;
         return next;
       });
@@ -1373,57 +1396,81 @@ export function CheckoutPage() {
                         )}
                       </div>
 
-                      <div className="sm:col-span-2">
-                        <LocationPicker
-                          label="Ubicación"
-                          value={addressForm.location}
-                          onChange={(location) =>
+                          <div className="sm:col-span-2">
+                            <LocationPicker
+                              label="Ubicación"
+                              value={addressForm.location}
+                              onChange={(location) =>
                             updateAddressField('location', location)
                           }
-                          error={fieldErrors.location}
-                        />
-                      </div>
+                              error={fieldErrors.location}
+                            />
+                          </div>
 
-                      <div>
-                        <InputText
-                          label="Código postal"
-                          value={addressForm.postalCode}
-                          onChange={(event) =>
+                          <div>
+                            <InputText
+                              label="Código postal"
+                              value={addressForm.postalCode}
+                              onChange={(event) =>
                             updateAddressField('postalCode', event.target.value)
                           }
-                          autoComplete="postal-code"
-                          maxLength={5}
-                          inputMode="numeric"
-                          required
-                        />
-                        {fieldErrors.postalCode && (
+                              autoComplete="postal-code"
+                              maxLength={5}
+                              inputMode="numeric"
+                              required
+                            />
+                            {fieldErrors.postalCode && (
                           <p className="-mt-3 mb-3 text-sm text-red-600">
                             {fieldErrors.postalCode}
                           </p>
                         )}
-                      </div>
+                          </div>
 
-                      <div className="sm:col-span-2">
-                        <InputTextarea
-                          label="Indicaciones opcionales"
-                          value={addressForm.notes}
-                          onChange={(event) =>
+                          <div className="sm:col-span-2">
+                            <InputTextarea
+                              label="Referencia adicional obligatoria"
+                              value={addressForm.notes}
+                              onChange={(event) =>
                             updateAddressField('notes', event.target.value)
                           }
-                          maxLength={255}
-                        />
-                      </div>
-                    </div>
+                              maxLength={255}
+                              required
+                            />
+                            {fieldErrors.notes && <p className="-mt-3 mb-3 text-sm text-red-600">{fieldErrors.notes}</p>}
+                          </div>
+                        </div>
 
-                    <div className="mt-4 rounded-2xl border border-border bg-bg p-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">
+                        {userProfile?.address && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setUseDefaultAddress(true);
+                              setAddressForm((prev) => ({
+                                ...prev,
+                                fullName: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
+                                street: userProfile.address || '',
+                                location: '',
+                                postalCode: '',
+                                notes: '',
+                              }));
+                            }}
+                            className="mt-4 w-full rounded-full border border-border bg-bg px-5 py-3 font-semibold text-text transition hover:border-babyblue-300 hover:text-babyblue-700"
+                          >
+                            Usar dirección registrada
+                          </button>
+                        )}
+
+                        <div className="mt-4 rounded-2xl border border-border bg-bg p-4">
+                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">
                         Vista previa
                       </p>
-                      <p className="mt-2 text-sm leading-6 text-text">
+                          <p className="mt-2 text-sm leading-6 text-text">
                         {shippingAddress ||
                           'Completa los campos para ver la dirección formateada.'}
                       </p>
-                    </div>
+                        </div>
+                      </>
+                    )}
                   </>
                 ) : (
                   <div className="mt-6 space-y-4">
@@ -1569,7 +1616,7 @@ export function CheckoutPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={goToPaymentStep}
+                    onClick={() => void goToPaymentStep()}
                     className="inline-flex items-center justify-center rounded-full bg-babyblue-600 px-5 py-3 font-semibold text-white transition hover:bg-babyblue-700"
                   >
                     Continuar al pago

@@ -94,6 +94,7 @@ export function InputText({ label, value, onChange, validationType = "none", ...
 
   const currentVal = value !== undefined ? String(value) : internalVal;
   const isDateInput = props.type === "date";
+  const isEmailInput = validationType === 'email' || props.type === 'email';
   const lifted = isDateInput ? true : focused || currentVal.length > 0;
   const showLabel = !(props.hideLabelOnFocus && focused);
 
@@ -129,17 +130,38 @@ export function InputText({ label, value, onChange, validationType = "none", ...
     onChange?.(e);
   };
 
+  const handleClipboardEvent = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    if (!isEmailInput) {
+      return;
+    }
+
+    e.preventDefault();
+  };
+
+  const handleDropEvent = (e: React.DragEvent<HTMLInputElement>) => {
+    if (!isEmailInput) {
+      return;
+    }
+
+    e.preventDefault();
+  };
+
   return (
     <div className={wrapper}>
       {showLabel && <FloatingLabel label={label ?? ""} lifted={lifted} />}
       <input
+        {...props}
         className={`${inputBase} ${PlaceholderBase}`}
         value={currentVal}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
-        {...props}
+        onCopy={handleClipboardEvent}
+        onCut={handleClipboardEvent}
+        onPaste={handleClipboardEvent}
+        onDrop={handleDropEvent}
+        onContextMenu={isEmailInput ? (event) => event.preventDefault() : props.onContextMenu}
       />
     </div>
   );
@@ -244,7 +266,9 @@ export function InputDate({
     readOnly: props.readOnly,
     tabIndex: props.tabIndex,
     className: `${inputBase} ${PlaceholderBase} ${props.className ?? ''}`,
-    InputLabelProps: { shrink: false },
+    slotProps: {
+      inputLabel: { shrink: false },
+    },
   };
 
   const handleChange = (nextValue: Dayjs | null) => {
@@ -306,11 +330,20 @@ export function InputPassword({ label, value, onChange, ...props }: InputPasswor
   const currentVal = value !== undefined ? String(value) : internalVal;
   const lifted = focused || currentVal.length > 0;
 
+  const handleClipboardEvent = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+  };
+
+  const handleDropEvent = (e: React.DragEvent<HTMLInputElement>) => {
+    e.preventDefault();
+  };
+
   return (
     <div className={wrapper}>
       <FloatingLabel label={label ?? ""} lifted={lifted} />
       <div className="relative">
         <input
+          {...props}
           type={show ? "text" : "password"}
           className={`${inputBase} pr-10 ${PlaceholderBase} [&::-ms-reveal]:hidden [&::-ms-clear]:hidden`}
           value={currentVal}
@@ -320,7 +353,11 @@ export function InputPassword({ label, value, onChange, ...props }: InputPasswor
             if (value === undefined) setInternalVal(e.target.value);
             onChange?.(e);
           }}
-          {...props}
+          onCopy={handleClipboardEvent}
+          onCut={handleClipboardEvent}
+          onPaste={handleClipboardEvent}
+          onDrop={handleDropEvent}
+          onContextMenu={(event) => event.preventDefault()}
         />
         <button
           type="button"

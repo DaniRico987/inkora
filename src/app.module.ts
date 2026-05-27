@@ -17,6 +17,7 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { VouchersModule } from './vouchers/vouchers.module';
 import { ConversationsModule } from './conversations/conversations.module';
+import { ConversationsModule } from './conversations/conversations.module';
 import { TasksModule } from './tasks/tasks.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ClientsModule } from './clients/clients.module';
@@ -46,6 +47,7 @@ import { RefundsModule } from './refunds/refunds.module';
     ReturnsModule,
     ConversationsModule,
     RefundsModule,
+    ConversationsModule,
     TasksModule,
     SubscriptionsModule,
     NotificationsModule,

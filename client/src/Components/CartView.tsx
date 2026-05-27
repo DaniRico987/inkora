@@ -243,9 +243,9 @@ export const CartView: React.FC = () => {
                   onRemove={removeItem}
                   index={index}
                   reservationCountdown={
-                    remainingMs !== null
+                    remainingMs !== null && reservation
                       ? {
-                          reservationId: reservation.reservationId,
+                          reservationId: reservation?.reservationId ?? 0,
                           remainingMs,
                         }
                       : undefined

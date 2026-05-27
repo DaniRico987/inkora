@@ -15,6 +15,7 @@ import { getCategories, type Category } from '../api/categories';
 import { saveAccessToken } from '../auth/session';
 import { LocationPicker } from '../Components/LocationPicker';
 import { validateDateValue } from '../utils/dateValidation';
+import { suggestAddresses, validateAddress } from '../services/addressValidation';
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const passwordPolicy = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/;
@@ -37,6 +38,12 @@ type FormData = {
 type FormErrors = Partial<Record<keyof FormData, string>>;
 
 type PasswordStrength = 'débil' | 'media' | 'fuerte';
+
+type AddressLookupState = {
+  status: 'idle' | 'checking' | 'valid' | 'invalid';
+  message: string;
+  suggestions: string[];
+};
 
 function getPasswordStrength(password: string): PasswordStrength {
   let score = 0;
@@ -83,6 +90,11 @@ export function RegisterPage() {
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [addressLookup, setAddressLookup] = useState<AddressLookupState>({
+    status: 'idle',
+    message: '',
+    suggestions: [],
+  });
   const hasPassword = formData.password.trim().length > 0;
   const passwordStrength = useMemo(
     () => getPasswordStrength(formData.password),
@@ -116,6 +128,80 @@ export function RegisterPage() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    const cleanAddress = formData.address.trim();
+
+    if (!cleanAddress) {
+      setAddressLookup({ status: 'idle', message: '', suggestions: [] });
+      setFormErrors((prev) => {
+        const next = { ...prev };
+        delete next.address;
+        return next;
+      });
+      return;
+    }
+
+    if (cleanAddress.length < 6) {
+      setAddressLookup({
+        status: 'checking',
+        message: 'Sigue escribiendo para validar la dirección.',
+        suggestions: [],
+      });
+      return;
+    }
+
+    let cancelled = false;
+    const timeoutId = window.setTimeout(async () => {
+      setAddressLookup((prev) => ({ ...prev, status: 'checking', message: 'Validando dirección...' }));
+
+      const isValid = await validateAddress(cleanAddress, '');
+
+      if (cancelled) {
+        return;
+      }
+
+      if (isValid) {
+        setAddressLookup({
+          status: 'valid',
+          message: 'Dirección válida.',
+          suggestions: [],
+        });
+        setFormErrors((prev) => {
+          const next = { ...prev };
+          delete next.address;
+          return next;
+        });
+        return;
+      }
+
+      const suggestions = await suggestAddresses(cleanAddress, '');
+
+      if (cancelled) {
+        return;
+      }
+
+      const nextSuggestions = suggestions.map((suggestion) => suggestion.label).slice(0, 4);
+      setAddressLookup({
+        status: 'invalid',
+        message: nextSuggestions.length > 0
+          ? 'La dirección no coincide. Prueba una de estas sugerencias.'
+          : 'La dirección no parece válida.',
+        suggestions: nextSuggestions,
+      });
+      setFormErrors((prev) => ({
+        ...prev,
+        address: nextSuggestions.length > 0
+          ? `La dirección no coincide. Sugerencias: ${nextSuggestions.join(' · ')}`
+          : 'La dirección no parece válida.',
+      }));
+    }, 600);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [formData.address]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
@@ -227,6 +313,11 @@ export function RegisterPage() {
     setFormErrors({});
 
     if (!validateForm()) {
+      return;
+    }
+
+    if (formData.address.trim() && addressLookup.status === 'invalid') {
+      setErrorMessage(addressLookup.message || 'Corrige la dirección antes de continuar.');
       return;
     }
 
@@ -460,6 +551,34 @@ export function RegisterPage() {
                     maxLength={255}
                     validationType="address"
                   />
+                  {(formErrors.address || addressLookup.message) && (
+                    <div className="-mt-3 space-y-1">
+                      <p className="text-xs text-red-300">
+                        {formErrors.address || addressLookup.message}
+                      </p>
+                      {addressLookup.suggestions.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {addressLookup.suggestions.map((suggestion) => (
+                            <button
+                              key={suggestion}
+                              type="button"
+                              onClick={() => {
+                                setFormData((prev) => ({ ...prev, address: suggestion }));
+                                setFormErrors((prev) => {
+                                  const next = { ...prev };
+                                  delete next.address;
+                                  return next;
+                                });
+                              }}
+                              className="rounded-full border border-border bg-bg-secondary px-3 py-1 text-[11px] text-text-muted transition hover:border-primary-400 hover:text-text"
+                            >
+                              {suggestion}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 

@@ -9,6 +9,7 @@ import {
 import { FormModal } from '../Components/FormModal';
 import { ConfirmationModal } from '../Components/ConfirmationModal';
 import { LocationPicker } from '../Components/LocationPicker';
+import { StoreMapPicker } from '../Components/StoreMapPicker';
 import { useSnackbar } from '../Components/SnackbarProvider';
 import { getRoleFromToken, getAccessToken } from '../auth/session';
 import {
@@ -37,6 +38,26 @@ const normalizeStoreLocation = (value: string) =>
     .replace(/\s+/g, ' ')
     .replace(/^\s+/, '');
 
+type StoreFormState = {
+  name: string;
+  address: string;
+  city: string;
+  latitude: string;
+  longitude: string;
+  capacity: string;
+  status: 'active' | 'inactive';
+};
+
+const initialStoreForm: StoreFormState = {
+  name: '',
+  address: '',
+  city: '',
+  latitude: '',
+  longitude: '',
+  capacity: '',
+  status: 'active',
+};
+
 const extractCityName = (value: string) => value.split(',')[0]?.trim() || '';
 
 export function StoresManagementPage() {
@@ -51,7 +72,7 @@ export function StoresManagementPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingStore, setEditingStore] = useState<Store | null>(null);
-  const [storeLocation, setStoreLocation] = useState('');
+  const [storeForm, setStoreForm] = useState<StoreFormState>(initialStoreForm);
   const [deleteConfirm, setDeleteConfirm] = useState<{
     isOpen: boolean;
     storeId?: string;
@@ -112,13 +133,21 @@ export function StoresManagementPage() {
 
   const handleAddStore = () => {
     setEditingStore(null);
-    setStoreLocation('');
+    setStoreForm(initialStoreForm);
     setIsFormOpen(true);
   };
 
   const handleEditStore = (store: Store) => {
     setEditingStore(store);
-    setStoreLocation('');
+    setStoreForm({
+      name: store.name,
+      address: store.address,
+      city: store.city,
+      latitude: store.latitude != null ? String(store.latitude) : '',
+      longitude: store.longitude != null ? String(store.longitude) : '',
+      capacity: store.capacity != null ? String(store.capacity) : '',
+      status: store.status ?? 'active',
+    });
     setIsFormOpen(true);
   };
 
@@ -144,6 +173,10 @@ export function StoresManagementPage() {
     }
   };
 
+  const roundTo7Decimals = (num: number): number => {
+    return Math.round(num * 10000000) / 10000000;
+  };
+
   const handleFormSubmit = async (formData: FormData) => {
     try {
       setIsLoading(true);
@@ -158,8 +191,8 @@ export function StoresManagementPage() {
         name: (formData.get('name') as string) || '',
         address: (formData.get('address') as string) || '',
         city: locationValue,
-        latitude: latitudeValue ? parseFloat(latitudeValue) : undefined,
-        longitude: longitudeValue ? parseFloat(longitudeValue) : undefined,
+        latitude: latitudeValue.trim() ? roundTo7Decimals(Number(latitudeValue)) : undefined,
+        longitude: longitudeValue.trim() ? roundTo7Decimals(Number(longitudeValue)) : undefined,
         capacity: capacityValue ? parseInt(capacityValue, 10) : undefined,
         status: formData.get('status') as string as
           | 'active'
@@ -196,7 +229,7 @@ export function StoresManagementPage() {
 
       setIsFormOpen(false);
       setCurrentPage(1);
-      setStoreLocation('');
+      setStoreForm(initialStoreForm);
       setEditingStore(null);
     } catch (err) {
       error('Error al guardar tienda');
@@ -297,7 +330,7 @@ export function StoresManagementPage() {
         onClose={() => {
           setIsFormOpen(false);
           setEditingStore(null);
-          setStoreLocation('');
+          setStoreForm(initialStoreForm);
         }}
         onSubmit={handleFormSubmit}
         isLoading={isLoading}
@@ -313,12 +346,14 @@ export function StoresManagementPage() {
               type="text"
               name="name"
               required
-              defaultValue={editingStore?.name || ''}
+              value={storeForm.name}
               placeholder="Nombre de la tienda"
-              onInput={(event) => {
-                event.currentTarget.value = normalizeStoreName(
+              onChange={(event) => {
+                const nextValue = normalizeStoreName(
                   event.currentTarget.value,
                 );
+                event.currentTarget.value = nextValue;
+                setStoreForm((prev) => ({ ...prev, name: nextValue }));
               }}
               title="Solo letras, números y espacios"
               className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
@@ -355,12 +390,14 @@ export function StoresManagementPage() {
                   type="text"
                   name="city"
                   required
-                  defaultValue={editingStore?.city || ''}
+                  value={storeForm.city}
                   placeholder="Ciudad"
-                  onInput={(event) => {
-                    event.currentTarget.value = normalizeStoreLocation(
+                  onChange={(event) => {
+                    const nextValue = normalizeStoreLocation(
                       event.currentTarget.value,
                     );
+                    event.currentTarget.value = nextValue;
+                    setStoreForm((prev) => ({ ...prev, city: nextValue }));
                   }}
                   title="Solo letras, números y espacios"
                   className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
@@ -369,21 +406,39 @@ export function StoresManagementPage() {
             ) : (
               <>
                 <LocationPicker
-                  label="Lugar"
-                  value={storeLocation}
-                  onChange={(value) => setStoreLocation(extractCityName(value))}
+                  label="Ciudad"
+                  value={storeForm.city}
+                  onChange={(value) => setStoreForm((prev) => ({ ...prev, city: extractCityName(value) }))}
                 />
                 <input
                   type="hidden"
                   name="city"
-                  value={storeLocation}
+                  value={storeForm.city}
                   readOnly
                 />
               </>
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-text mb-2">Dirección</label>
+            <input
+              type="text"
+              name="address"
+              required
+              value={storeForm.address}
+              placeholder="Dirección completa"
+              onChange={(event) => {
+                const nextValue = normalizeStoreAddress(event.currentTarget.value);
+                event.currentTarget.value = nextValue;
+                setStoreForm((prev) => ({ ...prev, address: nextValue }));
+              }}
+              title="Solo letras, números, espacios y signos de dirección básicos"
+              className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
+            />
+          </div>
+
+          {/*<div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-text mb-2">
                 Latitud (opcional)
@@ -392,7 +447,8 @@ export function StoresManagementPage() {
                 type="number"
                 name="latitude"
                 step="0.000001"
-                defaultValue={editingStore?.latitude ?? ''}
+                value={storeForm.latitude}
+                onChange={(event) => setStoreForm((prev) => ({ ...prev, latitude: event.target.value }))}
                 placeholder="-33.4489"
                 className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
               />
@@ -406,12 +462,30 @@ export function StoresManagementPage() {
                 type="number"
                 name="longitude"
                 step="0.000001"
-                defaultValue={editingStore?.longitude ?? ''}
+                value={storeForm.longitude}
+                onChange={(event) => setStoreForm((prev) => ({ ...prev, longitude: event.target.value }))}
                 placeholder="-70.6693"
                 className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
               />
             </div>
-          </div>
+          </div>*/}
+
+          <StoreMapPicker
+            address={storeForm.address}
+            city={storeForm.city}
+            latitude={storeForm.latitude.trim() ? Number(storeForm.latitude) : null}
+            longitude={storeForm.longitude.trim() ? Number(storeForm.longitude) : null}
+            onCoordinatesChange={(coordinates) => {
+              setStoreForm((prev) => ({
+                ...prev,
+                latitude: coordinates ? String(coordinates.latitude) : '',
+                longitude: coordinates ? String(coordinates.longitude) : '',
+              }));
+            }}
+          />
+
+          <input type="hidden" name="latitude" value={storeForm.latitude} />
+          <input type="hidden" name="longitude" value={storeForm.longitude} />
 
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -422,7 +496,8 @@ export function StoresManagementPage() {
                 type="number"
                 name="capacity"
                 min="0"
-                defaultValue={editingStore?.capacity ?? ''}
+                value={storeForm.capacity}
+                onChange={(event) => setStoreForm((prev) => ({ ...prev, capacity: event.target.value }))}
                 placeholder="100"
                 className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text placeholder-text-muted focus:outline-none focus:border-border-focus transition-colors"
               />
@@ -435,7 +510,8 @@ export function StoresManagementPage() {
               <select
                 name="status"
                 required
-                defaultValue={editingStore?.status || 'active'}
+                value={storeForm.status}
+                onChange={(event) => setStoreForm((prev) => ({ ...prev, status: event.target.value as 'active' | 'inactive' }))}
                 className="w-full px-4 py-2 rounded-lg border border-border bg-bg text-text focus:outline-none focus:border-border-focus transition-colors"
               >
                 <option value="active">Active</option>

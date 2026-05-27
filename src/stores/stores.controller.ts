@@ -12,16 +12,22 @@ import {
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiBadRequestResponse,
   ApiForbiddenResponse,
   ApiOperation,
+  ApiParam,
   ApiResponse,
   ApiTags,
+  ApiNotFoundResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { CreateStoreDto } from './dto/create-store.dto';
+import { StoreInventoryResponseDto } from './dto/store-inventory-response.dto';
+import { StoreOrdersResponseDto } from './dto/store-orders-response.dto';
+import { StoreResponseDto } from './dto/store-response.dto';
 import { UpdateStoreDto } from './dto/update-store.dto';
 import { StorePublicDto } from './dto/store-public.dto';
 import { StoresService } from './stores.service';
@@ -74,7 +80,11 @@ export class StoresController {
   @Roles('admin')
   @ApiBearerAuth('JWT')
   @ApiOperation({ summary: 'Listar tiendas (admin)' })
-  @ApiResponse({ status: 200, description: 'Listado de tiendas' })
+  @ApiResponse({
+    status: 200,
+    description: 'Listado de tiendas',
+    type: [StoreResponseDto],
+  })
   @ApiUnauthorizedResponse({ description: 'Token inválido o ausente' })
   @ApiForbiddenResponse({
     description: 'No tienes permisos para listar tiendas',
@@ -89,7 +99,11 @@ export class StoresController {
   @ApiBearerAuth('JWT')
   @ApiOperation({ summary: 'Registrar nueva tienda (admin)' })
   @ApiBody({ type: CreateStoreDto })
-  @ApiResponse({ status: 201, description: 'Tienda creada' })
+  @ApiResponse({
+    status: 201,
+    description: 'Tienda creada',
+    type: StoreResponseDto,
+  })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
   @ApiUnauthorizedResponse({ description: 'Token inválido o ausente' })
   @ApiForbiddenResponse({
@@ -105,7 +119,11 @@ export class StoresController {
   @ApiBearerAuth('JWT')
   @ApiOperation({ summary: 'Editar tienda (admin)' })
   @ApiBody({ type: UpdateStoreDto })
-  @ApiResponse({ status: 200, description: 'Tienda actualizada' })
+  @ApiResponse({
+    status: 200,
+    description: 'Tienda actualizada',
+    type: StoreResponseDto,
+  })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
   @ApiResponse({ status: 404, description: 'Tienda no encontrada' })
   @ApiUnauthorizedResponse({ description: 'Token inválido o ausente' })
@@ -119,12 +137,60 @@ export class StoresController {
     return this.storesService.update(id, dto);
   }
 
+  @Get(':id/inventory')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth('JWT')
+  @ApiOperation({ summary: 'Obtener inventario de una tienda (admin)' })
+  @ApiParam({ name: 'id', type: 'integer', example: 1 })
+  @ApiResponse({
+    status: 200,
+    description: 'Inventario de la tienda',
+    type: StoreInventoryResponseDto,
+  })
+  @ApiUnauthorizedResponse({ description: 'Token inválido o ausente' })
+  @ApiForbiddenResponse({
+    description: 'No tienes permisos para consultar inventario',
+  })
+  @ApiNotFoundResponse({ description: 'Tienda no encontrada' })
+  async getInventory(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<StoreInventoryResponseDto> {
+    return this.storesService.findInventoryByStoreId(id);
+  }
+
+  @Get(':id/orders')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth('JWT')
+  @ApiOperation({ summary: 'Obtener pedidos asociados a una tienda (admin)' })
+  @ApiParam({ name: 'id', type: 'integer', example: 1 })
+  @ApiResponse({
+    status: 200,
+    description: 'Pedidos asociados a la tienda',
+    type: StoreOrdersResponseDto,
+  })
+  @ApiUnauthorizedResponse({ description: 'Token inválido o ausente' })
+  @ApiForbiddenResponse({
+    description: 'No tienes permisos para consultar pedidos',
+  })
+  @ApiNotFoundResponse({ description: 'Tienda no encontrada' })
+  async getOrders(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<StoreOrdersResponseDto> {
+    return this.storesService.findOrdersByStoreId(id);
+  }
+
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @ApiBearerAuth('JWT')
   @ApiOperation({ summary: 'Eliminar tienda (admin)' })
+  @ApiParam({ name: 'id', type: 'integer', example: 1 })
   @ApiResponse({ status: 200, description: 'Tienda eliminada' })
+  @ApiBadRequestResponse({
+    description: 'La tienda tiene pedidos pendientes y no puede ser eliminada',
+  })
   @ApiResponse({ status: 404, description: 'Tienda no encontrada' })
   @ApiUnauthorizedResponse({ description: 'Token inválido o ausente' })
   @ApiForbiddenResponse({
