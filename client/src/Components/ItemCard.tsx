@@ -30,7 +30,7 @@ export default function ItemCard({ id, cuantity, image, title, author, tag, pric
 
           {showImage ? (
             <img
-              src={image}
+              src={image ?? undefined}
               alt={title}
               className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
               onError={() => setFailedImageSrc(image ?? null)}

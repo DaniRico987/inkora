@@ -74,32 +74,6 @@ export function useCart(): UseCartReturn {
     [loadCart],
   );
 
-  // ======================== UPDATE ITEM ========================
-
-  const updateItem = useCallback(
-    async (cartItemId: number, quantity: number) => {
-      if (quantity < 1) {
-        await removeItem(cartItemId);
-        return;
-      }
-
-      try {
-        setError(null);
-        await updateCartItem(cartItemId, quantity);
-        await loadCart(); // Refrescar carrito completo
-        window.dispatchEvent(new Event('cart:refresh'));
-      } catch (err) {
-        const message =
-          err instanceof Error
-            ? err.message
-            : 'Error al actualizar cantidad';
-        setError(message);
-        console.error('Error updating item:', err);
-      }
-    },
-    [loadCart],
-  );
-
   // ======================== REMOVE ITEM ========================
 
   const removeItem = useCallback(
@@ -144,7 +118,33 @@ export function useCart(): UseCartReturn {
         console.error('Error removing item:', err);
       }
     },
-    [removeItem],
+    [],
+  );
+
+  // ======================== UPDATE ITEM ========================
+
+  const updateItem = useCallback(
+    async (cartItemId: number, quantity: number) => {
+      if (quantity < 1) {
+        await removeItem(cartItemId);
+        return;
+      }
+
+      try {
+        setError(null);
+        await updateCartItem(cartItemId, quantity);
+        await loadCart(); // Refrescar carrito completo
+        window.dispatchEvent(new Event('cart:refresh'));
+      } catch (err) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : 'Error al actualizar cantidad';
+        setError(message);
+        console.error('Error updating item:', err);
+      }
+    },
+    [loadCart, removeItem],
   );
 
   // ======================== CLEAR ITEMS ========================
@@ -164,7 +164,7 @@ export function useCart(): UseCartReturn {
         });
         try {
           window.dispatchEvent(new Event('cart:refresh'));
-        } catch {}
+        } catch { }
       }
     } catch (err) {
       const message =

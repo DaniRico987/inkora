@@ -102,7 +102,7 @@ export function AdminsManagementPage() {
     {
       key: 'isActive',
       label: 'Estado',
-      render: (value: boolean) => (
+      render: (value) => (
         <StatusBadge
           label={value ? 'Activo' : 'Inactivo'}
           tone={value ? 'success' : 'neutral'}
@@ -113,8 +113,7 @@ export function AdminsManagementPage() {
     {
       key: 'createdAt',
       label: 'Creado',
-      render: (value: string) =>
-        value ? new Date(value).toLocaleDateString('es-ES') : '-',
+      render: (value) => (value ? new Date(String(value)).toLocaleDateString('es-ES') : '-'),
       width: '20%',
     },
   ];

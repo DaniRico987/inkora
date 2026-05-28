@@ -13,6 +13,7 @@ import { StoreInventoryResponseDto } from './dto/store-inventory-response.dto';
 import { StoreInventoryItemDto } from './dto/store-inventory-item.dto';
 import { StoreOrdersResponseDto } from './dto/store-orders-response.dto';
 import { StoreOrderResponseDto } from './dto/store-order-response.dto';
+import { UpdateStoreInventoryDto } from './dto/update-store-inventory.dto';
 
 export type StoreAvailabilityDto = {
   storeId: number;
@@ -296,6 +297,38 @@ export class StoresService {
         0,
       ),
     };
+  }
+
+  async updateInventoryByStoreId(
+    storeId: number,
+    dto: UpdateStoreInventoryDto,
+  ): Promise<StoreInventoryResponseDto> {
+    await this.findStoreSummaryOrThrow(storeId);
+
+    for (const item of dto.items) {
+      if (item.availableQuantity < 0) {
+        throw new BadRequestException('availableQuantity no puede ser negativo');
+      }
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const item of dto.items) {
+        await tx.inventory.upsert({
+          where: { bookId_storeId: { bookId: item.bookId, storeId } },
+          create: {
+            bookId: item.bookId,
+            storeId,
+            availableQuantity: item.availableQuantity,
+            reservedQuantity: 0,
+          },
+          update: {
+            availableQuantity: item.availableQuantity,
+          },
+        });
+      }
+    });
+
+    return this.findInventoryByStoreId(storeId);
   }
 
   async findOrdersByStoreId(storeId: number): Promise<StoreOrdersResponseDto> {

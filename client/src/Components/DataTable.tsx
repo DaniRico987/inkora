@@ -32,7 +32,7 @@ export interface DataTableProps<T> {
   emptyMessage?: string;
 }
 
-export function DataTable<T extends Record<string, unknown>>({
+export function DataTable<T extends object>({
   columns,
   data,
   actions = [],
@@ -126,13 +126,12 @@ export function DataTable<T extends Record<string, unknown>>({
                             <button
                               key={actionIndex}
                               onClick={() => action.onClick(row)}
-                              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                                action.variant === 'destructive'
+                              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${action.variant === 'destructive'
                                   ? 'bg-red-600/20 text-red-600 hover:bg-red-600/30'
                                   : action.variant === 'secondary'
                                     ? 'bg-babyblue-500/20 text-babyblue-600 hover:bg-babyblue-500/30'
                                     : 'bg-primary-500/20 text-primary-600 hover:bg-primary-500/30'
-                              }`}
+                                }`}
                             >
                               {action.icon && (
                                 <span className="mr-1">{action.icon}</span>

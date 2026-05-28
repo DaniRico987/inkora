@@ -6,6 +6,7 @@ import {
   Param,
   ParseIntPipe,
   Post,
+  Patch,
   Put,
   UseGuards,
 } from '@nestjs/common';
@@ -26,6 +27,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { CreateStoreDto } from './dto/create-store.dto';
 import { StoreInventoryResponseDto } from './dto/store-inventory-response.dto';
+import { UpdateStoreInventoryDto } from './dto/update-store-inventory.dto';
 import { StoreOrdersResponseDto } from './dto/store-orders-response.dto';
 import { StoreResponseDto } from './dto/store-response.dto';
 import { UpdateStoreDto } from './dto/update-store.dto';
@@ -35,7 +37,7 @@ import { StoresService } from './stores.service';
 @ApiTags('Stores')
 @Controller('stores')
 export class StoresController {
-  constructor(private readonly storesService: StoresService) {}
+  constructor(private readonly storesService: StoresService) { }
 
   @Get('public')
   @ApiOperation({ summary: 'Listar tiendas públicas con coordenadas' })
@@ -157,6 +159,30 @@ export class StoresController {
     @Param('id', ParseIntPipe) id: number,
   ): Promise<StoreInventoryResponseDto> {
     return this.storesService.findInventoryByStoreId(id);
+  }
+
+  @Patch(':id/inventory')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth('JWT')
+  @ApiOperation({ summary: 'Actualizar inventario de una tienda (admin)' })
+  @ApiBody({ type: UpdateStoreInventoryDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Inventario de la tienda actualizado',
+    type: StoreInventoryResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Datos inválidos' })
+  @ApiResponse({ status: 404, description: 'Tienda no encontrada' })
+  @ApiUnauthorizedResponse({ description: 'Token inválido o ausente' })
+  @ApiForbiddenResponse({
+    description: 'No tienes permisos para editar inventario',
+  })
+  async updateInventory(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateStoreInventoryDto,
+  ): Promise<StoreInventoryResponseDto> {
+    return this.storesService.updateInventoryByStoreId(id, dto);
   }
 
   @Get(':id/orders')

@@ -177,7 +177,9 @@ export function ReturnsManagementPage() {
         width: '23%',
         render: (value) => (
           <p className="line-clamp-3 text-sm text-text-muted">
-            {value || 'Sin descripcion adicional'}
+            {typeof value === 'string' && value.trim().length > 0
+              ? value
+              : 'Sin descripcion adicional'}
           </p>
         ),
       },

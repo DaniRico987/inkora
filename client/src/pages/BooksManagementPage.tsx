@@ -76,7 +76,7 @@ export function BooksManagementPage() {
     const fetchStores = async () => {
       try {
         const data = await getStores();
-        const mappedStores: Store[] = (data.items || data || []).map(
+        const mappedStores: Store[] = data.map(
           (store: any) => ({
             storeId: store.storeId?.toString() || store.id?.toString() || '',
             name: store.name,

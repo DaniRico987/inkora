@@ -96,6 +96,11 @@ export type StoreOrdersResponse = {
   pendingOrders: number;
 };
 
+export type UpdateStoreInventoryItem = {
+  bookId: number;
+  availableQuantity: number;
+};
+
 export async function getPublicStores(): Promise<PublicStore[]> {
   const response = await publicStoresClient.get<PublicStore[]>('/stores/public');
   return response.data;
@@ -192,6 +197,21 @@ export async function getStoreOrders(storeId: number): Promise<StoreOrdersRespon
     return response.data;
   } catch (error) {
     console.error('Error fetching store orders:', error);
+    throw error;
+  }
+}
+
+export async function updateStoreInventory(
+  storeId: number,
+  items: UpdateStoreInventoryItem[],
+): Promise<StoreInventoryResponse> {
+  try {
+    const response = await apiClient.patch<StoreInventoryResponse>(`/stores/${storeId}/inventory`, {
+      items,
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error updating store inventory:', error);
     throw error;
   }
 }
