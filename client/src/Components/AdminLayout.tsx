@@ -27,47 +27,53 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     navigate('/login', { replace: true });
   };
 
-  const menuItems: MenuItem[] = role === 'root' 
+  const menuItems: MenuItem[] = role === 'root'
     ? [
-        {
-          label: 'Administradores',
-          path: '/admin/admins',
-          icon: '👥',
-          roles: ['root'],
-        },
-        {
-          label: 'Crear Administrador',
-          path: '/admin/create-admin',
-          icon: '➕',
-          roles: ['root'],
-        },
-      ]
+      {
+        label: 'Administradores',
+        path: '/admin/admins',
+        icon: '👥',
+        roles: ['root'],
+      },
+      {
+        label: 'Crear Administrador',
+        path: '/admin/create-admin',
+        icon: '➕',
+        roles: ['root'],
+      },
+    ]
     : [
-        {
-          label: 'Dashboard',
-          path: '/admin',
-          icon: '📊',
-          roles: ['admin', 'root'],
-        },
-        {
-          label: 'Libros',
-          path: '/admin/books',
-          icon: '📚',
-          roles: ['admin', 'root'],
-        },
-        {
-          label: 'Tiendas',
-          path: '/admin/stores',
-          icon: '🏪',
-          roles: ['admin', 'root'],
-        },
-        {
-          label: 'Devoluciones',
-          path: '/admin/returns',
-          icon: '↩️',
-          roles: ['admin', 'root'],
-        },
-      ];
+      {
+        label: 'Dashboard',
+        path: '/admin',
+        icon: '📊',
+        roles: ['admin', 'root'],
+      },
+      {
+        label: 'Libros',
+        path: '/admin/books',
+        icon: '📚',
+        roles: ['admin', 'root'],
+      },
+      {
+        label: 'Tiendas',
+        path: '/admin/stores',
+        icon: '🏪',
+        roles: ['admin', 'root'],
+      },
+      {
+        label: 'Mensajería',
+        path: '/messages',
+        icon: '💬',
+        roles: ['admin', 'root'],
+      },
+      {
+        label: 'Devoluciones',
+        path: '/admin/returns',
+        icon: '↩️',
+        roles: ['admin', 'root'],
+      },
+    ];
 
   const visibleMenuItems = menuItems.filter(
     (item) => role && (role === 'admin' || role === 'root') && item.roles.includes(role as 'admin' | 'root')
@@ -84,9 +90,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     <div className="flex h-screen bg-bg-secondary">
       {/* Sidebar */}
       <div
-        className={`fixed left-0 top-0 h-full w-64 bg-bg-secondary border-r border-border z-40 transform transition-transform duration-300 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } md:translate-x-0 md:static`}
+        className={`fixed left-0 top-0 h-full w-64 bg-bg-secondary border-r border-border z-40 transform transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          } md:translate-x-0 md:static`}
       >
         <div className="flex flex-col h-full">
           {/* Logo/Header */}
@@ -101,11 +106,10 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                 key={item.path}
                 to={item.path}
                 onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                  isActive(item.path)
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive(item.path)
                     ? 'bg-primary-500 text-white'
                     : 'text-text hover:bg-border'
-                }`}
+                  }`}
               >
                 <span className="text-xl">{item.icon}</span>
                 <span className="font-medium">{item.label}</span>

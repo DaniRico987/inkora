@@ -14,27 +14,28 @@ import { StoreMapPicker } from '../Components/StoreMapPicker';
 import { useSnackbar } from '../Components/SnackbarProvider';
 import { getAccessToken, getRoleFromToken } from '../auth/session';
 import {
-      createStore,
-      deleteStore,
-      getStoreInventory,
-      getStoreOrders,
-      getStores,
-      updateStore,
+    createStore,
+    deleteStore,
+    getStoreInventory,
+    getStoreOrders,
+    getStores,
+    updateStore,
     updateStoreInventory,
-      type StoreInventoryResponse,
-      type StoreOrdersResponse,
-      type StoreRecord,
+    type StoreInventoryResponse,
+    type StoreOrdersResponse,
+    type StoreOrderStatus,
+    type StoreRecord,
 } from '../api/stores';
 import type { CreateStoreRequest } from '../interfaces/admin';
 
 type StoreFormValues = {
-      name: string;
-      address: string;
-      city: string;
-      latitude: string;
-      longitude: string;
-      capacity: string;
-      status: 'active' | 'inactive';
+    name: string;
+    address: string;
+    city: string;
+    latitude: string;
+    longitude: string;
+    capacity: string;
+    status: 'active' | 'inactive';
 };
 
 const INITIAL_FORM_VALUES: StoreFormValues = {
@@ -60,6 +61,8 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
     delivered: 'Entregado',
     cancelled: 'Cancelado',
 };
+
+const ACTIVE_ORDER_STATUSES = new Set<StoreOrderStatus>(['inPreparation', 'shipped']);
 
 function formatCoordinates(latitude: number | null, longitude: number | null) {
     if (latitude == null || longitude == null) {
@@ -200,9 +203,9 @@ export function StoresManagementPage() {
     const [formValues, setFormValues] = useState<StoreFormValues>(INITIAL_FORM_VALUES);
     const [formError, setFormError] = useState<string | null>(null);
 
-      const [inventoryModalOpen, setInventoryModalOpen] = useState(false);
-      const [inventoryLoading, setInventoryLoading] = useState(false);
-      const [inventoryData, setInventoryData] = useState<StoreInventoryResponse | null>(null);
+    const [inventoryModalOpen, setInventoryModalOpen] = useState(false);
+    const [inventoryLoading, setInventoryLoading] = useState(false);
+    const [inventoryData, setInventoryData] = useState<StoreInventoryResponse | null>(null);
     const [inventoryDraft, setInventoryDraft] = useState<InventoryDraft>({});
     const [inventorySaving, setInventorySaving] = useState(false);
 
@@ -217,17 +220,17 @@ export function StoresManagementPage() {
     } | null>(null);
     const [deleteCheckLoading, setDeleteCheckLoading] = useState(false);
 
-      const storesQuery = useQuery({
-            queryKey: ['admin-stores'],
-            queryFn: getStores,
-            enabled: role !== 'root',
-      });
+    const storesQuery = useQuery({
+        queryKey: ['admin-stores'],
+        queryFn: getStores,
+        enabled: role !== 'root',
+    });
 
-      const saveStoreMutation = useMutation({
-            mutationFn: async (payload: { storeId?: number; data: CreateStoreRequest }) => {
-                  if (payload.storeId != null) {
-                        return updateStore(payload.storeId, payload.data);
-                  }
+    const saveStoreMutation = useMutation({
+        mutationFn: async (payload: { storeId?: number; data: CreateStoreRequest }) => {
+            if (payload.storeId != null) {
+                return updateStore(payload.storeId, payload.data);
+            }
 
             return createStore(payload.data);
         },
@@ -252,13 +255,13 @@ export function StoresManagementPage() {
             return stores;
         }
 
-            return stores.filter(
+        return stores.filter(
             (store) =>
-                      store.name.toLowerCase().includes(query) ||
+                store.name.toLowerCase().includes(query) ||
                 store.address.toLowerCase().includes(query) ||
-                                store.city.toLowerCase().includes(query),
-            );
-      }, [search, stores]);
+                store.city.toLowerCase().includes(query),
+        );
+    }, [search, stores]);
 
     const totalStores = stores.length;
     const activeStores = stores.filter((store) => store.status === 'active').length;
@@ -271,42 +274,27 @@ export function StoresManagementPage() {
         [ordersData],
     );
 
-      const openCreateModal = () => {
-            setEditingStore(null);
-            setFormValues(INITIAL_FORM_VALUES);
-            setFormError(null);
-            setIsFormOpen(true);
-      };
-
-      const openEditModal = (store: StoreRecord) => {
-            setEditingStore(store);
-            setFormValues(toFormValues(store));
-            setFormError(null);
-            setIsFormOpen(true);
-      };
-
-      const closeFormModal = () => {
-            setIsFormOpen(false);
-            setEditingStore(null);
-            setFormError(null);
-            setFormValues(INITIAL_FORM_VALUES);
-      };
-
-    const fetchStoreInventory = async (storeId: number) => {
-        return queryClient.fetchQuery({
-            queryKey: ['admin-stores', storeId, 'inventory'],
-            queryFn: () => getStoreInventory(storeId),
-            staleTime: 30_000,
-        });
+    const openCreateModal = () => {
+        setEditingStore(null);
+        setFormValues(INITIAL_FORM_VALUES);
+        setFormError(null);
+        setIsFormOpen(true);
     };
 
-    const fetchStoreOrders = async (storeId: number) => {
-        return queryClient.fetchQuery({
-            queryKey: ['admin-stores', storeId, 'orders'],
-            queryFn: () => getStoreOrders(storeId),
-            staleTime: 30_000,
-        });
+    const openEditModal = (store: StoreRecord) => {
+        setEditingStore(store);
+        setFormValues(toFormValues(store));
+        setFormError(null);
+        setIsFormOpen(true);
     };
+
+    const closeFormModal = () => {
+        setIsFormOpen(false);
+        setEditingStore(null);
+        setFormError(null);
+        setFormValues(INITIAL_FORM_VALUES);
+    };
+
     const closeInventoryModal = () => {
         setInventoryModalOpen(false);
         setInventoryData(null);
@@ -358,123 +346,102 @@ export function StoresManagementPage() {
         }
     };
 
-      const openInventoryModal = async (store: StoreRecord) => {
-            setInventoryData(null);
+    const openInventoryModal = async (store: StoreRecord) => {
+        setInventoryData(null);
         setInventoryDraft({});
-            setInventoryLoading(true);
-            setInventoryModalOpen(true);
+        setInventoryLoading(true);
+        setInventoryModalOpen(true);
 
-            try {
-                  const data = await getStoreInventory(store.storeId);
-                  setInventoryData(data);
+        try {
+            const data = await getStoreInventory(store.storeId);
+            setInventoryData(data);
             setInventoryDraft(
                 Object.fromEntries(
                     data.items.map((item) => [item.bookId, String(item.availableQuantity)]),
                 ),
             );
-            } catch (err) {
-                  const message = err instanceof Error ? err.message : 'No se pudo cargar el inventario de la tienda';
-                  showError(message);
-                  closeInventoryModal();
-            } finally {
-                  setInventoryLoading(false);
-            }
-      };
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'No se pudo cargar el inventario de la tienda';
+            showError(message);
+            closeInventoryModal();
+        } finally {
+            setInventoryLoading(false);
+        }
+    };
 
     const openOrdersModal = async (store: StoreRecord) => {
         setOrdersData(null);
         setOrdersLoading(true);
         setOrdersModalOpen(true);
 
-            try {
-                  const data = await getStoreOrders(store.storeId);
-                  setOrdersData(data);
-            } catch (err) {
-                  const message = err instanceof Error ? err.message : 'No se pudieron cargar los pedidos de la tienda';
-                  showError(message);
-                  closeOrdersModal();
-            } finally {
-                  setOrdersLoading(false);
-            }
-      };
-
-      const handleDeleteClick = async (store: StoreRecord) => {
-            setDeleteCheckLoading(true);
-
         try {
-            const data = await fetchStoreOrders(store.storeId);
+            const data = await getStoreOrders(store.storeId);
             setOrdersData(data);
-
-                  if (data.pendingOrders > 0) {
-                        setDeleteBlocked({ store, pendingOrders: data.pendingOrders });
-                        return;
-                  }
-
-                  setDeleteTarget(store);
-            } catch (err) {
-                  const message = err instanceof Error ? err.message : 'No se pudo validar si la tienda puede eliminarse';
-                  showError(message);
-            console.error(err);
-            } finally {
-                  setDeleteCheckLoading(false);
-            }
-      };
-
-      const handleSaveInventory = async () => {
-                if (!inventoryData) {
-                        return;
-            }
-
-        const payload: CreateStoreRequest = {
-            name: formValues.name.trim(),
-            address: formValues.address.trim(),
-            city: formValues.city.trim(),
-            latitude: Number(formValues.latitude),
-            longitude: Number(formValues.longitude),
-            capacity: Number(formValues.capacity),
-            status: formValues.status,
-        };
-
-        setFormError(null);
-
-        try {
-            await saveStoreMutation.mutateAsync({
-                storeId: editingStore?.storeId,
-                data: payload,
-            });
-
-            await queryClient.invalidateQueries({ queryKey: ['admin-stores'] });
-
-            success(editingStore ? 'Tienda actualizada' : 'Tienda creada');
-            closeFormModal();
         } catch (err) {
-            const message = err instanceof Error ? err.message : 'No se pudo guardar la tienda';
-            setFormError(message);
+            const message = err instanceof Error ? err.message : 'No se pudieron cargar los pedidos de la tienda';
             showError(message);
+            closeOrdersModal();
+        } finally {
+            setOrdersLoading(false);
         }
     };
-        const items = inventoryData.items.map((item) => {
-            const rawValue = inventoryDraft[item.bookId] ?? String(item.availableQuantity);
-            const parsedValue = Number(rawValue.trim());
 
-            if (!Number.isFinite(parsedValue) || !Number.isInteger(parsedValue) || parsedValue < 0) {
-                throw new Error(`La cantidad del libro ${item.title} debe ser un número entero mayor o igual a cero.`);
+    const handleDeleteClick = async (store: StoreRecord) => {
+        setDeleteCheckLoading(true);
+
+        try {
+            const data = await getStoreOrders(store.storeId);
+
+            if (data.pendingOrders > 0) {
+                setDeleteBlocked({ store, pendingOrders: data.pendingOrders });
+                return;
             }
 
-            return {
-                bookId: item.bookId,
-                availableQuantity: parsedValue,
-            };
-        });
+            setDeleteTarget(store);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'No se pudo validar si la tienda puede eliminarse';
+            showError(message);
+            console.error(err);
+        } finally {
+            setDeleteCheckLoading(false);
+        }
+    };
+
+    const handleSaveInventory = async () => {
+        if (!inventoryData) {
+            return;
+        }
+
+        let items: Array<{ bookId: number; availableQuantity: number }>;
+
+        try {
+            items = inventoryData.items.map((item) => {
+                const rawValue = inventoryDraft[item.bookId] ?? String(item.availableQuantity);
+                const parsedValue = Number(rawValue.trim());
+
+                if (!Number.isFinite(parsedValue) || !Number.isInteger(parsedValue) || parsedValue < 0) {
+                    throw new Error(
+                        `La cantidad del libro ${item.title} debe ser un número entero mayor o igual a cero.`,
+                    );
+                }
+
+                return {
+                    bookId: item.bookId,
+                    availableQuantity: parsedValue,
+                };
+            });
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Revisa las cantidades del inventario';
+            showError(message);
+            return;
+        }
 
         try {
             setInventorySaving(true);
             const updated = await updateStoreInventory(inventoryData.store.storeId, items);
             setInventoryData(updated);
             setInventoryDraft(
-                Object.fromEntries(
-                    updated.items.map((item) => [item.bookId, String(item.availableQuantity)]),
-                ),
+                Object.fromEntries(updated.items.map((item) => [item.bookId, String(item.availableQuantity)])),
             );
             await queryClient.invalidateQueries({ queryKey: ['admin-stores'] });
             success('Inventario actualizado');
@@ -492,74 +459,74 @@ export function StoresManagementPage() {
             return;
         }
 
-            try {
-                  await deleteStoreMutation.mutateAsync(deleteTarget.storeId);
-                  await queryClient.invalidateQueries({ queryKey: ['admin-stores'] });
-                  success('Tienda eliminada');
-                  setDeleteTarget(null);
-            } catch (err) {
-                  const message = err instanceof Error ? err.message : 'No se pudo eliminar la tienda';
-                  showError(message);
+        try {
+            await deleteStoreMutation.mutateAsync(deleteTarget.storeId);
+            await queryClient.invalidateQueries({ queryKey: ['admin-stores'] });
+            success('Tienda eliminada');
+            setDeleteTarget(null);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'No se pudo eliminar la tienda';
+            showError(message);
             console.error(err);
-            }
-      };
+        }
+    };
 
     if (role === 'root') {
         return <Navigate to="/admin/create-admin" replace />;
     }
 
-      const columns: DataTableColumn<StoreRecord>[] = [
-            {
-                  key: 'storeId',
-                  label: 'ID',
-                  width: '88px',
-            },
-            {
-                  key: 'name',
-                  label: 'Tienda',
-                  width: '240px',
-                  render: (_, store) => (
-                        <div className="space-y-1">
-                              <p className="font-semibold text-text">{store.name}</p>
-                              <p className="text-xs text-text-muted">{store.city}</p>
-                        </div>
-                  ),
-            },
-            {
-                  key: 'address',
-                  label: 'Dirección',
-                  width: '260px',
-            },
-            {
-                  key: 'city',
-                  label: 'Ciudad',
-                  width: '170px',
-            },
-            {
-                  key: 'latitude',
-                  label: 'Coordenadas',
-                  width: '180px',
-                  render: (_, store) => <span>{formatCoordinates(store.latitude, store.longitude)}</span>,
-            },
-            {
-                  key: 'capacity',
-                  label: 'Capacidad',
-                  width: '120px',
-                  render: (value) => (value != null ? String(value) : 'N/A'),
-            },
-            {
-                  key: 'status',
-                  label: 'Estado',
-                  width: '130px',
-                  render: (_, store) => (
-                        <span
-                              className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStoreStatusClass(store.status)}`}
-                        >
-                              {STORE_STATUS_LABELS[store.status]}
-                        </span>
-                  ),
-            },
-      ];
+    const columns: DataTableColumn<StoreRecord>[] = [
+        {
+            key: 'storeId',
+            label: 'ID',
+            width: '88px',
+        },
+        {
+            key: 'name',
+            label: 'Tienda',
+            width: '240px',
+            render: (_, store) => (
+                <div className="space-y-1">
+                    <p className="font-semibold text-text">{store.name}</p>
+                    <p className="text-xs text-text-muted">{store.city}</p>
+                </div>
+            ),
+        },
+        {
+            key: 'address',
+            label: 'Dirección',
+            width: '260px',
+        },
+        {
+            key: 'city',
+            label: 'Ciudad',
+            width: '170px',
+        },
+        {
+            key: 'latitude',
+            label: 'Coordenadas',
+            width: '180px',
+            render: (_, store) => <span>{formatCoordinates(store.latitude, store.longitude)}</span>,
+        },
+        {
+            key: 'capacity',
+            label: 'Capacidad',
+            width: '120px',
+            render: (value) => (value != null ? String(value) : 'N/A'),
+        },
+        {
+            key: 'status',
+            label: 'Estado',
+            width: '130px',
+            render: (_, store) => (
+                <span
+                    className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStoreStatusClass(store.status)}`}
+                >
+                    {STORE_STATUS_LABELS[store.status]}
+                </span>
+            ),
+        },
+    ];
 
     const actions: DataTableAction<StoreRecord>[] = [
         {
@@ -700,18 +667,18 @@ export function StoresManagementPage() {
                         </label>
                     </div>
 
-                              <label className="space-y-2 text-sm font-medium text-text">
-                                    <span>Dirección</span>
-                                    <input
-                                          type="text"
-                                          value={formValues.address}
+                    <label className="space-y-2 text-sm font-medium text-text">
+                        <span>Dirección</span>
+                        <input
+                            type="text"
+                            value={formValues.address}
                             placeholder="Dirección completa"
-                                          onChange={(event) => {
-                                                setFormValues((current) => ({ ...current, address: event.target.value }));
-                                          }}
-                                          className="w-full rounded-xl border border-border bg-bg px-4 py-2.5 text-text outline-none transition focus:border-primary-400"
-                                                  />
-                              </label>
+                            onChange={(event) => {
+                                setFormValues((current) => ({ ...current, address: event.target.value }));
+                            }}
+                            className="w-full rounded-xl border border-border bg-bg px-4 py-2.5 text-text outline-none transition focus:border-primary-400"
+                        />
+                    </label>
 
                     <StoreMapPicker
                         address={formValues.address}
@@ -762,36 +729,36 @@ export function StoresManagementPage() {
                 </div>
             </FormModal>
 
-                  <FormModal
-                        isOpen={inventoryModalOpen}
-                        title={inventoryData ? `Inventario de ${inventoryData.store.name}` : 'Inventario de tienda'}
-                        onClose={closeInventoryModal}
-                        onSubmit={async () => {
-                              await handleSaveInventory();
-                        }}
-                        isLoading={inventoryLoading && inventoryData == null || inventorySaving}
-                        submitText={inventoryData ? 'Guardar cambios' : 'Cerrar'}
-                        size="lg"
-                  >
-                        {inventoryData ? (
-                              <div className="space-y-4">
-                                    <div className="grid gap-4 md:grid-cols-3">
-                                          <SummaryCard
-                                                label="Disponibles"
-                                                value={inventoryData.totalAvailableQuantity}
-                                                helper="Unidades listas para vender"
-                                          />
-                                          <SummaryCard
-                                                label="Reservados"
-                                                value={inventoryData.totalReservedQuantity}
-                                                helper="Unidades apartadas en pedidos"
-                                          />
-                                          <SummaryCard
-                                                label="Artículos"
-                                                value={inventoryData.items.length}
-                                                helper="Libros con inventario en esta tienda"
-                                          />
-                                    </div>
+            <FormModal
+                isOpen={inventoryModalOpen}
+                title={inventoryData ? `Inventario de ${inventoryData.store.name}` : 'Inventario de tienda'}
+                onClose={closeInventoryModal}
+                onSubmit={async () => {
+                    await handleSaveInventory();
+                }}
+                isLoading={inventoryLoading && inventoryData == null || inventorySaving}
+                submitText={inventoryData ? 'Guardar cambios' : 'Cerrar'}
+                size="lg"
+            >
+                {inventoryData ? (
+                    <div className="space-y-4">
+                        <div className="grid gap-4 md:grid-cols-3">
+                            <SummaryCard
+                                label="Disponibles"
+                                value={inventoryData.totalAvailableQuantity}
+                                helper="Unidades listas para vender"
+                            />
+                            <SummaryCard
+                                label="Reservados"
+                                value={inventoryData.totalReservedQuantity}
+                                helper="Unidades apartadas en pedidos"
+                            />
+                            <SummaryCard
+                                label="Artículos"
+                                value={inventoryData.items.length}
+                                helper="Libros con inventario en esta tienda"
+                            />
+                        </div>
 
                         <div className="rounded-2xl border border-border bg-bg-secondary overflow-x-auto">
                             <table className="w-full">
@@ -809,7 +776,21 @@ export function StoresManagementPage() {
                                         <tr key={item.bookId} className="hover:bg-bg">
                                             <td className="px-4 py-3 text-sm text-text">{item.title}</td>
                                             <td className="px-4 py-3 text-sm text-text-muted">{item.author}</td>
-                                            <td className="px-4 py-3 text-sm text-text">{item.availableQuantity}</td>
+                                            <td className="px-4 py-3 text-sm text-text">
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    value={inventoryDraft[item.bookId] ?? String(item.availableQuantity)}
+                                                    onChange={(event) => {
+                                                        const value = event.target.value;
+                                                        setInventoryDraft((current) => ({
+                                                            ...current,
+                                                            [item.bookId]: value,
+                                                        }));
+                                                    }}
+                                                    className="w-28 rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text outline-none transition focus:border-primary-400"
+                                                />
+                                            </td>
                                             <td className="px-4 py-3 text-sm text-text">{item.reservedQuantity}</td>
                                             <td className="px-4 py-3 text-sm text-text">{item.totalQuantity}</td>
                                         </tr>
@@ -821,6 +802,9 @@ export function StoresManagementPage() {
                         {inventoryData.items.length === 0 ? (
                             <p className="text-sm text-text-muted">No hay inventario registrado para esta tienda.</p>
                         ) : null}
+                        <p className="text-sm text-text-muted">
+                            Edita la cantidad disponible de cada libro y guarda los cambios para actualizar la tienda.
+                        </p>
                     </div>
                 ) : inventoryLoading ? (
                     <div className="flex justify-center py-12">
@@ -943,20 +927,20 @@ export function StoresManagementPage() {
                 }}
             />
 
-                  <ConfirmationModal
-                        isOpen={deleteTarget != null}
-                        title="Eliminar tienda"
-                        message={
-                              deleteTarget
-                                    ? `¿Seguro que deseas eliminar la tienda ${deleteTarget.name}? Esta acción no se puede deshacer.`
-                                    : ''
-                        }
-                                confirmText="Eliminar"
-                                cancelText="Cancelar"
-                        onConfirm={handleConfirmDelete}
+            <ConfirmationModal
+                isOpen={deleteTarget != null}
+                title="Eliminar tienda"
+                message={
+                    deleteTarget
+                        ? `¿Seguro que deseas eliminar la tienda ${deleteTarget.name}? Esta acción no se puede deshacer.`
+                        : ''
+                }
+                confirmText="Eliminar"
+                cancelText="Cancelar"
+                onConfirm={handleConfirmDelete}
                 onCancel={() => setDeleteTarget(null)}
                 isConfirmLoading={deleteStoreMutation.isPending}
-                  />
-            </AdminLayout>
-      );
+            />
+        </AdminLayout>
+    );
 }

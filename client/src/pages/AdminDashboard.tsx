@@ -304,6 +304,12 @@ export function AdminDashboard() {
                   >
                     ➕ Crear nueva tienda
                   </button>
+                  <Link
+                    to="/messages"
+                    className="block w-full px-4 py-3 rounded-lg hover:bg-border transition-colors text-text"
+                  >
+                    💬 Abrir mensajería
+                  </Link>
                 </div>
               </div>
 

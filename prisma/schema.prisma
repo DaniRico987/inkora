@@ -593,13 +593,13 @@ model NotificationLog {
 model Conversation {
   conversationId Int                @id @default(autoincrement())
   clientId       Int
-  adminId        Int
+  adminId        Int?
   startedAt      DateTime           @default(now())
   updatedAt      DateTime           @default(now()) @updatedAt
   status         ConversationStatus
 
   client   Client    @relation(fields: [clientId], references: [clientId])
-  admin    Admin     @relation(fields: [adminId], references: [adminId])
+  admin    Admin?    @relation(fields: [adminId], references: [adminId])
   messages Message[]
 
   @@index([clientId, status])

@@ -9,6 +9,9 @@ export class ConversationDto {
     @ApiProperty({ example: 'active' })
     status: 'active' | 'closed';
 
+    @ApiProperty({ example: true })
+    isQueued: boolean;
+
     @ApiProperty({ example: '2026-05-18T10:00:00.000Z' })
     startedAt: Date;
 

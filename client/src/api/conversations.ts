@@ -91,6 +91,15 @@ export async function sendConversationMessage(
     }
 }
 
+export async function claimConversation(conversationId: number): Promise<ConversationSummary> {
+    try {
+        const response = await api.post<ConversationSummary>(`/conversations/${conversationId}/claim`);
+        return response.data;
+    } catch (error) {
+        throw extractConversationError(error);
+    }
+}
+
 export async function markConversationMessageAsRead(
     messageId: number,
 ): Promise<ReadConversationMessageResponse> {

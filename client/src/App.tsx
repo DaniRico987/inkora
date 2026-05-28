@@ -167,13 +167,18 @@ function getNavBarVariant(): NavBarVariant {
 
 function AppContent() {
   const location = useLocation();
+  const appRole = resolveAppRole();
+  const isAdminMessagesRoute =
+    location.pathname === '/messages' &&
+    (appRole === 'admin' || appRole === 'root');
   const shouldHideNavBar =
     location.pathname === '/login' ||
     location.pathname === '/register' ||
     location.pathname.startsWith('/admin') ||
     location.pathname === '/forgot-password' ||
     location.pathname.startsWith('/reset-password') ||
-    location.pathname === '/create-admin';
+    location.pathname === '/create-admin' ||
+    isAdminMessagesRoute;
   const hasTopNav = !shouldHideNavBar;
   const navBarVariant = getNavBarVariant();
 
@@ -181,7 +186,7 @@ function AppContent() {
     <div className="bg-bg w-screen min-h-screen flex flex-col transition-all duration-300 ease-in-out">
       {!shouldHideNavBar && <NavBar variant={navBarVariant} />}
       <header
-        className={`relative pointer-events-none w-full ${shouldHideNavBar && location.pathname.startsWith('/admin') ? 'hidden' : ''}`}
+        className={`relative pointer-events-none w-full ${shouldHideNavBar && (location.pathname.startsWith('/admin') || isAdminMessagesRoute) ? 'hidden' : ''}`}
       >
         <div
           className={`mx-auto w-full px-4 ${hasTopNav ? 'max-w-7xl pt-1 pb-2' : 'pt-4 pb-2'}`}
@@ -192,7 +197,7 @@ function AppContent() {
         </div>
       </header>
       <main
-        className={`flex-1 ${location.pathname.startsWith('/admin') || location.pathname === '/checkout' || location.pathname === '/' ? '' : 'flex items-center justify-center'}`}
+        className={`flex-1 ${location.pathname.startsWith('/admin') || isAdminMessagesRoute || location.pathname === '/checkout' || location.pathname === '/' ? '' : 'flex items-center justify-center'}`}
       >
         <Routes>
           {/* Login */}

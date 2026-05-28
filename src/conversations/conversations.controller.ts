@@ -110,4 +110,23 @@ export class ConversationsController {
     ) {
         return this.conversationsService.sendMessage(conversationId, req.user, dto);
     }
+
+    @Post(':id/claim')
+    @HttpCode(HttpStatus.OK)
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('admin')
+    @ApiOperation({ summary: 'Aceptar una conversación pendiente' })
+    @ApiResponse({
+        status: 200,
+        description: 'Conversación aceptada por un administrador',
+        type: ConversationDto,
+    })
+    @ApiUnauthorizedResponse({ description: 'Token JWT inválido o ausente' })
+    @ApiForbiddenResponse({ description: 'Solo los administradores pueden aceptar conversaciones' })
+    async claimConversation(
+        @Param('id', ParseIntPipe) conversationId: number,
+        @Req() req: Request & { user: AuthenticatedUser },
+    ): Promise<ConversationDto> {
+        return this.conversationsService.claimConversation(conversationId, req.user);
+    }
 }

@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, Navigate } from 'react-router-dom';
+import { AdminLayout } from '../Components/AdminLayout';
 import { Spinner } from '../Components/Spinner';
 import { useSnackbar } from '../Components/SnackbarProvider';
 import { getRoleFromToken, isAuthenticated } from '../auth/session';
 import {
+    claimConversation,
     createConversation,
     getConversationMessages,
     getConversations,
@@ -19,7 +21,10 @@ import type {
 const POLLING_MS = 2000;
 
 function formatTime(value?: string | null): string {
-    if (!value) return 'Sin fecha';
+    if (!value) {
+        return 'Sin fecha';
+    }
+
     return new Date(value).toLocaleString('es-CO', {
         dateStyle: 'short',
         timeStyle: 'short',
@@ -27,7 +32,10 @@ function formatTime(value?: string | null): string {
 }
 
 function formatShortTime(value?: string | null): string {
-    if (!value) return '--:--';
+    if (!value) {
+        return '--:--';
+    }
+
     return new Date(value).toLocaleTimeString('es-CO', {
         hour: '2-digit',
         minute: '2-digit',
@@ -82,6 +90,12 @@ export function MessagesPage() {
     });
 
     const conversations = conversationsQuery.data?.conversations ?? [];
+    const pendingConversations = currentRole === 'admin'
+        ? conversations.filter((conversation) => conversation.isQueued)
+        : [];
+    const activeConversations = currentRole === 'admin'
+        ? conversations.filter((conversation) => !conversation.isQueued)
+        : conversations;
 
     useEffect(() => {
         if (selectedConversationId === null && conversations.length > 0) {
@@ -90,11 +104,13 @@ export function MessagesPage() {
     }, [conversations, selectedConversationId]);
 
     useEffect(() => {
-        if (selectedConversationId !== null) {
-            const exists = conversations.some((conversation) => conversation.conversationId === selectedConversationId);
-            if (!exists && conversations.length > 0) {
-                setSelectedConversationId(conversations[0].conversationId);
-            }
+        if (selectedConversationId === null) {
+            return;
+        }
+
+        const exists = conversations.some((conversation) => conversation.conversationId === selectedConversationId);
+        if (!exists && conversations.length > 0) {
+            setSelectedConversationId(conversations[0].conversationId);
         }
     }, [conversations, selectedConversationId]);
 
@@ -125,9 +141,14 @@ export function MessagesPage() {
     });
 
     const conversationMessages = messagesQuery.data?.messages ?? [];
+    const isPendingAdminConversation = currentRole === 'admin' && activeConversation?.isQueued;
 
     useEffect(() => {
         if (!activeConversation) {
+            return;
+        }
+
+        if (currentRole === 'admin' && activeConversation.isQueued) {
             return;
         }
 
@@ -250,21 +271,34 @@ export function MessagesPage() {
         },
     });
 
+    const claimConversationMutation = useMutation({
+        mutationFn: claimConversation,
+        onSuccess: async (conversation) => {
+            await queryClient.invalidateQueries({ queryKey: ['conversations'] });
+            await queryClient.invalidateQueries({ queryKey: ['conversations', conversation.conversationId, 'messages'] });
+            setSelectedConversationId(conversation.conversationId);
+            success('Conversación aceptada');
+        },
+        onError: (error) => {
+            showError(error instanceof Error ? error.message : 'No se pudo aceptar la conversación');
+        },
+    });
+
     const handleSend = async () => {
         const content = draft.trim();
-        if (!content || sendMessageMutation.isPending) {
+        if (!content || sendMessageMutation.isPending || isPendingAdminConversation) {
             return;
         }
 
         await sendMessageMutation.mutateAsync(content);
     };
 
-    if (role !== 'client' && role !== 'admin') {
-        return <Navigate to="/" replace />;
-    }
-
     if (!isAuthenticated()) {
         return <Navigate to="/login" replace />;
+    }
+
+    if (role !== 'client' && role !== 'admin') {
+        return <Navigate to="/" replace />;
     }
 
     const isLoading = conversationsQuery.isLoading || messagesQuery.isLoading;
@@ -273,9 +307,10 @@ export function MessagesPage() {
         : messagesQuery.error instanceof Error
             ? messagesQuery.error
             : null;
+    const pageShellClass = 'w-full px-4 py-4 sm:px-6 lg:px-8';
 
-    return (
-        <div className="w-full px-4 py-4 sm:px-6 lg:px-8">
+    const pageContent = (
+        <div className={pageShellClass}>
             <div className="relative overflow-hidden rounded-4xl border border-border bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.18),transparent_42%),linear-gradient(145deg,rgba(10,15,28,0.95),rgba(18,24,38,0.92))] shadow-[0_30px_80px_rgba(0,0,0,0.25)]">
                 <div className="absolute -left-24 top-4 h-48 w-48 rounded-full bg-skyblue-500/20 blur-3xl" aria-hidden="true" />
                 <div className="absolute -right-24 bottom-0 h-56 w-56 rounded-full bg-primary-500/20 blur-3xl" aria-hidden="true" />
@@ -302,18 +337,59 @@ export function MessagesPage() {
                         </div>
 
                         <div className="mt-5 space-y-3">
+                            {role === 'admin' && pendingConversations.length > 0 && (
+                                <div className="rounded-2xl border border-amber-300/30 bg-amber-400/10 p-4">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div>
+                                            <p className="text-sm font-semibold text-babyblue-50">Pendientes por aceptar</p>
+                                            <p className="text-xs text-babyblue-50/70">
+                                                {pendingConversations.length} conversación(es) esperan atención.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-3 space-y-2">
+                                        {pendingConversations.map((conversation) => (
+                                            <div
+                                                key={conversation.conversationId}
+                                                className="rounded-2xl border border-white/10 bg-white/5 p-3"
+                                            >
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <div className="min-w-0">
+                                                        <p className="truncate text-sm font-semibold text-babyblue-50">
+                                                            {conversationTitle(conversation, currentRole)}
+                                                        </p>
+                                                        <p className="mt-1 line-clamp-2 text-xs text-babyblue-50/70">
+                                                            {conversationSubtitle(conversation, currentRole)}
+                                                        </p>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => claimConversationMutation.mutate(conversation.conversationId)}
+                                                        disabled={claimConversationMutation.isPending}
+                                                        className="shrink-0 rounded-full bg-metallicgold-400 px-3 py-1.5 text-xs font-semibold text-primary-700 transition hover:bg-metallicgold-300 disabled:cursor-not-allowed disabled:opacity-60"
+                                                    >
+                                                        Aceptar
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             {conversationsQuery.isLoading ? (
                                 <div className="flex justify-center py-10">
                                     <Spinner size="md" label="Cargando conversaciones..." />
                                 </div>
-                            ) : conversations.length === 0 ? (
+                            ) : activeConversations.length === 0 && pendingConversations.length === 0 ? (
                                 <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 px-5 py-8 text-center text-sm text-babyblue-50/80">
                                     {role === 'admin'
-                                        ? 'Todavía no tienes chats asignados.'
+                                        ? 'Todavía no tienes chats aceptados.'
                                         : 'No tienes conversaciones todavía. Inicia una nueva para contactar al equipo de administración.'}
                                 </div>
                             ) : (
-                                conversations.map((conversation) => {
+                                activeConversations.map((conversation) => {
                                     const selected = conversation.conversationId === activeConversation?.conversationId;
                                     return (
                                         <button
@@ -333,6 +409,11 @@ export function MessagesPage() {
                                                     <p className="mt-1 line-clamp-2 text-xs leading-5 text-babyblue-50/70">
                                                         {conversationSubtitle(conversation, currentRole)}
                                                     </p>
+                                                    {role === 'admin' && conversation.isQueued && (
+                                                        <span className="mt-2 inline-flex rounded-full border border-amber-300/30 bg-amber-400/10 px-2 py-0.5 text-[11px] font-semibold text-amber-100">
+                                                            Pendiente
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 <div className="flex shrink-0 flex-col items-end gap-2">
                                                     <span className="text-[11px] text-babyblue-50/55">
@@ -368,7 +449,11 @@ export function MessagesPage() {
                                             {conversationTitle(activeConversation, currentRole)}
                                         </h2>
                                         <p className="mt-1 text-sm text-text-muted">
-                                            {activeConversation.status === 'active' ? 'Abierta' : 'Cerrada'} · Última actualización {formatTime(activeConversation.updatedAt)}
+                                            {activeConversation.isQueued
+                                                ? 'Pendiente de aceptación'
+                                                : activeConversation.status === 'active'
+                                                    ? 'Abierta'
+                                                    : 'Cerrada'} · Última actualización {formatTime(activeConversation.updatedAt)}
                                         </p>
                                     </div>
                                     <Link
@@ -422,30 +507,55 @@ export function MessagesPage() {
                                         </div>
 
                                         <div className="border-t border-white/10 bg-black/10 p-4 sm:p-5">
-                                            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                                                <label className="flex-1">
-                                                    <span className="mb-2 block text-sm font-medium text-text-muted">Escribe tu mensaje</span>
-                                                    <textarea
-                                                        value={draft}
-                                                        onChange={(event) => setDraft(event.target.value)}
-                                                        placeholder="Cuéntanos en qué podemos ayudarte..."
-                                                        rows={3}
-                                                        className="min-h-28 w-full resize-none rounded-2xl border border-border bg-bg px-4 py-3 text-sm text-text outline-none transition placeholder:text-text-muted focus:border-primary-500"
-                                                        maxLength={4000}
-                                                    />
-                                                </label>
-                                                <button
-                                                    type="button"
-                                                    onClick={handleSend}
-                                                    disabled={sendMessageMutation.isPending || draft.trim().length === 0}
-                                                    className="inline-flex items-center justify-center rounded-2xl bg-primary-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-primary-400 disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-14"
-                                                >
-                                                    {sendMessageMutation.isPending ? 'Enviando...' : 'Enviar mensaje'}
-                                                </button>
-                                            </div>
-                                            <p className="mt-2 text-xs text-text-muted">
-                                                Los nuevos mensajes se actualizarán automáticamente cada 2 segundos.
-                                            </p>
+                                            {isPendingAdminConversation ? (
+                                                <div className="flex flex-col gap-3 rounded-2xl border border-amber-300/30 bg-amber-400/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+                                                    <div>
+                                                        <p className="text-sm font-semibold text-babyblue-50">Conversación pendiente de aceptación</p>
+                                                        <p className="text-xs text-babyblue-50/70">
+                                                            Acepta la conversación para habilitar la respuesta.
+                                                        </p>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            if (activeConversation) {
+                                                                claimConversationMutation.mutate(activeConversation.conversationId);
+                                                            }
+                                                        }}
+                                                        disabled={claimConversationMutation.isPending}
+                                                        className="inline-flex items-center justify-center rounded-2xl bg-metallicgold-400 px-6 py-3 text-sm font-semibold text-primary-700 transition hover:bg-metallicgold-300 disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-14"
+                                                    >
+                                                        {claimConversationMutation.isPending ? 'Aceptando...' : 'Aceptar conversación'}
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                                                        <label className="flex-1">
+                                                            <span className="mb-2 block text-sm font-medium text-text-muted">Escribe tu mensaje</span>
+                                                            <textarea
+                                                                value={draft}
+                                                                onChange={(event) => setDraft(event.target.value)}
+                                                                placeholder="Cuéntanos en qué podemos ayudarte..."
+                                                                rows={3}
+                                                                className="min-h-28 w-full resize-none rounded-2xl border border-border bg-bg px-4 py-3 text-sm text-text outline-none transition placeholder:text-text-muted focus:border-primary-500"
+                                                                maxLength={4000}
+                                                            />
+                                                        </label>
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleSend}
+                                                            disabled={sendMessageMutation.isPending || draft.trim().length === 0}
+                                                            className="inline-flex items-center justify-center rounded-2xl bg-primary-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-primary-400 disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-14"
+                                                        >
+                                                            {sendMessageMutation.isPending ? 'Enviando...' : 'Enviar mensaje'}
+                                                        </button>
+                                                    </div>
+                                                    <p className="mt-2 text-xs text-text-muted">
+                                                        Los nuevos mensajes se actualizarán automáticamente cada 2 segundos.
+                                                    </p>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -481,6 +591,8 @@ export function MessagesPage() {
             </div>
         </div>
     );
+
+    return role === 'admin' ? <AdminLayout>{pageContent}</AdminLayout> : pageContent;
 }
 
 export default MessagesPage;

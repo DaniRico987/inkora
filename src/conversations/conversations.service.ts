@@ -32,7 +32,7 @@ type ConversationWithRelations = {
             email: string;
             userType: 'client' | 'admin' | 'root';
         };
-    };
+    } | null;
     messages: Array<{
         messageId: number;
         conversationId: number;
@@ -91,16 +91,14 @@ export class ConversationsService {
             throw new ForbiddenException('Solo los clientes pueden iniciar conversaciones');
         }
 
-        const admin = await this.prisma.admin.findFirst({
+        const activeAdmins = await this.prisma.admin.findMany({
             where: {
                 user: {
                     status: 'active',
                     userType: 'admin',
                 },
             },
-            orderBy: { adminId: 'asc' },
             select: {
-                adminId: true,
                 user: {
                     select: {
                         userId: true,
@@ -113,27 +111,25 @@ export class ConversationsService {
             },
         });
 
-        if (!admin) {
+        if (activeAdmins.length === 0) {
             throw new NotFoundException('No hay administradores disponibles');
         }
 
         const conversation = (await this.prisma.conversation.create({
             data: {
-                clientId: client.clientId,
-                adminId: admin.adminId,
                 status: 'active',
+                client: {
+                    connect: {
+                        clientId: client.clientId,
+                    },
+                },
             },
             include: this.conversationInclude(),
         })) as unknown as ConversationWithRelations;
 
-        await this.prisma.notification.create({
-            data: {
-                userId: admin.user.userId,
-                notificationType: 'message',
-                content: `Nueva conversación iniciada por ${client.user.firstName} ${client.user.lastName}`,
-                isRead: false,
-            },
-        });
+        await this.notifyActiveAdmins(
+            `Nueva conversación pendiente iniciada por ${client.user.firstName} ${client.user.lastName}`,
+        );
 
         return this.mapConversation(conversation, 0, null);
     }
@@ -145,7 +141,12 @@ export class ConversationsService {
             where:
                 scope.kind === 'client'
                     ? { clientId: scope.clientId }
-                    : { adminId: scope.adminId },
+                    : {
+                        OR: [
+                            { adminId: scope.adminId },
+                            { adminId: null },
+                        ],
+                    },
             include: this.conversationInclude(),
         })) as unknown as ConversationWithRelations[];
 
@@ -218,7 +219,7 @@ export class ConversationsService {
         dto: CreateMessageRequestDto,
     ): Promise<MessageDto> {
         const conversation = await this.findAccessibleConversation(conversationId, user.userId);
-        this.ensureParticipant(conversation, user.userId);
+        this.ensureCanReply(conversation, user.userId);
 
         const content = dto.content.trim();
         if (!content) {
@@ -244,24 +245,89 @@ export class ConversationsService {
             },
         })) as unknown as MessageWithSender;
 
-        await this.prisma.conversation.update({
-            where: { conversationId },
-            data: { status: 'active' },
-        });
+        if (user.userType === 'admin') {
+            await this.prisma.conversation.update({
+                where: { conversationId },
+                data: { status: 'active' },
+            });
+        }
 
-        const recipientUserId = this.getRecipientUserId(conversation, user.userId);
         const senderName = `${message.sender.firstName} ${message.sender.lastName}`.trim();
+
+        if (conversation.admin === null && user.userType === 'client') {
+            await this.notifyActiveAdmins(
+                `Nuevo mensaje de ${senderName}: ${message.content.slice(0, 160)}`,
+            );
+        } else {
+            const recipientUserId = this.getRecipientUserId(conversation, user.userId);
+
+            await this.prisma.notification.create({
+                data: {
+                    userId: recipientUserId,
+                    notificationType: 'message',
+                    content: `Nuevo mensaje de ${senderName}: ${message.content.slice(0, 160)}`,
+                    isRead: false,
+                },
+            });
+        }
+
+        return this.mapMessage(message);
+    }
+
+    async claimConversation(
+        conversationId: number,
+        user: AuthenticatedUser,
+    ): Promise<ConversationDto> {
+        const scope = await this.getUserScope(user);
+
+        if (scope.kind !== 'admin') {
+            throw new ForbiddenException('Solo los administradores pueden aceptar conversaciones');
+        }
+
+        const conversation = (await this.prisma.conversation.findUnique({
+            where: { conversationId },
+            include: this.conversationInclude(),
+        })) as unknown as ConversationWithRelations | null;
+
+        if (!conversation) {
+            throw new NotFoundException('Conversation not found');
+        }
+
+        if (conversation.admin !== null) {
+            if (conversation.admin.user.userId === user.userId) {
+                const unreadCount = await this.prisma.message.count({
+                    where: {
+                        conversationId,
+                        senderId: { not: user.userId },
+                        isRead: false,
+                    },
+                });
+
+                return this.mapConversation(conversation, unreadCount, conversation.messages[0] ?? null);
+            }
+
+            throw new ForbiddenException('La conversación ya fue aceptada por otro administrador');
+        }
+
+        const updated = (await this.prisma.conversation.update({
+            where: { conversationId },
+            data: {
+                adminId: scope.adminId,
+                status: 'active',
+            },
+            include: this.conversationInclude(),
+        })) as unknown as ConversationWithRelations;
 
         await this.prisma.notification.create({
             data: {
-                userId: recipientUserId,
+                userId: updated.client.user.userId,
                 notificationType: 'message',
-                content: `Nuevo mensaje de ${senderName}: ${message.content.slice(0, 160)}`,
+                content: `Tu conversación fue aceptada por ${updated.admin.user.firstName} ${updated.admin.user.lastName}`,
                 isRead: false,
             },
         });
 
-        return this.mapMessage(message);
+        return this.mapConversation(updated, 0, updated.messages[0] ?? null);
     }
 
     async markMessageAsRead(
@@ -290,7 +356,9 @@ export class ConversationsService {
             throw new NotFoundException('Message not found');
         }
 
-        this.ensureParticipant(message.conversation as ConversationWithRelations, user.userId);
+        if (!this.canViewConversation(message.conversation as ConversationWithRelations, user.userId)) {
+            throw new NotFoundException('Conversation not found');
+        }
 
         if (message.senderId === user.userId) {
             throw new ForbiddenException('No puedes marcar como leído un mensaje enviado por ti');
@@ -380,26 +448,56 @@ export class ConversationsService {
             throw new NotFoundException('Conversation not found');
         }
 
-        this.ensureParticipant(conversation, userId);
+        if (!this.canViewConversation(conversation, userId)) {
+            throw new NotFoundException('Conversation not found');
+        }
 
         return conversation;
     }
 
-    private ensureParticipant(conversation: ConversationWithRelations, userId: number): void {
+    private ensureCanReply(conversation: ConversationWithRelations, userId: number): void {
         const clientUserId = conversation.client.user.userId;
-        const adminUserId = conversation.admin.user.userId;
+        const adminUserId = conversation.admin?.user.userId ?? null;
+
+        if (userId === clientUserId) {
+            return;
+        }
+
+        if (adminUserId !== null && userId === adminUserId && conversation.admin !== null) {
+            return;
+        }
+
+        if (adminUserId !== null && userId === adminUserId && conversation.admin === null) {
+            throw new ForbiddenException('Debes aceptar la conversación antes de responder');
+        }
 
         if (userId !== clientUserId && userId !== adminUserId) {
             throw new NotFoundException('Conversation not found');
         }
     }
 
+    private canViewConversation(conversation: ConversationWithRelations, userId: number): boolean {
+        if (conversation.client.user.userId === userId) {
+            return true;
+        }
+
+        if (conversation.admin?.user.userId === userId) {
+            return true;
+        }
+
+        return conversation.admin === null;
+    }
+
     private getRecipientUserId(conversation: ConversationWithRelations, senderUserId: number): number {
         if (conversation.client.user.userId === senderUserId) {
+            if (!conversation.admin) {
+                throw new NotFoundException('Conversation not found');
+            }
+
             return conversation.admin.user.userId;
         }
 
-        if (conversation.admin.user.userId === senderUserId) {
+        if (conversation.admin?.user.userId === senderUserId) {
             return conversation.client.user.userId;
         }
 
@@ -450,6 +548,37 @@ export class ConversationsService {
                 },
             },
         };
+    }
+
+    private async notifyActiveAdmins(content: string): Promise<void> {
+        const admins = await this.prisma.admin.findMany({
+            where: {
+                user: {
+                    status: 'active',
+                    userType: 'admin',
+                },
+            },
+            select: {
+                user: {
+                    select: {
+                        userId: true,
+                    },
+                },
+            },
+        });
+
+        await Promise.all(
+            admins.map((admin) =>
+                this.prisma.notification.create({
+                    data: {
+                        userId: admin.user.userId,
+                        notificationType: 'message',
+                        content,
+                        isRead: false,
+                    },
+                }),
+            ),
+        );
     }
 
     private mapParticipant(participant: {
@@ -512,11 +641,20 @@ export class ConversationsService {
         return {
             conversationId: conversation.conversationId,
             status: conversation.status,
+            isQueued: conversation.admin === null,
             startedAt: conversation.startedAt,
             updatedAt: conversation.updatedAt,
             unreadCount,
             client: this.mapParticipant(conversation.client),
-            admin: this.mapParticipant(conversation.admin),
+            admin: conversation.admin
+                ? this.mapParticipant(conversation.admin)
+                : {
+                    userId: 0,
+                    firstName: '',
+                    lastName: '',
+                    email: '',
+                    userType: 'admin',
+                },
             lastMessage: lastMessage ? this.mapMessage(lastMessage) : null,
         };
     }

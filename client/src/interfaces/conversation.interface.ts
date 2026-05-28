@@ -22,6 +22,7 @@ export interface ConversationMessage {
 export interface ConversationSummary {
     conversationId: number;
     status: 'active' | 'closed';
+    isQueued: boolean;
     startedAt: string;
     updatedAt: string;
     unreadCount: number;
