@@ -26,6 +26,30 @@ type WalletTransactionsApiResponse = {
   items: WalletTransaction[];
 };
 
+const getApiErrorMessage = (error: unknown, fallback: string): string => {
+  if (!axios.isAxiosError(error)) {
+    return fallback;
+  }
+
+  const payload = error.response?.data as
+    | { message?: string | string[]; error?: string }
+    | undefined;
+
+  if (Array.isArray(payload?.message) && payload.message.length > 0) {
+    return payload.message.join(', ');
+  }
+
+  if (typeof payload?.message === 'string' && payload.message.trim().length > 0) {
+    return payload.message;
+  }
+
+  if (typeof payload?.error === 'string' && payload.error.trim().length > 0) {
+    return payload.error;
+  }
+
+  return fallback;
+};
+
 export type WalletTopUpPayload = {
   amount: number;
   cardId: number;
@@ -49,13 +73,17 @@ export const getWalletTransactions = async (): Promise<WalletTransaction[]> => {
 export const topUpWallet = async (
   payload: WalletTopUpPayload,
 ): Promise<Wallet> => {
-  const { data } = await api.post<WalletApiResponse>('/wallet/top-up', {
-    ...payload,
-    currency: payload.currency ?? 'COP',
-  });
-  return {
-    balance: data.availableBalance,
-  };
+  try {
+    const { data } = await api.post<WalletApiResponse>('/wallet/top-up', {
+      ...payload,
+      currency: payload.currency ?? 'COP',
+    });
+    return {
+      balance: data.availableBalance,
+    };
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, 'No se pudo recargar el monedero'));
+  }
 };
 
 export type WalletTopUpWithCardPayload = {
@@ -72,11 +100,15 @@ export type WalletTopUpWithCardPayload = {
 export const topUpWalletWithCard = async (
   payload: WalletTopUpWithCardPayload,
 ): Promise<Wallet> => {
-  const { data } = await api.post<WalletApiResponse>(
-    '/wallet/top-up-with-card',
-    { ...payload, currency: payload.currency ?? 'COP' },
-  );
-  return {
-    balance: data.availableBalance,
-  };
+  try {
+    const { data } = await api.post<WalletApiResponse>(
+      '/wallet/top-up-with-card',
+      { ...payload, currency: payload.currency ?? 'COP' },
+    );
+    return {
+      balance: data.availableBalance,
+    };
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, 'No se pudo recargar con la tarjeta'));
+  }
 };

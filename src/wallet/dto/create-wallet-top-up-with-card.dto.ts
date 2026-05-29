@@ -8,9 +8,11 @@ import {
   IsNotEmpty,
   IsOptional,
   IsIn,
+  ValidateNested,
+  IsDefined,
 } from 'class-validator';
 
-class NewCardDto {
+export class NewCardDto {
   @ApiProperty({ example: 'Juan Perez' })
   @IsString()
   @IsNotEmpty()
@@ -44,6 +46,9 @@ export class CreateWalletTopUpWithCardDto {
   amount: number;
 
   @ApiProperty({ type: NewCardDto })
+  @IsDefined()
+  @ValidateNested()
+  @Type(() => NewCardDto)
   newCard: NewCardDto;
 
   @ApiProperty({ example: 'COP', required: false })

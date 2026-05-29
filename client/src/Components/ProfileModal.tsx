@@ -20,6 +20,8 @@ interface UserProfile {
   birthDate: string;
   birthPlace: string;
   address: string;
+  postalCode: string;
+  addressComplement: string;
   gender: string;
 }
 
@@ -33,6 +35,8 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     birthDate: '',
     birthPlace: '',
     address: '',
+    postalCode: '',
+    addressComplement: '',
     gender: '',
   });
   const [loading, setLoading] = useState(false);
@@ -58,6 +62,8 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
         birthDate: userProfile.birthDate ? userProfile.birthDate.split('T')[0] : '',
         birthPlace: userProfile.birthPlace || '',
         address: userProfile.address || '',
+        postalCode: userProfile.postalCode || '',
+        addressComplement: userProfile.addressComplement || '',
         gender: userProfile.gender || '',
       });
     } catch (error) {
@@ -73,6 +79,11 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
 
     if (!profile.address.trim()) {
       showError('La dirección es obligatoria en tu perfil');
+      return;
+    }
+
+    if (!/^\d{6}$/.test(profile.postalCode.trim())) {
+      showError('El código postal debe tener 6 dígitos y solo números');
       return;
     }
 
@@ -95,6 +106,8 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
         birthDate: profile.birthDate,
         birthPlace: profile.birthPlace,
         address: profile.address,
+        postalCode: profile.postalCode,
+        addressComplement: profile.addressComplement,
         gender: profile.gender,
       });
       success('Perfil actualizado correctamente');
@@ -171,6 +184,21 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                 value={profile.address}
                 onChange={(e) => handleInputChange('address', e.target.value)}
                 required
+              />
+
+              <InputText
+                label="Código postal"
+                value={profile.postalCode}
+                inputMode="numeric"
+                maxLength={6}
+                onChange={(e) => handleInputChange('postalCode', e.target.value.replace(/\D/g, '').slice(0, 6))}
+                required
+              />
+
+              <InputText
+                label="Complemento de la dirección"
+                value={profile.addressComplement}
+                onChange={(e) => handleInputChange('addressComplement', e.target.value)}
               />
 
               <div>

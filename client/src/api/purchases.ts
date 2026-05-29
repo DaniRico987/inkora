@@ -5,15 +5,9 @@ import type { Purchase } from '../interfaces/PurchaseInterface';
 export type CreatePurchasePayload = {
   deliveryMode: 'homeDelivery' | 'storePickup';
   pickupStoreId?: number;
+  allowWaitlistPickup?: boolean;
   paymentMethod?: string;
   currency?: string;
-  registeredCardId?: number;
-  newCard?: {
-    cardholder: string;
-    cardNumber: string;
-    expiry: string;
-    cvv: string;
-  };
   shippingAddress?: string;
   voucherCode?: string;
 };
@@ -68,8 +62,8 @@ function normalizeApiError(error: unknown, fallback: string): Error {
       Array.isArray(message)
         ? message.join(', ')
         : typeof message === 'string' && message.trim().length > 0
-        ? message
-        : fallback,
+          ? message
+          : fallback,
     );
 
     // Attach additional info from the response for higher-level callers

@@ -54,6 +54,8 @@ export function ProfilePage() {
     birthDate: '',
     birthPlace: '',
     address: '',
+    postalCode: '',
+    addressComplement: '',
     gender: '',
   });
 
@@ -78,6 +80,8 @@ export function ProfilePage() {
           : '',
         birthPlace: profileResult.birthPlace ?? '',
         address: profileResult.address ?? '',
+        postalCode: profileResult.postalCode ?? '',
+        addressComplement: profileResult.addressComplement ?? '',
         gender: profileResult.gender ?? '',
       });
     } catch (error) {
@@ -125,6 +129,11 @@ export function ProfilePage() {
 
     if (!form.address.trim()) {
       snackbar.warning('La dirección es obligatoria en tu perfil');
+      return;
+    }
+
+    if (!/^\d{6}$/.test(form.postalCode.trim())) {
+      snackbar.warning('El código postal debe tener 6 dígitos y solo números');
       return;
     }
 
@@ -186,6 +195,8 @@ export function ProfilePage() {
         birthDate: form.birthDate || undefined,
         birthPlace: form.birthPlace || undefined,
         address: form.address || undefined,
+        postalCode: form.postalCode || undefined,
+        addressComplement: form.addressComplement || undefined,
         gender: form.gender || undefined,
       });
       setProfile(updated);
@@ -213,14 +224,14 @@ export function ProfilePage() {
     const nextSubscriptions = isSubscribed
       ? previousSubscriptions.filter((sub) => sub.categoryId !== categoryId)
       : [
-          ...previousSubscriptions,
-          {
-            subscriptionId: -Date.now(),
-            categoryId,
-            categoryName,
-            subscribedAt: new Date().toISOString(),
-          },
-        ];
+        ...previousSubscriptions,
+        {
+          subscriptionId: -Date.now(),
+          categoryId,
+          categoryName,
+          subscribedAt: new Date().toISOString(),
+        },
+      ];
 
     setProfile({ ...profile, subscriptions: nextSubscriptions });
     setProcessingCategoryId(categoryId);
@@ -436,6 +447,28 @@ export function ProfilePage() {
               }
               required
             />
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <InputText
+                label="Código postal"
+                value={form.postalCode}
+                inputMode="numeric"
+                maxLength={6}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    postalCode: event.target.value.replace(/\D/g, '').slice(0, 6),
+                  }))
+                }
+                required
+              />
+              <InputText
+                label="Complemento de la dirección"
+                value={form.addressComplement}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, addressComplement: event.target.value }))
+                }
+              />
+            </div>
             <div className="flex justify-end">
               <Button
                 variant="primary"

@@ -24,8 +24,11 @@ export class ConversationDto {
     @ApiProperty({ type: ParticipantDto })
     client: ParticipantDto;
 
-    @ApiProperty({ type: ParticipantDto })
-    admin: ParticipantDto;
+    @ApiProperty({ type: ParticipantDto, nullable: true })
+    admin: ParticipantDto | null;
+
+    @ApiProperty({ type: ParticipantDto, nullable: true })
+    lastAdmin: ParticipantDto | null;
 
     @ApiPropertyOptional({ type: MessageDto })
     lastMessage?: MessageDto | null;

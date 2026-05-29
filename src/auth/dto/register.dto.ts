@@ -70,6 +70,36 @@ export class RegisterDto {
   address?: string;
 
   @ApiProperty({
+    description: 'Código postal de residencia (opcional)',
+    maxLength: 10,
+    example: '760001',
+    required: false,
+  })
+  @IsOptional()
+  @MaxLength(10)
+  postalCode?: string;
+
+  @ApiProperty({
+    description: 'Complemento de la dirección (opcional)',
+    maxLength: 255,
+    example: 'Apto 201',
+    required: false,
+  })
+  @IsOptional()
+  @MaxLength(255)
+  addressComplement?: string;
+
+  @ApiProperty({
+    description: 'Ubicación de residencia: ciudad, departamento y país (opcional)',
+    maxLength: 255,
+    example: 'Cali, Valle del Cauca, Colombia',
+    required: false,
+  })
+  @IsOptional()
+  @MaxLength(255)
+  addressLocation?: string;
+
+  @ApiProperty({
     description: 'Género del usuario',
     enum: ['male', 'female', 'other', 'prefer_not_say'],
     example: 'male',

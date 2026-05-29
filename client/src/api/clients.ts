@@ -57,6 +57,9 @@ export interface ClientProfile {
   birthDate: string;
   birthPlace: string | null;
   address: string | null;
+  postalCode: string | null;
+  addressComplement: string | null;
+  addressLocation: string | null;
   gender: string | null;
   subscriptions: ClientSubscription[];
   cards: ClientCard[];
@@ -69,6 +72,9 @@ export type UpdateClientProfilePayload = {
   birthDate?: string;
   birthPlace?: string;
   address?: string;
+  postalCode?: string;
+  addressComplement?: string;
+  addressLocation?: string;
   gender?: string;
   email?: string;
   username?: string;

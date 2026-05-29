@@ -38,7 +38,7 @@ export class AuthService {
     private readonly recaptchaService: RecaptchaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   private async safeUpdateUser(args: {
     where: { userId: number };
@@ -301,6 +301,9 @@ export class AuthService {
         birthDate: true,
         birthPlace: true,
         address: true,
+        postalCode: true,
+        addressComplement: true,
+        addressLocation: true,
         gender: true,
         userType: true,
         status: true,
@@ -450,6 +453,9 @@ export class AuthService {
         birthDate: new Date(dto.birthDate),
         birthPlace: dto.birthPlace,
         address: dto.address,
+        postalCode: dto.postalCode,
+        addressComplement: dto.addressComplement,
+        addressLocation: dto.addressLocation,
         gender: dto.gender,
         email,
         username,
@@ -521,6 +527,9 @@ export class AuthService {
           birthDate,
           birthPlace: dto.birthPlace,
           address: dto.address,
+          postalCode: dto.postalCode,
+          addressComplement: dto.addressComplement,
+          addressLocation: dto.addressLocation,
           gender: dto.gender,
           email,
           username,
@@ -587,6 +596,11 @@ export class AuthService {
       updateData.birthDate = new Date(dto.birthDate);
     if (dto.birthPlace !== undefined) updateData.birthPlace = dto.birthPlace;
     if (dto.address !== undefined) updateData.address = dto.address;
+    if (dto.postalCode !== undefined) updateData.postalCode = dto.postalCode;
+    if (dto.addressComplement !== undefined)
+      updateData.addressComplement = dto.addressComplement;
+    if (dto.addressLocation !== undefined)
+      updateData.addressLocation = dto.addressLocation;
     if (dto.gender !== undefined) updateData.gender = dto.gender;
     if (dto.email !== undefined)
       updateData.email = dto.email.trim().toLowerCase();
@@ -619,10 +633,10 @@ export class AuthService {
         passwordHash,
         admin: user.admin
           ? {
-              update: {
-                isTemporaryPassword: false,
-              },
-            }
+            update: {
+              isTemporaryPassword: false,
+            },
+          }
           : undefined,
       },
     });

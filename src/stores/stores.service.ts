@@ -90,27 +90,23 @@ export class StoresService {
   constructor(private readonly prisma: PrismaService) { }
 
   async findAvailableByBook(bookId: number): Promise<StoreAvailabilityDto[]> {
-    const inventories = await this.prisma.inventory.findMany({
+    const stores = await this.prisma.store.findMany({
       where: {
-        bookId,
-        availableQuantity: { gt: 0 },
-        store: {
-          status: 'active',
-        },
+        status: 'active',
       },
       select: {
-        availableQuantity: true,
-        store: {
-          select: {
-            storeId: true,
-            name: true,
-            address: true,
-            city: true,
-            latitude: true,
-            longitude: true,
-            capacity: true,
-            status: true,
-          },
+        storeId: true,
+        name: true,
+        address: true,
+        city: true,
+        latitude: true,
+        longitude: true,
+        capacity: true,
+        status: true,
+        inventories: {
+          where: { bookId },
+          select: { availableQuantity: true },
+          take: 1,
         },
       },
       orderBy: {
@@ -118,17 +114,17 @@ export class StoresService {
       },
     });
 
-    return inventories
-      .map((inventory) => ({
-        storeId: inventory.store.storeId,
-        name: inventory.store.name,
-        address: inventory.store.address,
-        city: inventory.store.city,
-        latitude: toNullableNumber(inventory.store.latitude),
-        longitude: toNullableNumber(inventory.store.longitude),
-        capacity: inventory.store.capacity,
-        status: inventory.store.status,
-        availableQuantity: inventory.availableQuantity,
+    return stores
+      .map((store) => ({
+        storeId: store.storeId,
+        name: store.name,
+        address: store.address,
+        city: store.city,
+        latitude: toNullableNumber(store.latitude),
+        longitude: toNullableNumber(store.longitude),
+        capacity: store.capacity,
+        status: store.status,
+        availableQuantity: store.inventories[0]?.availableQuantity ?? 0,
       }))
       .sort((left, right) => {
         if (left.availableQuantity !== right.availableQuantity) {

@@ -1,11 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { CardFormData } from '../Components/CardFormInput';
 import { InputText, InputTextarea } from '../Components/Inputs';
 import { LocationPicker } from '../Components/LocationPicker';
 import { Spinner } from '../Components/Spinner';
 import { useSnackbar } from '../Components/SnackbarProvider';
-import { getClientProfile, type ClientCard } from '../api/clients';
+import {
+  createClientCard,
+  getClientProfile,
+  updateClientProfile,
+  type ClientCard,
+} from '../api/clients';
 import {
   createPurchase,
   validateVoucherCode,
@@ -19,7 +24,6 @@ import { suggestAddresses, validateAddress } from '../services/addressValidation
 import {
   formatCardNumberInput,
   maskCardNumber,
-  normalizeCardNumber,
 } from '../utils/cardNumber';
 import { validateCard } from '../utils/cardValidation';
 
@@ -93,6 +97,7 @@ function mapPaymentError(errAny: any) {
 type CheckoutStep = 1 | 2 | 3 | 4;
 type PaymentChoice = 'registered' | 'new';
 type DeliveryChoice = 'homeDelivery' | 'storePickup';
+type PickupFallbackChoice = 'waitPickup' | null;
 
 type AddressFormState = {
   fullName: string;
@@ -108,8 +113,7 @@ type FieldErrors = Partial<
   Record<
     | keyof AddressFormState
     | keyof PaymentFormState
-    | 'pickupStoreId'
-    | 'registeredCardId',
+    | 'pickupStoreId',
     string
   >
 >;
@@ -226,21 +230,7 @@ function buildPickupStoreOptions(
     } satisfies PickupStoreOption;
   });
 
-  return result.sort((left, right) => {
-    if (left.isFullyAvailable !== right.isFullyAvailable) {
-      return left.isFullyAvailable ? -1 : 1;
-    }
-
-    if (left.coveredBooks !== right.coveredBooks) {
-      return right.coveredBooks - left.coveredBooks;
-    }
-
-    if (left.totalAvailableQuantity !== right.totalAvailableQuantity) {
-      return right.totalAvailableQuantity - left.totalAvailableQuantity;
-    }
-
-    return left.name.localeCompare(right.name, 'es');
-  });
+  return result.sort((left, right) => left.name.localeCompare(right.name, 'es'));
 }
 
 const initialAddressState: AddressFormState = {
@@ -303,6 +293,28 @@ function composeShippingAddress(address: AddressFormState): string {
   const notes = address.notes.trim();
 
   return notes ? `${baseAddress} · ${notes}` : baseAddress;
+}
+
+function expiryToApiDate(expiryDate: string): string | null {
+  const clean = expiryDate.replace(/\D/g, '');
+  if (clean.length !== 4) {
+    return null;
+  }
+
+  const month = Number.parseInt(clean.slice(0, 2), 10);
+  const shortYear = Number.parseInt(clean.slice(2, 4), 10);
+  if (!Number.isInteger(month) || month < 1 || month > 12) {
+    return null;
+  }
+
+  const currentYear = new Date().getFullYear();
+  const centuryBase = Math.floor(currentYear / 100) * 100;
+  let fullYear = centuryBase + shortYear;
+  if (fullYear < currentYear - 1) {
+    fullYear += 100;
+  }
+
+  return `${fullYear}-${String(month).padStart(2, '0')}-01`;
 }
 
 function getStepLabel(step: CheckoutStep): string {
@@ -403,6 +415,314 @@ function CartLine({ item }: { item: CartItem }) {
   );
 }
 
+// ─── Store Pickup Panel ────────────────────────────────────────────────────
+
+type StorePickupPanelProps = {
+  stores: PickupStoreOption[];
+  loading: boolean;
+  error: string | null;
+  selectedStoreId: number | null;
+  pickupFallbackChoice: PickupFallbackChoice;
+  fieldError?: string;
+  onSelectStore: (id: number) => void;
+  onResetStore: () => void;
+  onFallbackChoice: (choice: PickupFallbackChoice) => void;
+  onSwitchToDelivery: () => void;
+};
+
+function StorePickupPanel({
+  stores,
+  loading,
+  error,
+  selectedStoreId,
+  pickupFallbackChoice,
+  fieldError,
+  onSelectStore,
+  onResetStore,
+  onFallbackChoice,
+  onSwitchToDelivery,
+}: StorePickupPanelProps) {
+  const hasSelection = selectedStoreId !== null;
+
+  if (loading) {
+    return (
+      <div className="rounded-3xl border border-border bg-bg p-6">
+        <Spinner
+          size="md"
+          tone="calm"
+          label="Buscando tiendas disponibles..."
+          fullScreen={false}
+        />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-3xl border border-danger-200 bg-danger-50 p-4 text-sm text-danger-800">
+        {error}
+      </div>
+    );
+  }
+
+  if (stores.length === 0) {
+    return (
+      <div className="rounded-3xl border border-border bg-bg p-5 text-sm text-text-muted">
+        No encontramos tiendas disponibles. Puedes continuar con envío a domicilio.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {stores.map((store) => {
+        const isSelected = store.storeId === selectedStoreId;
+        const isDimmed = hasSelection && !isSelected;
+
+        return (
+          <div
+            key={store.storeId}
+            className={[
+              'overflow-hidden rounded-2xl border transition-all duration-200',
+              isSelected
+                ? 'border-babyblue-400 bg-babyblue-50/60 shadow-sm'
+                : isDimmed
+                  ? 'border-border bg-bg opacity-40'
+                  : 'border-border bg-bg',
+            ].join(' ')}
+          >
+            {/* Fila compacta — siempre visible */}
+            <button
+              type="button"
+              id={`store-pickup-${store.storeId}`}
+              aria-expanded={isSelected}
+              onClick={() => {
+                if (isSelected) {
+                  onResetStore();
+                } else {
+                  onSelectStore(store.storeId);
+                }
+              }}
+              className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-babyblue-50/40"
+            >
+              {/* Indicador radio */}
+              <span
+                className={[
+                  'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
+                  isSelected
+                    ? 'border-babyblue-600 bg-babyblue-600'
+                    : 'border-border bg-bg',
+                ].join(' ')}
+                aria-hidden="true"
+              >
+                {isSelected && (
+                  <span className="h-2 w-2 rounded-full bg-white" />
+                )}
+              </span>
+
+              {/* Info básica de tienda */}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-bold text-text">
+                  {store.name}
+                </p>
+                <p className="truncate text-xs text-text-muted">
+                  {store.address} · {store.city}
+                </p>
+              </div>
+
+              {/* Chevron */}
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                className={[
+                  'h-4 w-4 shrink-0 text-text-muted transition-transform duration-200',
+                  isSelected ? 'rotate-180' : '',
+                ].join(' ')}
+                aria-hidden="true"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M5.22 8.22a.75.75 0 000 1.06l4.25 4.25a.75.75 0 001.06 0l4.25-4.25a.75.75 0 000-1.06.75.75 0 00-1.06 0L10 11.94 6.28 8.22a.75.75 0 00-1.06 0z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </button>
+
+            {/* Contenido expandido */}
+            {isSelected && (
+              <div className="border-t border-babyblue-200/60 px-4 pb-4 pt-3">
+                {store.isFullyAvailable ? (
+                  /* ── Con stock disponible ── */
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                        className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600"
+                        aria-hidden="true"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      <div>
+                        <p className="text-sm font-semibold text-emerald-800">
+                          Stock disponible
+                        </p>
+                        <p className="mt-0.5 text-xs leading-5 text-emerald-700">
+                          Todos los productos de tu carrito están disponibles
+                          en esta sucursal.
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-text-muted">
+                      Usa el botón{' '}
+                      <span className="font-semibold text-text">
+                        Continuar al pago
+                      </span>{' '}
+                      para confirmar esta tienda y avanzar.
+                    </p>
+                  </div>
+                ) : (
+                  /* ── Sin stock suficiente ── */
+                  <div className="space-y-3">
+                    {/* Detalle del déficit */}
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                      <p className="text-sm font-semibold text-amber-900">
+                        Stock insuficiente en esta tienda
+                      </p>
+                      {store.missingBooks.length > 0 && (
+                        <ul className="mt-1.5 space-y-0.5">
+                          {store.missingBooks.map((book, index) => (
+                            <li
+                              key={index}
+                              className="flex items-center gap-1.5 text-xs text-amber-800"
+                            >
+                              <span className="h-1 w-1 shrink-0 rounded-full bg-amber-500" />
+                              {book}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+
+                    {/* Encabezado de opciones */}
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-muted">
+                      ¿Cómo quieres continuar?
+                    </p>
+
+                    <div className="space-y-2">
+                      {/* Opción 1: Esperar disponibilidad */}
+                      <button
+                        id={`store-pickup-wait-${store.storeId}`}
+                        type="button"
+                        onClick={() =>
+                          onFallbackChoice(
+                            pickupFallbackChoice === 'waitPickup'
+                              ? null
+                              : 'waitPickup',
+                          )
+                        }
+                        className={[
+                          'w-full rounded-xl border p-3 text-left transition',
+                          pickupFallbackChoice === 'waitPickup'
+                            ? 'border-babyblue-400 bg-babyblue-50/80 shadow-sm'
+                            : 'border-border bg-bg hover:border-babyblue-300',
+                        ].join(' ')}
+                      >
+                        <div className="flex items-start gap-2.5">
+                          <span
+                            className={[
+                              'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
+                              pickupFallbackChoice === 'waitPickup'
+                                ? 'border-babyblue-600 bg-babyblue-600'
+                                : 'border-border',
+                            ].join(' ')}
+                            aria-hidden="true"
+                          >
+                            {pickupFallbackChoice === 'waitPickup' && (
+                              <span className="h-2 w-2 rounded-full bg-white" />
+                            )}
+                          </span>
+                          <div>
+                            <p className="text-sm font-semibold text-text">
+                              Esperar disponibilidad en esta tienda
+                            </p>
+                            <p className="mt-0.5 text-xs leading-4 text-text-muted">
+                              Continúa con pedido pendiente de reposición o
+                              transferencia entre sucursales.
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+
+                      {/* Opción 2: Cambiar de tienda */}
+                      <button
+                        id={`store-pickup-change-store-${store.storeId}`}
+                        type="button"
+                        onClick={onResetStore}
+                        className="w-full rounded-xl border border-border bg-bg p-3 text-left transition hover:border-babyblue-300"
+                      >
+                        <div className="flex items-start gap-2.5">
+                          <span
+                            className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 border-border"
+                            aria-hidden="true"
+                          />
+                          <div>
+                            <p className="text-sm font-semibold text-text">
+                              Cambiar de tienda
+                            </p>
+                            <p className="mt-0.5 text-xs leading-4 text-text-muted">
+                              Volver al listado para elegir otra sucursal.
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+
+                      {/* Opción 3: Cambiar a envío a domicilio */}
+                      <button
+                        id={`store-pickup-switch-delivery-${store.storeId}`}
+                        type="button"
+                        onClick={onSwitchToDelivery}
+                        className="w-full rounded-xl border border-border bg-bg p-3 text-left transition hover:border-babyblue-300"
+                      >
+                        <div className="flex items-start gap-2.5">
+                          <span
+                            className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 border-border"
+                            aria-hidden="true"
+                          />
+                          <div>
+                            <p className="text-sm font-semibold text-text">
+                              Cambiar a envío a domicilio
+                            </p>
+                            <p className="mt-0.5 text-xs leading-4 text-text-muted">
+                              Recibe tu pedido en la dirección que prefieras.
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {fieldError && (
+        <p className="pt-1 text-sm text-red-600">{fieldError}</p>
+      )}
+    </div>
+  );
+}
+
+// ─── Checkout Page ─────────────────────────────────────────────────────────
+
 export function CheckoutPage() {
   const snackbar = useSnackbar();
   const { cart, loading: cartLoading, error: cartError, loadCart } = useCart();
@@ -412,13 +732,15 @@ export function CheckoutPage() {
   const [deliveryMode, setDeliveryMode] =
     useState<DeliveryChoice>('homeDelivery');
   const [pickupStoreId, setPickupStoreId] = useState<number | null>(null);
+  const [pickupFallbackChoice, setPickupFallbackChoice] =
+    useState<PickupFallbackChoice>(null);
   const [pickupStores, setPickupStores] = useState<PickupStoreOption[]>([]);
   const [pickupStoresLoading, setPickupStoresLoading] = useState(false);
   const [pickupStoresError, setPickupStoresError] = useState<string | null>(
     null,
   );
   const [paymentChoice, setPaymentChoice] =
-    useState<PaymentChoice>('registered');
+    useState<PaymentChoice>('new');
   const [registeredCards, setRegisteredCards] = useState<ClientCard[]>([]);
   const [registeredCardsLoading, setRegisteredCardsLoading] = useState(false);
   const [registeredCardsError, setRegisteredCardsError] = useState<
@@ -443,20 +765,68 @@ export function CheckoutPage() {
   const [paymentErrorType, setPaymentErrorType] = useState<
     'insufficient_funds' | 'card_declined' | 'other' | null
   >(null);
-  const [topUpAmount, setTopUpAmount] = useState('');
-  const [topUpLoading, setTopUpLoading] = useState(false);
-  const [topUpError, setTopUpError] = useState<string | null>(null);
   const [purchase, setPurchase] = useState<Purchase | null>(null);
-  const [userProfile, setUserProfile] = useState<{ firstName: string; lastName: string; address: string | null } | null>(null);
+  const [userProfile, setUserProfile] = useState<{
+    firstName: string;
+    lastName: string;
+    address: string | null;
+    postalCode: string | null;
+    addressComplement: string | null;
+    addressLocation: string | null;
+  } | null>(null);
+  const [useRegisteredAddress, setUseRegisteredAddress] = useState(false);
+  const paymentChoiceInitializedRef = useRef(false);
   const cartItems = cart?.items ?? [];
   const subtotal = cart?.subtotal ?? 0;
   const total = cart?.total ?? 0;
   const tax = cart?.tax ?? 0;
   const hasItems = cartItems.length > 0;
-  const shippingAddress = useMemo(
-    () => composeShippingAddress(addressForm),
-    [addressForm],
-  );
+  const registeredAddressState = useMemo(() => {
+    const address = userProfile?.address?.trim() || '';
+    const postalCode = userProfile?.postalCode?.trim() || '';
+    const addressComplement = userProfile?.addressComplement?.trim() || '';
+
+    return {
+      hasRegisteredAddress: Boolean(address),
+      hasPostalCode: Boolean(postalCode),
+      hasAddressComplement: Boolean(addressComplement),
+      needsPostalCode: Boolean(address) && !postalCode,
+      needsAddressComplement: Boolean(address) && !addressComplement,
+    };
+  }, [userProfile]);
+  const registeredShippingAddress = useMemo(() => {
+    if (!registeredAddressState.hasRegisteredAddress) {
+      return '';
+    }
+
+    const fullName = `${userProfile?.firstName || ''} ${userProfile?.lastName || ''}`.trim();
+    const addressParts = [
+      userProfile?.address?.trim() || '',
+      userProfile?.postalCode?.trim() || addressForm.postalCode.trim(),
+      userProfile?.addressComplement?.trim() || addressForm.notes.trim(),
+      userProfile?.addressLocation?.trim() || addressForm.location.trim(),
+    ].filter(Boolean);
+
+    const registeredAddress = addressParts.join(' · ');
+
+    return fullName ? `${fullName} · ${registeredAddress}` : registeredAddress;
+  }, [userProfile]);
+  const shippingAddress = useMemo(() => {
+    if (
+      deliveryMode === 'homeDelivery' &&
+      useRegisteredAddress &&
+      registeredShippingAddress
+    ) {
+      return registeredShippingAddress;
+    }
+
+    return composeShippingAddress(addressForm);
+  }, [
+    addressForm,
+    deliveryMode,
+    registeredShippingAddress,
+    useRegisteredAddress,
+  ]);
   const selectedRegisteredCard = useMemo(
     () =>
       registeredCards.find(
@@ -484,6 +854,7 @@ export function CheckoutPage() {
     () => pickupStores.filter((store) => store.isFullyAvailable),
     [pickupStores],
   );
+  const hasFullyAvailablePickupStores = fullyAvailablePickupStores.length > 0;
   const voucherDiscountAmount = useMemo(() => {
     if (!voucherValidation) return 0;
 
@@ -508,14 +879,21 @@ export function CheckoutPage() {
           firstName: profile.firstName,
           lastName: profile.lastName,
           address: profile.address,
+          postalCode: profile.postalCode,
+          addressComplement: profile.addressComplement,
+          addressLocation: profile.addressLocation,
         });
 
         // Pre-fill address form if user has a saved address
         if (profile.address) {
+          setUseRegisteredAddress(true);
           setAddressForm((prev) => ({
             ...prev,
             fullName: `${profile.firstName} ${profile.lastName}`.trim(),
             street: profile.address || '',
+            postalCode: profile.postalCode || '',
+            notes: profile.addressComplement || '',
+            location: profile.addressLocation || '',
           }));
         }
       } catch (error) {
@@ -542,11 +920,15 @@ export function CheckoutPage() {
   }, []);
 
   useEffect(() => {
+    if (registeredCardsLoading) {
+      return;
+    }
+
     if (!registeredCards.length) {
       setSelectedRegisteredCardId(null);
-
-      if (paymentChoice === 'registered') {
+      if (!paymentChoiceInitializedRef.current) {
         setPaymentChoice('new');
+        paymentChoiceInitializedRef.current = true;
       }
 
       return;
@@ -559,7 +941,12 @@ export function CheckoutPage() {
 
       return registeredCards[0].cardId;
     });
-  }, [paymentChoice, registeredCards]);
+
+    if (!paymentChoiceInitializedRef.current) {
+      setPaymentChoice('registered');
+      paymentChoiceInitializedRef.current = true;
+    }
+  }, [registeredCards, registeredCardsLoading]);
 
   useEffect(() => {
     if (deliveryMode !== 'storePickup' || requiredByBook.size === 0) {
@@ -589,18 +976,10 @@ export function CheckoutPage() {
         setPickupStores(options);
 
         setPickupStoreId((current) => {
-          if (
-            current &&
-            options.some(
-              (store) => store.storeId === current && store.isFullyAvailable,
-            )
-          ) {
+          if (current && options.some((store) => store.storeId === current)) {
             return current;
           }
-
-          return (
-            options.find((store) => store.isFullyAvailable)?.storeId ?? null
-          );
+          return null;
         });
       } catch (error) {
         if (!cancelled) {
@@ -683,19 +1062,49 @@ export function CheckoutPage() {
     }
 
     if (selectedPickupStore) {
+      if (
+        !selectedPickupStore.isFullyAvailable &&
+        pickupFallbackChoice === 'waitPickup'
+      ) {
+        return `${selectedPickupStore.name} · ${selectedPickupStore.address} · ${selectedPickupStore.city} · retiro con espera`;
+      }
+
       return `${selectedPickupStore.name} · ${selectedPickupStore.address} · ${selectedPickupStore.city}`;
     }
 
     return 'Selecciona una tienda disponible';
-  }, [deliveryMode, selectedPickupStore, shippingAddress]);
+  }, [
+    deliveryMode,
+    hasFullyAvailablePickupStores,
+    pickupFallbackChoice,
+    selectedPickupStore,
+    shippingAddress,
+  ]);
 
   const updateAddressField = (field: keyof AddressFormState, value: string) => {
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+    if (field === 'postalCode') {
+      setAddressForm((prev) => ({
+        ...prev,
+        postalCode: value.replace(/\D/g, '').slice(0, 6),
+      }));
+      return;
+    }
     setAddressForm((prev) => ({ ...prev, [field]: value }));
   };
 
   const updatePaymentField = (field: keyof PaymentFormState, value: string) => {
     setPaymentError(null);
     setPaymentErrorType(null);
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
     if (field === 'cardNumber') {
       setPaymentForm((prev) => ({
         ...prev,
@@ -722,6 +1131,34 @@ export function CheckoutPage() {
   };
 
   const validateAddressStep = async (): Promise<boolean> => {
+    if (useRegisteredAddress && registeredAddressState.hasRegisteredAddress) {
+      const nextErrors: FieldErrors = {};
+
+      if (registeredAddressState.needsPostalCode && !addressForm.postalCode.trim()) {
+        nextErrors.postalCode = 'Ingresa el código postal guardado para continuar';
+      }
+
+      if (registeredAddressState.needsAddressComplement && !addressForm.notes.trim()) {
+        nextErrors.notes = 'Ingresa el complemento de la dirección guardada para continuar';
+      }
+
+      if (Object.keys(nextErrors).length > 0) {
+        setFieldErrors((prev) => ({ ...prev, ...nextErrors }));
+        return false;
+      }
+
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next.fullName;
+        delete next.street;
+        delete next.location;
+        delete next.postalCode;
+        delete next.notes;
+        return next;
+      });
+      return true;
+    }
+
     const nextErrors: FieldErrors = {};
 
     if (addressForm.fullName.trim().length < 3) {
@@ -733,15 +1170,15 @@ export function CheckoutPage() {
     }
 
     if (addressForm.notes.trim().length < 5) {
-      nextErrors.notes = 'Agrega una referencia adicional obligatoria';
+      nextErrors.notes = 'Agrega un complemento de dirección válido';
     }
 
     if (addressForm.location.trim().length < 3) {
       nextErrors.location = 'Selecciona una ubicación válida';
     }
 
-    if (!/^\d{4,5}$/.test(addressForm.postalCode.trim())) {
-      nextErrors.postalCode = 'El código postal debe tener 4 o 5 dígitos';
+    if (!/^\d{6}$/.test(addressForm.postalCode.trim())) {
+      nextErrors.postalCode = 'El código postal debe tener 6 dígitos y solo números';
     }
 
     if (Object.keys(nextErrors).length === 0) {
@@ -755,7 +1192,15 @@ export function CheckoutPage() {
       }
     }
 
-    setFieldErrors((prev) => ({ ...prev, ...nextErrors }));
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      delete next.fullName;
+      delete next.street;
+      delete next.location;
+      delete next.postalCode;
+      delete next.notes;
+      return { ...next, ...nextErrors };
+    });
     return Object.keys(nextErrors).length === 0;
   };
 
@@ -764,13 +1209,21 @@ export function CheckoutPage() {
 
     if (!pickupStoreId) {
       nextErrors.pickupStoreId =
-        'Selecciona una tienda con stock suficiente para continuar';
-    } else if (!selectedPickupStore?.isFullyAvailable) {
+        'Selecciona una tienda para continuar';
+    } else if (
+      selectedPickupStore &&
+      !selectedPickupStore.isFullyAvailable &&
+      pickupFallbackChoice !== 'waitPickup'
+    ) {
       nextErrors.pickupStoreId =
-        'La tienda seleccionada no cubre todo el carrito';
+        'La tienda seleccionada no cubre todo el carrito. Elige envío a domicilio o activa recogida con tiempo de espera';
     }
 
-    setFieldErrors((prev) => ({ ...prev, ...nextErrors }));
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      delete next.pickupStoreId;
+      return { ...next, ...nextErrors };
+    });
     return Object.keys(nextErrors).length === 0;
   };
 
@@ -794,11 +1247,14 @@ export function CheckoutPage() {
       }
     }
 
-    if (paymentChoice === 'registered' && !selectedRegisteredCard) {
-      nextErrors.registeredCardId = 'Selecciona una tarjeta registrada';
-    }
-
-    setFieldErrors((prev) => ({ ...prev, ...nextErrors }));
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      delete next.cardholder;
+      delete next.cardNumber;
+      delete next.expiryDate;
+      delete next.cvv;
+      return { ...next, ...nextErrors };
+    });
     return Object.keys(nextErrors).length === 0;
   };
 
@@ -815,7 +1271,7 @@ export function CheckoutPage() {
       }
     } else if (!validatePickupStep()) {
       snackbar.error(
-        'Selecciona una tienda con stock suficiente para continuar',
+        'Revisa la opción de entrega para la tienda seleccionada',
       );
       return;
     }
@@ -845,16 +1301,13 @@ export function CheckoutPage() {
         return next;
       });
     } else {
-      setFieldErrors((prev) => {
-        const next = { ...prev };
-        delete next.registeredCardId;
-        return next;
-      });
+      setFieldErrors((prev) => prev);
     }
   };
 
   const handleDeliveryModeChange = (mode: DeliveryChoice) => {
     setDeliveryMode(mode);
+    setPickupFallbackChoice(null);
     setFieldErrors((prev) => {
       const next = { ...prev };
       delete next.pickupStoreId;
@@ -867,13 +1320,17 @@ export function CheckoutPage() {
 
     if (mode === 'homeDelivery') {
       setPickupStoreId(null);
+
+      if (registeredShippingAddress) {
+        setUseRegisteredAddress(true);
+      }
     }
   };
 
   const submitPurchase = async () => {
     const deliveryValid =
       deliveryMode === 'homeDelivery'
-        ? validateAddressStep()
+        ? await validateAddressStep()
         : validatePickupStep();
 
     if (!deliveryValid || !validatePaymentStep()) {
@@ -889,25 +1346,60 @@ export function CheckoutPage() {
           deliveryMode === 'storePickup'
             ? (pickupStoreId ?? undefined)
             : undefined,
+        allowWaitlistPickup:
+          deliveryMode === 'storePickup' &&
+          pickupFallbackChoice === 'waitPickup' &&
+          !selectedPickupStore?.isFullyAvailable,
         shippingAddress:
           deliveryMode === 'homeDelivery' ? shippingAddress : undefined,
         paymentMethod: paymentMethodLabel,
         voucherCode: voucherCode.trim() || undefined,
         currency: 'COP',
-        registeredCardId:
-          paymentChoice === 'registered' ? selectedRegisteredCard?.cardId : undefined,
-        newCard:
-          paymentChoice === 'new'
-            ? {
-              cardholder: paymentForm.cardholder,
-              cardNumber: normalizeCardNumber(paymentForm.cardNumber),
-              expiry: paymentForm.expiryDate,
-              cvv: paymentForm.cvv,
-            }
-            : undefined,
       };
 
       const createdPurchase = await createPurchase(payload);
+
+      if (deliveryMode === 'homeDelivery') {
+        try {
+          const updatedProfile = await updateClientProfile({
+            address: addressForm.street.trim(),
+            postalCode: addressForm.postalCode.trim(),
+            addressComplement: addressForm.notes.trim(),
+            addressLocation: addressForm.location.trim(),
+          });
+
+          setUserProfile({
+            firstName: updatedProfile.firstName,
+            lastName: updatedProfile.lastName,
+            address: updatedProfile.address,
+            postalCode: updatedProfile.postalCode,
+            addressComplement: updatedProfile.addressComplement,
+            addressLocation: updatedProfile.addressLocation,
+          });
+        } catch {
+          snackbar.warning('La compra se confirmó, pero no pudimos guardar la dirección para futuras compras');
+        }
+      }
+
+      if (paymentChoice === 'new') {
+        const maskedNumber = maskCardNumber(paymentForm.cardNumber);
+        const expirationDate = expiryToApiDate(paymentForm.expiryDate);
+
+        if (maskedNumber && expirationDate) {
+          try {
+            const profile = await createClientCard({
+              maskedNumber,
+              cardType: 'credit',
+              expirationDate,
+              cardHolder: paymentForm.cardholder.trim().toUpperCase(),
+            });
+
+            setRegisteredCards(profile.cards);
+          } catch {
+            snackbar.warning('La compra se confirmó, pero no pudimos guardar la tarjeta nueva');
+          }
+        }
+      }
 
       setPurchase(createdPurchase);
       setCurrentStep(4);
@@ -944,42 +1436,6 @@ export function CheckoutPage() {
       snackbar.error(message);
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleTopUpWithNewCard = async () => {
-    setTopUpError(null);
-    const parsed = Number.parseInt(topUpAmount, 10);
-    if (!Number.isInteger(parsed) || parsed <= 0) {
-      setTopUpError('Ingresa un monto válido mayor a cero');
-      return;
-    }
-
-    setTopUpLoading(true);
-    try {
-      // Lazy import to avoid circulars
-      const { topUpWalletWithCard } = await import('../services/walletService');
-
-      await topUpWalletWithCard({
-        amount: parsed,
-        newCard: {
-          cardholder: paymentForm.cardholder,
-          cardNumber: normalizeCardNumber(paymentForm.cardNumber),
-          expiry: paymentForm.expiryDate,
-          cvv: paymentForm.cvv,
-        },
-      });
-
-      snackbar.success('Recarga realizada correctamente');
-      setTopUpAmount('');
-      setPaymentError(null);
-      setPaymentErrorType(null);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'No se pudo recargar';
-      setTopUpError(message);
-      snackbar.error(message);
-    } finally {
-      setTopUpLoading(false);
     }
   };
 
@@ -1360,108 +1816,170 @@ export function CheckoutPage() {
 
                 {deliveryMode === 'homeDelivery' ? (
                   <>
-                    <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                      <div className="sm:col-span-2">
-                        <InputText
-                          label="Nombre y apellido del destinatario"
-                          value={addressForm.fullName}
-                          onChange={(event) =>
-                            updateAddressField('fullName', event.target.value)
-                          }
-                          autoComplete="name"
-                          maxLength={80}
-                          required
+                    {registeredCardsLoading ? (
+                      <div className="mt-6 rounded-3xl border border-border bg-bg p-6">
+                        <Spinner
+                          size="md"
+                          tone="calm"
+                          label="Cargando dirección registrada..."
+                          fullScreen={false}
                         />
-                        {fieldErrors.fullName && (
-                          <p className="-mt-3 mb-3 text-sm text-red-600">
-                            {fieldErrors.fullName}
-                          </p>
+                      </div>
+                    ) : (
+                      <>
+                        {registeredShippingAddress && (
+                          <div className="mt-6 rounded-3xl border border-border bg-bg p-4">
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">
+                              Dirección registrada
+                            </p>
+                            <p className="mt-2 text-sm leading-6 text-text">
+                              {registeredShippingAddress}
+                            </p>
+                            <div className="mt-4">
+                              <button
+                                type="button"
+                                onClick={() => setUseRegisteredAddress((current) => !current)}
+                                className="w-full rounded-full border border-border bg-bg px-5 py-3 font-semibold text-text transition hover:border-babyblue-300 hover:text-babyblue-700"
+                              >
+                                {useRegisteredAddress
+                                  ? 'Entregar en otra dirección'
+                                  : 'Usar dirección registrada'}
+                              </button>
+                            </div>
+                          </div>
                         )}
-                      </div>
 
-                      <div className="sm:col-span-2">
-                        <InputText
-                          label="Dirección de entrega"
-                          value={addressForm.street}
-                          onChange={(event) =>
-                            updateAddressField('street', event.target.value)
-                          }
-                          autoComplete="street-address"
-                          maxLength={120}
-                          required
-                        />
-                        {fieldErrors.street && (
-                          <p className="-mt-3 mb-3 text-sm text-red-600">
-                            {fieldErrors.street}
-                          </p>
+                        {(!useRegisteredAddress || !registeredAddressState.hasRegisteredAddress) && (
+                          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                            <div className="sm:col-span-2">
+                              <InputText
+                                label="Nombre y apellido del destinatario"
+                                value={addressForm.fullName}
+                                onChange={(event) =>
+                                  updateAddressField('fullName', event.target.value)
+                                }
+                                autoComplete="name"
+                                maxLength={80}
+                                required
+                              />
+                              {fieldErrors.fullName && (
+                                <p className="-mt-3 mb-3 text-sm text-red-600">
+                                  {fieldErrors.fullName}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="sm:col-span-2">
+                              <InputText
+                                label="Dirección de entrega"
+                                value={addressForm.street}
+                                onChange={(event) =>
+                                  updateAddressField('street', event.target.value)
+                                }
+                                autoComplete="street-address"
+                                maxLength={120}
+                                required
+                              />
+                              {fieldErrors.street && (
+                                <p className="-mt-3 mb-3 text-sm text-red-600">
+                                  {fieldErrors.street}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="sm:col-span-2">
+                              <LocationPicker
+                                label="Ubicación"
+                                value={addressForm.location}
+                                onChange={(location) =>
+                                  updateAddressField('location', location)
+                                }
+                                error={fieldErrors.location}
+                              />
+                            </div>
+
+                            <div>
+                              <InputText
+                                label="Código postal"
+                                value={addressForm.postalCode}
+                                onChange={(event) =>
+                                  updateAddressField('postalCode', event.target.value)
+                                }
+                                autoComplete="postal-code"
+                                maxLength={6}
+                                inputMode="numeric"
+                                required
+                              />
+                              {fieldErrors.postalCode && (
+                                <p className="-mt-3 mb-3 text-sm text-red-600">
+                                  {fieldErrors.postalCode}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="sm:col-span-2">
+                              <InputTextarea
+                                label="Complemento de la dirección"
+                                value={addressForm.notes}
+                                onChange={(event) =>
+                                  updateAddressField('notes', event.target.value)
+                                }
+                                maxLength={255}
+                                required
+                              />
+                              {fieldErrors.notes && (
+                                <p className="-mt-3 mb-3 text-sm text-red-600">
+                                  {fieldErrors.notes}
+                                </p>
+                              )}
+                            </div>
+                          </div>
                         )}
-                      </div>
 
-                      <div className="sm:col-span-2">
-                        <LocationPicker
-                          label="Ubicación"
-                          value={addressForm.location}
-                          onChange={(location) =>
-                            updateAddressField('location', location)
-                          }
-                          error={fieldErrors.location}
-                        />
-                      </div>
+                        {useRegisteredAddress && registeredAddressState.hasRegisteredAddress && (
+                          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                            {registeredAddressState.needsPostalCode && (
+                              <div>
+                                <InputText
+                                  label="Código postal"
+                                  value={addressForm.postalCode}
+                                  onChange={(event) =>
+                                    updateAddressField('postalCode', event.target.value)
+                                  }
+                                  autoComplete="postal-code"
+                                  maxLength={6}
+                                  inputMode="numeric"
+                                  required
+                                />
+                                {fieldErrors.postalCode && (
+                                  <p className="-mt-3 mb-3 text-sm text-red-600">
+                                    {fieldErrors.postalCode}
+                                  </p>
+                                )}
+                              </div>
+                            )}
 
-                      <div>
-                        <InputText
-                          label="Código postal"
-                          value={addressForm.postalCode}
-                          onChange={(event) =>
-                            updateAddressField('postalCode', event.target.value)
-                          }
-                          autoComplete="postal-code"
-                          maxLength={5}
-                          inputMode="numeric"
-                          required
-                        />
-                        {fieldErrors.postalCode && (
-                          <p className="-mt-3 mb-3 text-sm text-red-600">
-                            {fieldErrors.postalCode}
-                          </p>
+                            {registeredAddressState.needsAddressComplement && (
+                              <div className="sm:col-span-2">
+                                <InputTextarea
+                                  label="Complemento de la dirección"
+                                  value={addressForm.notes}
+                                  onChange={(event) =>
+                                    updateAddressField('notes', event.target.value)
+                                  }
+                                  maxLength={255}
+                                  required
+                                />
+                                {fieldErrors.notes && (
+                                  <p className="-mt-3 mb-3 text-sm text-red-600">
+                                    {fieldErrors.notes}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         )}
-                      </div>
-
-                      <div className="sm:col-span-2">
-                        <InputTextarea
-                          label="Referencia adicional obligatoria"
-                          value={addressForm.notes}
-                          onChange={(event) =>
-                            updateAddressField('notes', event.target.value)
-                          }
-                          maxLength={255}
-                          required
-                        />
-                        {fieldErrors.notes && (
-                          <p className="-mt-3 mb-3 text-sm text-red-600">
-                            {fieldErrors.notes}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {userProfile?.address && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAddressForm((prev) => ({
-                            ...prev,
-                            fullName: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
-                            street: userProfile.address || '',
-                            location: '',
-                            postalCode: '',
-                            notes: '',
-                          }));
-                        }}
-                        className="mt-4 w-full rounded-full border border-border bg-bg px-5 py-3 font-semibold text-text transition hover:border-babyblue-300 hover:text-babyblue-700"
-                      >
-                        Usar dirección registrada
-                      </button>
+                      </>
                     )}
 
                     <div className="mt-4 rounded-2xl border border-border bg-bg p-4">
@@ -1478,133 +1996,35 @@ export function CheckoutPage() {
                   <div className="mt-6 space-y-4">
                     <div className="rounded-3xl border border-babyblue-200 bg-babyblue-50/70 p-4 text-sm text-babyblue-900">
                       <p className="font-semibold">
-                        Selecciona una tienda con stock suficiente
+                        Selecciona la tienda que prefieras
                       </p>
                       <p className="mt-1 leading-6">
-                        Solo podrás confirmar la compra en una sucursal que
-                        cubra todo el carrito. Si no hay una opción válida, te
-                        sugerimos cambiar a envío a domicilio.
+                        Puedes elegir cualquier sucursal. Una vez que
+                        selecciones una, verás el estado de inventario y las
+                        opciones disponibles.
                       </p>
                     </div>
 
-                    {pickupStoresLoading ? (
-                      <div className="rounded-3xl border border-border bg-bg p-6">
-                        <Spinner
-                          size="md"
-                          tone="calm"
-                          label="Buscando tiendas disponibles..."
-                          fullScreen={false}
-                        />
-                      </div>
-                    ) : pickupStoresError ? (
-                      <div className="rounded-3xl border border-danger-200 bg-danger-50 p-4 text-sm text-danger-800">
-                        {pickupStoresError}
-                      </div>
-                    ) : pickupStores.length === 0 ? (
-                      <div className="rounded-3xl border border-border bg-bg p-5 text-sm text-text-muted">
-                        No encontramos tiendas con stock para recoger este
-                        carrito. Puedes continuar con envío a domicilio.
-                      </div>
-                    ) : (
-                      <>
-                        {pickupStores.some(
-                          (store) => !store.isFullyAvailable,
-                        ) && (
-                            <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                              Algunas tiendas tienen stock parcial. Las marcadas
-                              en rojo no cubren todo el carrito y no se pueden
-                              seleccionar.
-                            </div>
-                          )}
-
-                        <div className="grid gap-3 lg:grid-cols-2">
-                          {pickupStores.map((store) => {
-                            const isSelected =
-                              selectedPickupStore?.storeId === store.storeId;
-                            const isSelectable = store.isFullyAvailable;
-
-                            return (
-                              <button
-                                key={store.storeId}
-                                type="button"
-                                onClick={() => {
-                                  if (isSelectable) {
-                                    setPickupStoreId(store.storeId);
-                                  }
-                                }}
-                                className={[
-                                  'rounded-3xl border p-4 text-left transition',
-                                  isSelectable
-                                    ? isSelected
-                                      ? 'border-emerald-400 bg-emerald-50/70 shadow-sm'
-                                      : 'border-border bg-bg hover:border-babyblue-300'
-                                    : 'border-red-300 bg-red-50/70 opacity-90',
-                                ].join(' ')}
-                              >
-                                <div className="flex items-start justify-between gap-3">
-                                  <div>
-                                    <p className="text-base font-bold text-text">
-                                      {store.name}
-                                    </p>
-                                    <p className="mt-1 text-sm text-text-muted">
-                                      {store.address}
-                                    </p>
-                                    <p className="text-sm text-text-muted">
-                                      {store.city}
-                                    </p>
-                                  </div>
-                                  <span
-                                    className={[
-                                      'rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]',
-                                      isSelectable
-                                        ? 'bg-emerald-100 text-emerald-700'
-                                        : 'bg-red-100 text-red-700',
-                                    ].join(' ')}
-                                  >
-                                    {isSelectable
-                                      ? 'Disponible'
-                                      : 'Sin stock suficiente'}
-                                  </span>
-                                </div>
-
-                                <div className="mt-4 flex flex-wrap gap-2 text-xs">
-                                  <span className="rounded-full bg-bg px-3 py-1 text-text-muted">
-                                    {store.coveredBooks}/{store.totalBooks}{' '}
-                                    libros cubiertos
-                                  </span>
-                                  <span className="rounded-full bg-bg px-3 py-1 text-text-muted">
-                                    {store.totalAvailableQuantity} unidades
-                                    disponibles
-                                  </span>
-                                </div>
-
-                                {!isSelectable &&
-                                  store.missingBooks.length > 0 && (
-                                    <div className="mt-4 rounded-2xl border border-red-200 bg-white/80 p-3 text-sm text-red-700">
-                                      Falta stock para:{' '}
-                                      {store.missingBooks.join(', ')}
-                                    </div>
-                                  )}
-                              </button>
-                            );
-                          })}
-                        </div>
-
-                        {!fullyAvailablePickupStores.length && (
-                          <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                            No hay ninguna tienda que cubra todo el carrito. Te
-                            sugerimos cambiar a envío a domicilio para
-                            continuar.
-                          </div>
-                        )}
-
-                        {fieldErrors.pickupStoreId && (
-                          <p className="text-sm text-red-600">
-                            {fieldErrors.pickupStoreId}
-                          </p>
-                        )}
-                      </>
-                    )}
+                    <StorePickupPanel
+                      stores={pickupStores}
+                      loading={pickupStoresLoading}
+                      error={pickupStoresError}
+                      selectedStoreId={pickupStoreId}
+                      pickupFallbackChoice={pickupFallbackChoice}
+                      fieldError={fieldErrors.pickupStoreId}
+                      onSelectStore={(id) => {
+                        setPickupStoreId(id);
+                        setPickupFallbackChoice(null);
+                      }}
+                      onResetStore={() => {
+                        setPickupStoreId(null);
+                        setPickupFallbackChoice(null);
+                      }}
+                      onFallbackChoice={setPickupFallbackChoice}
+                      onSwitchToDelivery={() =>
+                        handleDeliveryModeChange('homeDelivery')
+                      }
+                    />
                   </div>
                 )}
 
@@ -1781,28 +2201,8 @@ export function CheckoutPage() {
                         </p>
                       )}
                     </div>
-                    <div className="sm:col-span-2">
-                      <InputText
-                        label="Monto para recargar con esta tarjeta"
-                        value={topUpAmount}
-                        onChange={(e) => setTopUpAmount(e.target.value)}
-                        placeholder="0"
-                        inputMode="numeric"
-                        maxLength={10}
-                      />
-                      {topUpError && (
-                        <p className="-mt-3 mb-3 text-sm text-red-600">{topUpError}</p>
-                      )}
-                      <div className="mt-3">
-                        <button
-                          type="button"
-                          onClick={handleTopUpWithNewCard}
-                          disabled={topUpLoading}
-                          className="inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2 font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60"
-                        >
-                          {topUpLoading ? 'Recargando...' : 'Recargar con esta tarjeta'}
-                        </button>
-                      </div>
+                    <div className="sm:col-span-2 rounded-3xl border border-emerald-200 bg-emerald-50/70 p-4 text-sm leading-6 text-emerald-900">
+                      Esta tarjeta se usará para confirmar la compra. Si el pago se completa, la guardaremos en tu perfil para futuros pedidos.
                     </div>
                   </div>
                 )}
@@ -1871,11 +2271,6 @@ export function CheckoutPage() {
                           </button>
                         );
                       })
-                    )}
-                    {fieldErrors.registeredCardId && (
-                      <p className="text-sm text-red-600">
-                        {fieldErrors.registeredCardId}
-                      </p>
                     )}
                   </div>
                 )}

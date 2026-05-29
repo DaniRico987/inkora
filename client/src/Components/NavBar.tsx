@@ -74,6 +74,13 @@ export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
         setNotificationsDropdownOpen(false);
 
         if (notificationType === 'message') {
+            if (variant === 'client') {
+                const params = new URLSearchParams(location.search);
+                params.set('chat', 'open');
+                navigate(`${location.pathname}?${params.toString()}`);
+                return;
+            }
+
             navigate('/messages');
             return;
         }

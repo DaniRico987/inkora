@@ -8,6 +8,7 @@ import {
   IsString,
   MaxLength,
   IsIn,
+  IsBoolean,
 } from 'class-validator';
 
 export class CreatePurchaseDto {
@@ -23,6 +24,15 @@ export class CreatePurchaseDto {
   @IsInt({ message: 'pickupStoreId debe ser un entero' })
   @IsPositive({ message: 'pickupStoreId debe ser mayor a 0' })
   pickupStoreId?: number;
+
+  @ApiPropertyOptional({
+    example: false,
+    description:
+      'Permite confirmar retiro en tienda con stock parcial cuando no existe ninguna sucursal con cobertura total.',
+  })
+  @IsOptional()
+  @IsBoolean({ message: 'allowWaitlistPickup debe ser booleano' })
+  allowWaitlistPickup?: boolean;
 
   @ApiPropertyOptional({ example: 'Tarjeta de credito' })
   @IsOptional()

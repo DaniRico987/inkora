@@ -106,7 +106,7 @@ export class PurchasesService {
     private readonly mailService: MailService,
     private readonly storesService: StoresService,
     private readonly walletService: WalletService,
-  ) {}
+  ) { }
 
   async createPurchase(
     clientId: number,
@@ -154,22 +154,26 @@ export class PurchasesService {
     }
 
     const cartItems = cart.cartItems as PurchaseCartItem[];
-    const totalAmount = cartItems.reduce((sum, item) => {
+    const subtotalAmount = cartItems.reduce((sum, item) => {
       return sum + item.quantity * toNumber(item.unitPrice);
     }, 0);
+    const taxAmount = subtotalAmount * 0.21;
+    const totalAmount = subtotalAmount + taxAmount;
 
     const requestedItems = this.groupCartItemsByBook(cartItems);
     let pickupStoreName: string | undefined;
 
     const purchase = await this.prisma.$transaction(
       async (tx): Promise<PurchaseDetails> => {
-        pickupStoreName = await this.validatePurchaseInventory(
+        const inventoryValidation = await this.validatePurchaseInventory(
           tx,
           clientId,
           cartItems,
           dto.deliveryMode,
           dto.pickupStoreId,
+          dto.allowWaitlistPickup === true,
         );
+        pickupStoreName = inventoryValidation.pickupStoreName;
 
         const reservedConsumption = await this.consumeReservedInventoryForPurchase(
           tx,
@@ -181,6 +185,8 @@ export class PurchasesService {
         const estimatedDeliveryTime = this.calculateEstimatedDeliveryTime(
           dto.deliveryMode,
           pickupStoreName,
+          dto.shippingAddress,
+          inventoryValidation.waitlistApplied,
         );
 
         // Apply voucher if provided
@@ -294,7 +300,13 @@ export class PurchasesService {
             const bookInventories = decrementInventories.filter(
               (inventory) => inventory.bookId === bookId,
             );
-            await this.decrementInventoryForPurchase(tx, bookInventories, remaining);
+            await this.decrementInventoryForPurchase(
+              tx,
+              bookInventories,
+              remaining,
+              inventoryValidation.waitlistApplied &&
+              dto.deliveryMode === DeliveryMode.storePickup,
+            );
           }
         }
 
@@ -546,15 +558,33 @@ export class PurchasesService {
     deliveryMode: DeliveryMode,
     pickupStoreName?: string,
     shippingAddress?: string,
+    isWaitlistPickup = false,
   ): string {
     const now = new Date();
 
     if (deliveryMode === DeliveryMode.storePickup) {
+      if (isWaitlistPickup) {
+        const minDate = new Date(now);
+        minDate.setDate(minDate.getDate() + 3);
+        const maxDate = new Date(now);
+        maxDate.setDate(maxDate.getDate() + 7);
+        const safeStoreName = pickupStoreName || 'tienda seleccionada';
+        const msg = `Retiro con espera estimado entre ${minDate.toLocaleDateString('es-AR')} y ${maxDate.toLocaleDateString('es-AR')} en ${safeStoreName}`;
+        if (msg.length > 100) {
+          return msg.substring(0, 97) + '...';
+        }
+        return msg;
+      }
+
       const readyDate = new Date(now);
       readyDate.setDate(readyDate.getDate() + 1);
       const formattedDate = readyDate.toLocaleDateString('es-AR');
       const safeStoreName = pickupStoreName || 'tienda seleccionada';
-      return `Retiro disponible desde ${formattedDate} en ${safeStoreName}`;
+      const msg = `Retiro disponible desde ${formattedDate} en ${safeStoreName}`;
+      if (msg.length > 100) {
+        return msg.substring(0, 97) + '...';
+      }
+      return msg;
     }
 
     const minDate = new Date(now);
@@ -562,12 +592,22 @@ export class PurchasesService {
     const maxDate = new Date(now);
     maxDate.setDate(maxDate.getDate() + 4);
 
+    const baseMessage = `Entrega estimada entre ${minDate.toLocaleDateString('es-AR')} y ${maxDate.toLocaleDateString('es-AR')}`;
     const destinationSuffix =
       deliveryMode === DeliveryMode.homeDelivery && shippingAddress?.trim()
         ? ` para ${shippingAddress.trim()}`
         : '';
 
-    return `Entrega estimada entre ${minDate.toLocaleDateString('es-AR')} y ${maxDate.toLocaleDateString('es-AR')}${destinationSuffix}`;
+    const fullMessage = `${baseMessage}${destinationSuffix}`;
+    if (fullMessage.length > 100) {
+      const fallbackMessage = `${baseMessage} para el domicilio indicado`;
+      if (fallbackMessage.length > 100) {
+        return fallbackMessage.substring(0, 100);
+      }
+      return fallbackMessage;
+    }
+
+    return fullMessage;
   }
 
   private mapPurchaseResponse(purchase: {
@@ -641,29 +681,29 @@ export class PurchasesService {
       }),
       returnBook: purchase.returnBook
         ? {
-            returnBookId: purchase.returnBook.returnBookId,
-            purchaseId: purchase.returnBook.purchaseId,
-            clientId: purchase.returnBook.clientId,
-            reason: (purchase.returnBook.reason as any) ?? null,
-            additionalDescription: purchase.returnBook.additionalDescription,
-            requestDate: purchase.returnBook.requestDate,
-            status: purchase.returnBook.status,
-            qrCodeUrl: purchase.returnBook.qrCodeUrl,
-            approvalDate: purchase.returnBook.approvalDate ?? null,
-            adminNote: purchase.returnBook.adminNote ?? null,
-            decisionDate: purchase.returnBook.decisionDate ?? null,
-          }
+          returnBookId: purchase.returnBook.returnBookId,
+          purchaseId: purchase.returnBook.purchaseId,
+          clientId: purchase.returnBook.clientId,
+          reason: (purchase.returnBook.reason as any) ?? null,
+          additionalDescription: purchase.returnBook.additionalDescription,
+          requestDate: purchase.returnBook.requestDate,
+          status: purchase.returnBook.status,
+          qrCodeUrl: purchase.returnBook.qrCodeUrl,
+          approvalDate: purchase.returnBook.approvalDate ?? null,
+          adminNote: purchase.returnBook.adminNote ?? null,
+          decisionDate: purchase.returnBook.decisionDate ?? null,
+        }
         : null,
       refund: purchase.refunds?.[0]
         ? {
-            refundId: purchase.refunds[0].refundId,
-            returnId: purchase.refunds[0].returnId,
-            purchaseId: purchase.refunds[0].purchaseId,
-            amount: toNumber(purchase.refunds[0].amount),
-            refundMethod: purchase.refunds[0].refundMethod,
-            requestDate: purchase.refunds[0].requestDate,
-            status: purchase.refunds[0].status,
-          }
+          refundId: purchase.refunds[0].refundId,
+          returnId: purchase.refunds[0].returnId,
+          purchaseId: purchase.refunds[0].purchaseId,
+          amount: toNumber(purchase.refunds[0].amount),
+          refundMethod: purchase.refunds[0].refundMethod,
+          requestDate: purchase.refunds[0].requestDate,
+          status: purchase.refunds[0].status,
+        }
         : null,
     };
   }
@@ -674,7 +714,8 @@ export class PurchasesService {
     cartItems: PurchaseCartItem[],
     deliveryMode: DeliveryMode,
     pickupStoreId?: number,
-  ): Promise<string | undefined> {
+    allowWaitlistPickup = false,
+  ): Promise<{ pickupStoreName?: string; waitlistApplied: boolean }> {
     const requestedItems = this.groupCartItemsByBook(cartItems);
     const requestedBookIds = [...requestedItems.keys()];
 
@@ -757,6 +798,10 @@ export class PurchasesService {
       );
 
       if (insufficient) {
+        if (allowWaitlistPickup) {
+          return { pickupStoreName: pickupStore.name, waitlistApplied: true };
+        }
+
         const alternative = await this.findAlternativePickupStore(
           tx,
           requestedItems,
@@ -772,7 +817,7 @@ export class PurchasesService {
         );
       }
 
-      return pickupStore.name;
+      return { pickupStoreName: pickupStore.name, waitlistApplied: false };
     }
 
     const inventories = await tx.inventory.findMany({
@@ -796,7 +841,7 @@ export class PurchasesService {
       reservedQuantities,
     );
 
-    return undefined;
+    return { pickupStoreName: undefined, waitlistApplied: false };
   }
 
   private async getReservedQuantitiesForClient(
@@ -960,7 +1005,7 @@ export class PurchasesService {
       availableByBook.set(
         inventory.bookId,
         (availableByBook.get(inventory.bookId) ?? 0) +
-          inventory.availableQuantity,
+        inventory.availableQuantity,
       );
     }
 
@@ -989,7 +1034,7 @@ export class PurchasesService {
       availableByBook.set(
         inventory.bookId,
         (availableByBook.get(inventory.bookId) ?? 0) +
-          inventory.availableQuantity,
+        inventory.availableQuantity,
       );
     }
 
@@ -1078,7 +1123,7 @@ export class PurchasesService {
       candidate.availableByBook.set(
         inventory.bookId,
         (candidate.availableByBook.get(inventory.bookId) ?? 0) +
-          inventory.availableQuantity,
+        inventory.availableQuantity,
       );
     }
 
@@ -1121,9 +1166,9 @@ export class PurchasesService {
       const a =
         Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
         Math.sin(deltaLon / 2) *
-          Math.sin(deltaLon / 2) *
-          Math.cos(lat1) *
-          Math.cos(lat2);
+        Math.sin(deltaLon / 2) *
+        Math.cos(lat1) *
+        Math.cos(lat2);
       return 2 * earthRadiusKm * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     };
 
@@ -1152,6 +1197,7 @@ export class PurchasesService {
     tx: Prisma.TransactionClient,
     inventories: PurchaseBookInventory[],
     quantity: number,
+    allowPartialFulfillment = false,
   ): Promise<void> {
     let remaining = quantity;
 
@@ -1175,7 +1221,7 @@ export class PurchasesService {
       remaining -= take;
     }
 
-    if (remaining > 0) {
+    if (remaining > 0 && !allowPartialFulfillment) {
       throw new BadRequestException(
         'No hay inventario suficiente para completar la compra',
       );
@@ -1199,10 +1245,17 @@ export class PurchasesService {
       book: { title: string };
     }>;
   }): Promise<void> {
+    const subtotalAmount = purchase.purchaseItems.reduce((sum, item) => {
+      return sum + toNumber(item.unitPrice) * item.quantity;
+    }, 0);
+    const taxAmount = subtotalAmount * 0.21;
+
     await this.mailService.sendPurchaseInvoice(purchase.client.user.email, {
       firstName: purchase.client.user.firstName,
       purchaseId: purchase.purchaseId,
       purchaseDateIso: purchase.purchaseDate.toISOString(),
+      subtotalAmount,
+      taxAmount,
       totalAmount: toNumber(purchase.totalAmount),
       paymentMethod: purchase.paymentMethod || undefined,
       shippingAddress: purchase.shippingAddress || undefined,

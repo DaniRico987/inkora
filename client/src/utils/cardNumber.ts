@@ -1,5 +1,5 @@
 export function normalizeCardNumber(value: string): string {
-  return value.replace(/\D/g, '').slice(0, 16);
+  return value.replace(/\D/g, '').slice(0, 19);
 }
 
 export function formatCardNumberInput(value: string): string {

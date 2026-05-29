@@ -40,6 +40,24 @@ export class UpdateProfileDto {
   @MaxLength(255)
   address?: string;
 
+  @ApiPropertyOptional({ example: '170001' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  postalCode?: string;
+
+  @ApiPropertyOptional({ example: 'Apto 201' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  addressComplement?: string;
+
+  @ApiPropertyOptional({ example: 'Cali, Valle del Cauca, Colombia' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  addressLocation?: string;
+
   @ApiPropertyOptional({ example: 'Femenino' })
   @IsOptional()
   @IsString()

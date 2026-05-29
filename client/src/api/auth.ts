@@ -47,6 +47,8 @@ export type UpdateProfilePayload = {
   birthDate?: string;
   birthPlace?: string;
   address?: string;
+  postalCode?: string;
+  addressComplement?: string;
   gender?: string;
   email?: string;
   username?: string;

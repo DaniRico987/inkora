@@ -1,8 +1,10 @@
 import {
     ForbiddenException,
     Injectable,
+    Logger,
     NotFoundException,
 } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from 'prisma/prisma/prisma.service';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { CreateMessageRequestDto } from './dto/message.dto';
@@ -25,6 +27,17 @@ type ConversationWithRelations = {
         };
     };
     admin: {
+        adminId: number;
+        user: {
+            userId: number;
+            firstName: string;
+            lastName: string;
+            email: string;
+            userType: 'client' | 'admin' | 'root';
+        };
+    } | null;
+    lastAdmin: {
+        adminId: number;
         user: {
             userId: number;
             firstName: string;
@@ -51,6 +64,9 @@ type ConversationWithRelations = {
     }>;
 };
 
+const CONVERSATION_INACTIVITY_TIMEOUT_MS = 60 * 60 * 1000;
+const CONVERSATION_RECLAIM_GRACE_MS = 30 * 60 * 1000;
+
 type MessageWithSender = {
     messageId: number;
     conversationId: number;
@@ -68,6 +84,8 @@ type MessageWithConversation = MessageWithSender & {
 
 @Injectable()
 export class ConversationsService {
+    private readonly logger = new Logger(ConversationsService.name);
+
     constructor(private readonly prisma: PrismaService) { }
 
     async createConversation(user: AuthenticatedUser): Promise<ConversationDto> {
@@ -89,6 +107,24 @@ export class ConversationsService {
 
         if (!client) {
             throw new ForbiddenException('Solo los clientes pueden iniciar conversaciones');
+        }
+
+        const existingConversation = await this.findLatestConversationForClient(client.clientId);
+
+        if (existingConversation) {
+            const unreadCount = await this.prisma.message.count({
+                where: {
+                    conversationId: existingConversation.conversationId,
+                    senderId: { not: user.userId },
+                    isRead: false,
+                },
+            });
+
+            return this.mapConversation(
+                existingConversation,
+                unreadCount,
+                existingConversation.messages[0] ?? null,
+            );
         }
 
         const activeAdmins = await this.prisma.admin.findMany({
@@ -137,18 +173,21 @@ export class ConversationsService {
     async listConversations(user: AuthenticatedUser): Promise<ConversationDto[]> {
         const scope = await this.getUserScope(user);
 
-        const conversations = (await this.prisma.conversation.findMany({
-            where:
-                scope.kind === 'client'
-                    ? { clientId: scope.clientId }
-                    : {
-                        OR: [
-                            { adminId: scope.adminId },
-                            { adminId: null },
-                        ],
-                    },
-            include: this.conversationInclude(),
-        })) as unknown as ConversationWithRelations[];
+        const clientConversation = scope.kind === 'client'
+            ? await this.findLatestConversationForClient(scope.clientId)
+            : null;
+
+        const conversations = scope.kind === 'client'
+            ? (clientConversation ? [clientConversation] : [])
+            : ((await this.prisma.conversation.findMany({
+                where: {
+                    OR: [
+                        { adminId: scope.adminId },
+                        { adminId: null },
+                    ],
+                },
+                include: this.conversationInclude(),
+            })) as unknown as ConversationWithRelations[]);
 
         conversations.sort((leftConversation, rightConversation) =>
             rightConversation.updatedAt.getTime() - leftConversation.updatedAt.getTime(),
@@ -245,12 +284,10 @@ export class ConversationsService {
             },
         })) as unknown as MessageWithSender;
 
-        if (user.userType === 'admin') {
-            await this.prisma.conversation.update({
-                where: { conversationId },
-                data: { status: 'active' },
-            });
-        }
+        await this.prisma.conversation.update({
+            where: { conversationId },
+            data: { status: 'active' },
+        });
 
         const senderName = `${message.sender.firstName} ${message.sender.lastName}`.trim();
 
@@ -293,8 +330,10 @@ export class ConversationsService {
             throw new NotFoundException('Conversation not found');
         }
 
-        if (conversation.admin !== null) {
-            if (conversation.admin.user.userId === user.userId) {
+        const refreshedConversation = await this.refreshConversationIfNeeded(conversation);
+
+        if (refreshedConversation.admin !== null) {
+            if (refreshedConversation.admin.user.userId === user.userId) {
                 const unreadCount = await this.prisma.message.count({
                     where: {
                         conversationId,
@@ -303,7 +342,7 @@ export class ConversationsService {
                     },
                 });
 
-                return this.mapConversation(conversation, unreadCount, conversation.messages[0] ?? null);
+                return this.mapConversation(refreshedConversation, unreadCount, refreshedConversation.messages[0] ?? null);
             }
 
             throw new ForbiddenException('La conversación ya fue aceptada por otro administrador');
@@ -448,11 +487,51 @@ export class ConversationsService {
             throw new NotFoundException('Conversation not found');
         }
 
-        if (!this.canViewConversation(conversation, userId)) {
+        const refreshedConversation = await this.refreshConversationIfNeeded(conversation);
+
+        if (!this.canViewConversation(refreshedConversation, userId)) {
             throw new NotFoundException('Conversation not found');
         }
 
-        return conversation;
+        return refreshedConversation;
+    }
+
+    private isConversationExpired(conversation: ConversationWithRelations): boolean {
+        const lastMessage = conversation.messages[0] ?? null;
+
+        if (!lastMessage) {
+            return false;
+        }
+
+        if (
+            conversation.status === 'active'
+            && conversation.admin !== null
+            && Date.now() - conversation.updatedAt.getTime() < CONVERSATION_RECLAIM_GRACE_MS
+        ) {
+            return false;
+        }
+
+        return Date.now() - lastMessage.sentAt.getTime() >= CONVERSATION_INACTIVITY_TIMEOUT_MS;
+    }
+
+    private async refreshConversationIfNeeded(
+        conversation: ConversationWithRelations,
+    ): Promise<ConversationWithRelations> {
+        if (!this.isConversationExpired(conversation) || conversation.status === 'closed') {
+            return conversation;
+        }
+
+        const updated = (await this.prisma.conversation.update({
+            where: { conversationId: conversation.conversationId },
+            data: {
+                status: 'closed',
+                adminId: null,
+                lastAdminId: conversation.admin?.adminId ?? conversation.lastAdmin?.adminId ?? null,
+            },
+            include: this.conversationInclude(),
+        })) as unknown as ConversationWithRelations;
+
+        return updated;
     }
 
     private ensureCanReply(conversation: ConversationWithRelations, userId: number): void {
@@ -520,7 +599,22 @@ export class ConversationsService {
                 },
             },
             admin: {
-                include: {
+                select: {
+                    adminId: true,
+                    user: {
+                        select: {
+                            userId: true,
+                            firstName: true,
+                            lastName: true,
+                            email: true,
+                            userType: true,
+                        },
+                    },
+                },
+            },
+            lastAdmin: {
+                select: {
+                    adminId: true,
                     user: {
                         select: {
                             userId: true,
@@ -548,6 +642,62 @@ export class ConversationsService {
                 },
             },
         };
+    }
+
+    @Cron(CronExpression.EVERY_MINUTE)
+    async closeInactiveConversationsCron(): Promise<void> {
+        const conversations = (await this.prisma.conversation.findMany({
+            where: {
+                status: 'active',
+            },
+            include: this.conversationInclude(),
+            orderBy: { conversationId: 'asc' },
+        })) as unknown as ConversationWithRelations[];
+
+        const expiredConversations = conversations.filter((conversation) =>
+            this.isConversationExpired(conversation),
+        );
+
+        if (expiredConversations.length === 0) {
+            return;
+        }
+
+        for (const conversation of expiredConversations) {
+            try {
+                await this.prisma.conversation.update({
+                    where: { conversationId: conversation.conversationId },
+                    data: {
+                        status: 'closed',
+                        adminId: null,
+                        lastAdminId: conversation.admin?.adminId ?? conversation.lastAdmin?.adminId ?? null,
+                    },
+                });
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                this.logger.error(`No se pudo cerrar la conversación ${conversation.conversationId}: ${message}`);
+            }
+        }
+
+        this.logger.log(`Conversaciones cerradas por inactividad: ${expiredConversations.length}`);
+    }
+
+    private async findLatestConversationForClient(
+        clientId: number,
+    ): Promise<ConversationWithRelations | null> {
+        const conversation = (await this.prisma.conversation.findFirst({
+            where: { clientId },
+            orderBy: [
+                { updatedAt: 'desc' },
+                { conversationId: 'desc' },
+            ],
+            include: this.conversationInclude(),
+        })) as unknown as ConversationWithRelations | null;
+
+        if (!conversation) {
+            return null;
+        }
+
+        return this.refreshConversationIfNeeded(conversation);
     }
 
     private async notifyActiveAdmins(content: string): Promise<void> {
@@ -641,20 +791,13 @@ export class ConversationsService {
         return {
             conversationId: conversation.conversationId,
             status: conversation.status,
-            isQueued: conversation.admin === null,
+            isQueued: conversation.status === 'active' && conversation.admin === null,
             startedAt: conversation.startedAt,
             updatedAt: conversation.updatedAt,
             unreadCount,
             client: this.mapParticipant(conversation.client),
-            admin: conversation.admin
-                ? this.mapParticipant(conversation.admin)
-                : {
-                    userId: 0,
-                    firstName: '',
-                    lastName: '',
-                    email: '',
-                    userType: 'admin',
-                },
+            admin: conversation.admin ? this.mapParticipant(conversation.admin) : null,
+            lastAdmin: conversation.lastAdmin ? this.mapParticipant(conversation.lastAdmin) : null,
             lastMessage: lastMessage ? this.mapMessage(lastMessage) : null,
         };
     }

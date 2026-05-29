@@ -15,6 +15,8 @@ type PurchaseInvoiceParams = {
   firstName: string;
   purchaseId: number;
   purchaseDateIso: string;
+  subtotalAmount: number;
+  taxAmount: number;
   totalAmount: number;
   paymentMethod?: string;
   shippingAddress?: string;
@@ -60,6 +62,21 @@ const BRAND_NAME = 'INKORA';
 const BRAND_GRADIENT_START = '#0f172a';
 const BRAND_GRADIENT_END = '#1d4ed8';
 const BRAND_ACCENT = '#2563eb';
+
+function getPurchaseStatusLabel(status: PurchaseInvoiceParams['status']): string {
+  switch (status) {
+    case 'inPreparation':
+      return 'En preparación';
+    case 'shipped':
+      return 'Enviado';
+    case 'delivered':
+      return 'Entregado';
+    case 'cancelled':
+      return 'Cancelado';
+    default:
+      return status;
+  }
+}
 
 function escapeHtml(value: string): string {
   return value
@@ -286,7 +303,7 @@ export function buildPurchaseInvoiceTemplate(
       ? `Retiro en tienda${params.pickupStoreName ? ` (${params.pickupStoreName})` : ''}`
       : 'Envio a domicilio',
   );
-  const safeStatus = escapeHtml(params.status);
+  const safeStatus = escapeHtml(getPurchaseStatusLabel(params.status));
   const safePaymentMethod = escapeHtml(params.paymentMethod || 'No informado');
   const safeShippingAddress = escapeHtml(
     params.shippingAddress || 'No informada',
@@ -352,9 +369,20 @@ export function buildPurchaseInvoiceTemplate(
         ${itemsRows}
       </tbody>
     </table>
-    <p style="margin:0;font-size:16px;line-height:1.4;color:#0f172a;">
-      <strong>Total pagado: $${params.totalAmount.toFixed(2)}</strong>
-    </p>
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;margin:0 0 16px 0;max-width:320px;margin-left:auto;">
+      <tr>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-size:14px;color:#0f172a;">Subtotal</td>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;font-size:14px;color:#0f172a;text-align:right;">$${params.subtotalAmount.toFixed(2)}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;font-size:14px;color:#0f172a;">Impuestos (21%)</td>
+        <td style="padding:10px 12px;border:1px solid #e2e8f0;font-size:14px;color:#0f172a;text-align:right;">$${params.taxAmount.toFixed(2)}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 12px;border:1px solid #cbd5e1;background:#dbeafe;font-size:15px;font-weight:700;color:#0f172a;">Total pagado</td>
+        <td style="padding:10px 12px;border:1px solid #cbd5e1;background:#dbeafe;font-size:15px;font-weight:700;color:#0f172a;text-align:right;">$${params.totalAmount.toFixed(2)}</td>
+      </tr>
+    </table>
   `;
 
   return {
@@ -371,9 +399,11 @@ export function buildPurchaseInvoiceTemplate(
     text:
       `Compra #${params.purchaseId} confirmada\n` +
       `Fecha: ${params.purchaseDateIso}\n` +
-      `Estado: ${params.status}\n` +
+      `Estado: ${getPurchaseStatusLabel(params.status)}\n` +
       `Entrega: ${params.deliveryMode || 'N/D'}\n` +
       `ETA: ${params.estimatedDeliveryTime || 'N/D'}\n` +
+      `Subtotal: $${params.subtotalAmount.toFixed(2)}\n` +
+      `Impuestos (21%): $${params.taxAmount.toFixed(2)}\n` +
       `Total: $${params.totalAmount.toFixed(2)}\n`,
   };
 }

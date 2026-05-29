@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma, TransactionType } from '@prisma/client';
 import { PrismaService } from 'prisma/prisma/prisma.service';
 import { CreateWalletTopUpDto } from './dto/create-wallet-top-up.dto';
+import { CreateWalletTopUpWithCardDto } from './dto/create-wallet-top-up-with-card.dto';
 import { GetWalletTransactionsQueryDto } from './dto/get-wallet-transactions-query.dto';
 import { WalletSummaryDto } from './dto/wallet-summary.dto';
 import { WalletTransactionDto } from './dto/wallet-transaction.dto';
@@ -31,7 +32,7 @@ type WalletMovementInput = {
 
 @Injectable()
 export class WalletService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async getWallet(clientId: number): Promise<WalletSummaryDto> {
     const [client, lastTransaction, totalTransactions, paymentTotals, refundTotals] =
@@ -75,12 +76,12 @@ export class WalletService {
       activeCardsCount: client.paymentCards.length,
       lastTransaction: lastTransaction
         ? {
-            transactionId: lastTransaction.transactionId,
-            transactionType: lastTransaction.transactionType,
-            amount: toNumber(lastTransaction.amount),
-            balanceAfter: toNumber(lastTransaction.balanceAfter),
-            transactionDate: lastTransaction.transactionDate,
-          }
+          transactionId: lastTransaction.transactionId,
+          transactionType: lastTransaction.transactionType,
+          amount: toNumber(lastTransaction.amount),
+          balanceAfter: toNumber(lastTransaction.balanceAfter),
+          transactionDate: lastTransaction.transactionDate,
+        }
         : null,
     };
   }
@@ -102,11 +103,11 @@ export class WalletService {
       ...(query.type ? { transactionType: query.type } : {}),
       ...(query.from || query.to
         ? {
-            transactionDate: {
-              ...(query.from ? { gte: new Date(query.from) } : {}),
-              ...(query.to ? { lte: new Date(query.to) } : {}),
-            },
-          }
+          transactionDate: {
+            ...(query.from ? { gte: new Date(query.from) } : {}),
+            ...(query.to ? { lte: new Date(query.to) } : {}),
+          },
+        }
         : {}),
     };
 
@@ -185,7 +186,7 @@ export class WalletService {
     return this.getWallet(clientId);
   }
 
-  async topUpWalletWithCard(clientId: number, payload: { amount: number; newCard: { cardholder: string; cardNumber: string; expiry: string; cvv: string }; currency?: string }): Promise<WalletSummaryDto> {
+  async topUpWalletWithCard(clientId: number, payload: CreateWalletTopUpWithCardDto): Promise<WalletSummaryDto> {
     if (!Number.isFinite(payload.amount) || payload.amount <= 0) {
       throw new BadRequestException('amount debe ser mayor a cero');
     }

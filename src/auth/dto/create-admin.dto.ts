@@ -51,6 +51,21 @@ export class CreateAdminDto {
   @IsString()
   address?: string;
 
+  @ApiProperty({ example: '760001', required: false })
+  @IsOptional()
+  @IsString()
+  postalCode?: string;
+
+  @ApiProperty({ example: 'Apto 201', required: false })
+  @IsOptional()
+  @IsString()
+  addressComplement?: string;
+
+  @ApiProperty({ example: 'Cali, Valle del Cauca, Colombia', required: false })
+  @IsOptional()
+  @IsString()
+  addressLocation?: string;
+
   @ApiProperty({ example: 'Femenino', required: false })
   @IsOptional()
   @IsString()

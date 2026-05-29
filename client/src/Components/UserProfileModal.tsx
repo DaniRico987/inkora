@@ -50,6 +50,8 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
     birthDate: '',
     birthPlace: '',
     address: '',
+    postalCode: '',
+    addressComplement: '',
     gender: '',
   });
   const [error, setError] = useState<string | null>(null);
@@ -101,6 +103,8 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
         birthDate: profileData.birthDate ? profileData.birthDate.slice(0, 10) : '',
         birthPlace: profileData.birthPlace ?? '',
         address: profileData.address ?? '',
+        postalCode: profileData.postalCode ?? '',
+        addressComplement: profileData.addressComplement ?? '',
         gender: profileData.gender ?? '',
       });
     } catch (err) {
@@ -129,6 +133,11 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
       return;
     }
 
+    if (!/^\d{6}$/.test(form.postalCode.trim())) {
+      snackbar.warning('El código postal debe tener 6 dígitos y solo números');
+      return;
+    }
+
     const isAddressValid = await validateAddress(form.address, '');
     if (!isAddressValid) {
       const suggestions = await suggestAddresses(form.address, '');
@@ -149,6 +158,8 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
         birthDate: form.birthDate || undefined,
         birthPlace: form.birthPlace || undefined,
         address: form.address || undefined,
+        postalCode: form.postalCode || undefined,
+        addressComplement: form.addressComplement || undefined,
         gender: form.gender || undefined,
       });
       setProfile(updated);
@@ -337,6 +348,18 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
                     value={form.address}
                     validationType="address"
                     onChange={(event) => setForm((prev) => ({ ...prev, address: event.target.value }))}
+                  />
+                  <InputText
+                    label="Código postal"
+                    value={form.postalCode}
+                    inputMode="numeric"
+                    maxLength={6}
+                    onChange={(event) => setForm((prev) => ({ ...prev, postalCode: event.target.value.replace(/\D/g, '').slice(0, 6) }))}
+                  />
+                  <InputText
+                    label="Complemento de la dirección"
+                    value={form.addressComplement}
+                    onChange={(event) => setForm((prev) => ({ ...prev, addressComplement: event.target.value }))}
                   />
                   <div className="flex justify-end">
                     <Button

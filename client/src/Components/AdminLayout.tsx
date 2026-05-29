@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getRoleFromToken, getAccessToken, clearAccessToken } from '../auth/session';
+import { getConversations } from '../api/conversations';
 import { ProfileModal } from './ProfileModal';
 
 interface AdminLayoutProps {
@@ -79,6 +81,20 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     (item) => role && (role === 'admin' || role === 'root') && item.roles.includes(role as 'admin' | 'root')
   );
 
+  const conversationsQuery = useQuery({
+    queryKey: ['admin-layout', 'conversations'],
+    queryFn: getConversations,
+    enabled: role === 'admin',
+    refetchInterval: 2000,
+    refetchIntervalInBackground: true,
+    staleTime: 0,
+  });
+
+  const unreadConversationCount = (conversationsQuery.data?.conversations ?? []).reduce(
+    (total, conversation) => total + conversation.unreadCount,
+    0,
+  );
+
   const isActive = (path: string) => {
     if (path === '/admin') {
       return location.pathname === '/admin';
@@ -106,13 +122,18 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                 key={item.path}
                 to={item.path}
                 onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive(item.path)
-                    ? 'bg-primary-500 text-white'
-                    : 'text-text hover:bg-border'
+                className={`relative flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive(item.path)
+                  ? 'bg-primary-500 text-white'
+                  : 'text-text hover:bg-border'
                   }`}
               >
                 <span className="text-xl">{item.icon}</span>
                 <span className="font-medium">{item.label}</span>
+                {item.path === '/messages' && unreadConversationCount > 0 && (
+                  <span className="ml-auto inline-flex min-w-6 items-center justify-center rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold text-white">
+                    {unreadConversationCount > 99 ? '99+' : unreadConversationCount}
+                  </span>
+                )}
               </Link>
             ))}
           </nav>

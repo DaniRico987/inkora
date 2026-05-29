@@ -26,7 +26,7 @@ const toNumber = (value: unknown): number => {
 
 @Injectable()
 export class ClientsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async getMyProfile(userId: number): Promise<ClientMeResponseDto> {
     const now = new Date();
@@ -75,6 +75,9 @@ export class ClientsService {
       birthDate: client.user.birthDate,
       birthPlace: client.user.birthPlace,
       address: client.user.address,
+      postalCode: client.user.postalCode,
+      addressComplement: client.user.addressComplement,
+      addressLocation: client.user.addressLocation,
       gender: client.user.gender,
       subscriptions: client.subscriptions.map((sub) => ({
         subscriptionId: sub.subscriptionId,
@@ -91,13 +94,13 @@ export class ClientsService {
       })),
       activeBirthdayVoucher: client.user.vouchers[0]
         ? {
-            code: client.user.vouchers[0].code,
-            discountPercentage: toNumber(
-              client.user.vouchers[0].discountPercentage,
-            ),
-            expiresAt: client.user.vouchers[0].expiresAt,
-            generatedAt: client.user.vouchers[0].createdAt,
-          }
+          code: client.user.vouchers[0].code,
+          discountPercentage: toNumber(
+            client.user.vouchers[0].discountPercentage,
+          ),
+          expiresAt: client.user.vouchers[0].expiresAt,
+          generatedAt: client.user.vouchers[0].createdAt,
+        }
         : null,
     };
   }
@@ -122,6 +125,9 @@ export class ClientsService {
     if (payload.username !== undefined) data.username = payload.username;
     if (payload.birthPlace !== undefined) data.birthPlace = payload.birthPlace;
     if (payload.address !== undefined) data.address = payload.address;
+    if (payload.postalCode !== undefined) data.postalCode = payload.postalCode;
+    if (payload.addressComplement !== undefined)
+      data.addressComplement = payload.addressComplement;
     if (payload.gender !== undefined) data.gender = payload.gender;
     if (payload.birthDate !== undefined)
       data.birthDate = new Date(payload.birthDate);
@@ -225,53 +231,53 @@ export class ClientsService {
     const [purchases, reservations] = await Promise.all([
       shouldIncludePurchases
         ? this.prisma.purchase.findMany({
-            where: {
-              clientId,
-              ...(requestedStatus && PURCHASE_STATUS_VALUES.has(requestedStatus)
-                ? { status: requestedStatus as PurchaseStatus }
-                : {}),
-            },
-            include: {
-              purchaseItems: {
-                include: {
-                  book: {
-                    select: {
-                      bookId: true,
-                      title: true,
-                      author: true,
-                    },
+          where: {
+            clientId,
+            ...(requestedStatus && PURCHASE_STATUS_VALUES.has(requestedStatus)
+              ? { status: requestedStatus as PurchaseStatus }
+              : {}),
+          },
+          include: {
+            purchaseItems: {
+              include: {
+                book: {
+                  select: {
+                    bookId: true,
+                    title: true,
+                    author: true,
                   },
                 },
-                orderBy: { purchaseItemId: 'asc' },
               },
+              orderBy: { purchaseItemId: 'asc' },
             },
-          })
+          },
+        })
         : Promise.resolve([]),
       shouldIncludeReservations
         ? this.prisma.reservation.findMany({
-            where: {
-              clientId,
-              ...(requestedStatus &&
+          where: {
+            clientId,
+            ...(requestedStatus &&
               RESERVATION_STATUS_VALUES.has(requestedStatus)
-                ? { status: requestedStatus as ReservationStatus }
-                : {}),
-            },
-            include: {
-              reservationItems: {
-                include: {
-                  book: {
-                    select: {
-                      bookId: true,
-                      title: true,
-                      author: true,
-                      price: true,
-                    },
+              ? { status: requestedStatus as ReservationStatus }
+              : {}),
+          },
+          include: {
+            reservationItems: {
+              include: {
+                book: {
+                  select: {
+                    bookId: true,
+                    title: true,
+                    author: true,
+                    price: true,
                   },
                 },
-                orderBy: { reservationItemId: 'asc' },
               },
+              orderBy: { reservationItemId: 'asc' },
             },
-          })
+          },
+        })
         : Promise.resolve([]),
     ]);
 
@@ -303,11 +309,11 @@ export class ClientsService {
         const remainingTimeSeconds =
           reservation.status === ReservationStatus.active
             ? Math.max(
-                0,
-                Math.floor(
-                  (reservation.expirationDate.getTime() - nowMs) / 1000,
-                ),
-              )
+              0,
+              Math.floor(
+                (reservation.expirationDate.getTime() - nowMs) / 1000,
+              ),
+            )
             : undefined;
 
         const items = reservation.reservationItems.map((item) => {

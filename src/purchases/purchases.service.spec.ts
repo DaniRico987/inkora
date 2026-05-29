@@ -257,7 +257,7 @@ describe('PurchasesService', () => {
         tx,
         expect.objectContaining({
           clientId: 10,
-          amount: 21490,
+          amount: 26002.9,
           purchaseId: 15,
         }),
       );

@@ -77,6 +77,15 @@ export class ClientMeResponseDto {
   @ApiProperty({ example: 'Calle 1 #2-3', nullable: true })
   address: string | null;
 
+  @ApiProperty({ example: '170001', nullable: true })
+  postalCode: string | null;
+
+  @ApiProperty({ example: 'Apto 201', nullable: true })
+  addressComplement: string | null;
+
+  @ApiProperty({ example: 'Cali, Valle del Cauca, Colombia', nullable: true })
+  addressLocation: string | null;
+
   @ApiProperty({ example: 'Femenino', nullable: true })
   gender: string | null;
 

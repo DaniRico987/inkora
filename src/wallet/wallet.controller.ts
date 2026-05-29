@@ -24,7 +24,7 @@ import { WalletService } from './wallet.service';
 @UseGuards(JwtAuthGuard)
 @Controller('wallet')
 export class WalletController {
-  constructor(private readonly walletService: WalletService) {}
+  constructor(private readonly walletService: WalletService) { }
 
   @Get()
   @ApiOperation({
@@ -105,7 +105,6 @@ export class WalletController {
       throw new ForbiddenException('Solo los clientes pueden recargar su monedero');
     }
 
-    // Delegate to service which validates currency and records movement
-    return this.walletService.topUpWalletWithCard(req.user.clientId, payload as any);
+    return this.walletService.topUpWalletWithCard(req.user.clientId, payload);
   }
 }

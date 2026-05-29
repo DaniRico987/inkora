@@ -124,6 +124,8 @@ export class MailService {
       firstName: string;
       purchaseId: number;
       purchaseDateIso: string;
+      subtotalAmount: number;
+      taxAmount: number;
       totalAmount: number;
       paymentMethod?: string;
       shippingAddress?: string;
@@ -365,12 +367,12 @@ export class MailService {
     const replyTo = this.configService.get<string>('MAIL_REPLY_TO')?.trim();
     const baseAttachments = this.logoPath
       ? [
-          {
-            filename: 'inkora-logo.png',
-            path: this.logoPath,
-            cid: this.logoCid || 'inkora-logo',
-          },
-        ]
+        {
+          filename: 'inkora-logo.png',
+          path: this.logoPath,
+          cid: this.logoCid || 'inkora-logo',
+        },
+      ]
       : undefined;
 
     const attachments = [

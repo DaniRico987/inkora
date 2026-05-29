@@ -116,22 +116,25 @@ enum NotificationLogStatus {
 // ==================== USERS ====================
 
 model User {
-  userId           Int        @id @default(autoincrement())
-  dni              String     @unique @db.VarChar(20)
-  firstName        String     @db.VarChar(100)
-  lastName         String     @db.VarChar(100)
-  email            String     @unique @db.VarChar(150)
-  username         String     @unique @db.VarChar(50)
-  passwordHash     String     @db.VarChar(255)
-  birthDate        DateTime   @db.Date
-  birthPlace       String?    @db.VarChar(100)
-  address          String?    @db.VarChar(255)
-  gender           String?    @db.VarChar(20)
-  userType         UserType
-  status           UserStatus
-  registrationDate DateTime   @default(now())
-  failedAttempts   Int        @default(0)
-  blockedUntil     DateTime?
+  userId            Int        @id @default(autoincrement())
+  dni               String     @unique @db.VarChar(20)
+  firstName         String     @db.VarChar(100)
+  lastName          String     @db.VarChar(100)
+  email             String     @unique @db.VarChar(150)
+  username          String     @unique @db.VarChar(50)
+  passwordHash      String     @db.VarChar(255)
+  birthDate         DateTime   @db.Date
+  birthPlace        String?    @db.VarChar(100)
+  address           String?    @db.VarChar(255)
+  postalCode        String?    @db.VarChar(10)
+  addressComplement String?    @db.VarChar(255)
+  addressLocation   String?    @db.VarChar(255)
+  gender            String?    @db.VarChar(20)
+  userType          UserType
+  status            UserStatus
+  registrationDate  DateTime   @default(now())
+  failedAttempts    Int        @default(0)
+  blockedUntil      DateTime?
 
   // Relations
   client              Client?
@@ -194,7 +197,8 @@ model Admin {
 
   // Relations
   news          News[]
-  conversations Conversation[]
+  conversations Conversation[] @relation("ConversationCurrentAdmin")
+  lastResponses Conversation[] @relation("ConversationLastAdmin")
 
   @@map("admin")
 }
@@ -594,16 +598,19 @@ model Conversation {
   conversationId Int                @id @default(autoincrement())
   clientId       Int
   adminId        Int?
+  lastAdminId    Int?
   startedAt      DateTime           @default(now())
   updatedAt      DateTime           @default(now()) @updatedAt
   status         ConversationStatus
 
-  client   Client    @relation(fields: [clientId], references: [clientId])
-  admin    Admin?    @relation(fields: [adminId], references: [adminId])
-  messages Message[]
+  client    Client    @relation(fields: [clientId], references: [clientId])
+  admin     Admin?    @relation("ConversationCurrentAdmin", fields: [adminId], references: [adminId])
+  lastAdmin Admin?    @relation("ConversationLastAdmin", fields: [lastAdminId], references: [adminId])
+  messages  Message[]
 
   @@index([clientId, status])
   @@index([adminId, status])
+  @@index([lastAdminId, status])
   @@index([updatedAt])
   @@map("conversation")
 }

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ConfirmationModal } from '../Components/ConfirmationModal';
 import { Spinner } from '../Components/Spinner';
 import { useSnackbar } from '../Components/SnackbarProvider';
 import { createReservation } from '../api/reservations';
@@ -36,7 +35,6 @@ export function BookDetailPage() {
   } = useBookDetail(Number.isFinite(bookId) ? bookId : null);
   const snackbar = useSnackbar();
 
-  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isSubmittingReservation, setIsSubmittingReservation] = useState(false);
   const [reservationExpiration, setReservationExpiration] = useState<
     string | null
@@ -71,11 +69,6 @@ export function BookDetailPage() {
   useEffect(() => {
     setImageFailed(false);
   }, [book?.coverUrl]);
-
-  const closeConfirmModal = () => {
-    if (isSubmittingReservation) return;
-    setIsConfirmOpen(false);
-  };
 
   const handleQuantityChange = (rawValue: number) => {
     if (!Number.isFinite(rawValue)) return;
@@ -121,7 +114,6 @@ export function BookDetailPage() {
         items: [{ bookId: book.id, quantity: selectedQuantity }],
       });
       setReservationExpiration(response.expirationDate);
-      setIsConfirmOpen(false);
 
       // Intentar agregar los items reservados al carrito del cliente
       try {
@@ -322,7 +314,7 @@ export function BookDetailPage() {
                       onClick={() => handleQuantityChange(selectedQuantity + 1)}
                       disabled={
                         selectedQuantity >=
-                          Math.min(MAX_BOOK_QUANTITY, totalAvailable) ||
+                        Math.min(MAX_BOOK_QUANTITY, totalAvailable) ||
                         isSubmittingReservation
                       }
                       className="h-10 w-10 rounded-xl bg-babyblue-600 text-lg font-semibold text-white transition hover:bg-babyblue-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -344,7 +336,9 @@ export function BookDetailPage() {
                 <button
                   type="button"
                   className="inline-flex w-full items-center justify-center rounded-full bg-babyblue-600 px-5 py-3 font-semibold text-white transition hover:bg-babyblue-700 disabled:cursor-not-allowed disabled:opacity-60"
-                  onClick={() => setIsConfirmOpen(true)}
+                  onClick={() => {
+                    void handleConfirmReservation();
+                  }}
                   disabled={addToCartDisabled}
                 >
                   {isSubmittingReservation
@@ -409,18 +403,6 @@ export function BookDetailPage() {
         </section>
       </div>
 
-      <ConfirmationModal
-        isOpen={isConfirmOpen}
-        title="Confirmar agregado al carrito"
-        message="Este libro se agregará al carrito y se reservará por un maximo de 24 horas. Tras ese tiempo, si no compras, se liberará automaticamente."
-        confirmText="Agregar y reservar"
-        cancelText="Cancelar"
-        onCancel={closeConfirmModal}
-        onConfirm={() => {
-          void handleConfirmReservation();
-        }}
-        isConfirmLoading={isSubmittingReservation}
-      />
     </div>
   );
 }

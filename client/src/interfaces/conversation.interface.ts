@@ -27,7 +27,8 @@ export interface ConversationSummary {
     updatedAt: string;
     unreadCount: number;
     client: ConversationParticipant;
-    admin: ConversationParticipant;
+    admin: ConversationParticipant | null;
+    lastAdmin: ConversationParticipant | null;
     lastMessage?: ConversationMessage | null;
 }
 
