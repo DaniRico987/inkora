@@ -138,15 +138,20 @@ export function BookForm({
         previewUrl: initialData.preview || '',
       });
       setSelectedCategories(initialData.categories.map((c) => c.id));
-      setInventory(
-        initialData.inventoriesByStore.map((inv) => ({
-          storeId: inv.storeId,
-          availableQuantity: inv.availableQuantity,
-        }))
-      );
+      
+      const existingInventory = initialData.inventoriesByStore || [];
+      const mergedInventory = stores.map((store) => {
+        const sId = parseInt(store.storeId, 10);
+        const existing = existingInventory.find((inv) => inv.storeId === sId);
+        return {
+          storeId: sId,
+          availableQuantity: existing ? existing.availableQuantity : 0,
+        };
+      });
+      setInventory(mergedInventory);
     } else {
       // Initialize inventory with all stores
-      setInventory(stores.map((store) => ({ storeId: parseInt(store.storeId), availableQuantity: 0 })));
+      setInventory(stores.map((store) => ({ storeId: parseInt(store.storeId, 10), availableQuantity: 0 })));
     }
 
     setPendingGalleryFiles([]);
@@ -246,6 +251,23 @@ export function BookForm({
         inventory: 'Asigna al menos una cantidad de inventario para continuar',
       }));
       return;
+    }
+
+    // Validation: only allow increasing stock (no decrease) when editing
+    if (initialData) {
+      for (const item of inventoryItems) {
+        const prevItem = initialData.inventoriesByStore.find((inv) => inv.storeId === item.storeId);
+        const prevQty = prevItem ? prevItem.availableQuantity : 0;
+        if (item.availableQuantity < prevQty) {
+          const storeName = stores.find((s) => parseInt(s.storeId, 10) === item.storeId)?.name || `Tienda ${item.storeId}`;
+          showError(`No se puede disminuir la cantidad en la tienda "${storeName}". Solo se permite incrementar.`);
+          setValidationErrors((prev) => ({
+            ...prev,
+            inventory: `Solo se permite incrementar la cantidad en "${storeName}", no disminuirla`,
+          }));
+          return;
+        }
+      }
     }
 
     setIsSubmitting(true);

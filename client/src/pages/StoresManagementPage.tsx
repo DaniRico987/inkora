@@ -208,6 +208,7 @@ export function StoresManagementPage() {
     const [inventoryData, setInventoryData] = useState<StoreInventoryResponse | null>(null);
     const [inventoryDraft, setInventoryDraft] = useState<InventoryDraft>({});
     const [inventorySaving, setInventorySaving] = useState(false);
+    const [inventorySearch, setInventorySearch] = useState('');
 
     const [ordersModalOpen, setOrdersModalOpen] = useState(false);
     const [ordersLoading, setOrdersLoading] = useState(false);
@@ -301,6 +302,7 @@ export function StoresManagementPage() {
         setInventoryLoading(false);
         setInventoryDraft({});
         setInventorySaving(false);
+        setInventorySearch('');
     };
 
     const closeOrdersModal = () => {
@@ -740,73 +742,126 @@ export function StoresManagementPage() {
                 submitText={inventoryData ? 'Guardar cambios' : 'Cerrar'}
                 size="lg"
             >
-                {inventoryData ? (
-                    <div className="space-y-4">
-                        <div className="grid gap-4 md:grid-cols-3">
-                            <SummaryCard
-                                label="Disponibles"
-                                value={inventoryData.totalAvailableQuantity}
-                                helper="Unidades listas para vender"
-                            />
-                            <SummaryCard
-                                label="Reservados"
-                                value={inventoryData.totalReservedQuantity}
-                                helper="Unidades apartadas en pedidos"
-                            />
-                            <SummaryCard
-                                label="Artículos"
-                                value={inventoryData.items.length}
-                                helper="Libros con inventario en esta tienda"
-                            />
-                        </div>
+                {inventoryData ? (() => {
+                    const normalizeText = (text: string): string => {
+                        return (text || "")
+                            .toLowerCase()
+                            .normalize("NFD")
+                            .replace(/[\u0300-\u036f]/g, "")
+                            .replace(/[^\w\s]/gi, "")
+                            .replace(/\s+/g, " ")
+                            .trim();
+                    };
 
-                        <div className="rounded-2xl border border-border bg-bg-secondary overflow-x-auto">
-                            <table className="w-full">
-                                <thead className="border-b border-border bg-bg">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-text">Libro</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-text">Autor</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-text">Disponible</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-text">Reservado</th>
-                                        <th className="px-4 py-3 text-left text-sm font-semibold text-text">Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-border">
-                                    {inventoryData.items.map((item) => (
-                                        <tr key={item.bookId} className="hover:bg-bg">
-                                            <td className="px-4 py-3 text-sm text-text">{item.title}</td>
-                                            <td className="px-4 py-3 text-sm text-text-muted">{item.author}</td>
-                                            <td className="px-4 py-3 text-sm text-text">
-                                                <input
-                                                    type="number"
-                                                    min="0"
-                                                    value={inventoryDraft[item.bookId] ?? String(item.availableQuantity)}
-                                                    onChange={(event) => {
-                                                        const value = event.target.value;
-                                                        setInventoryDraft((current) => ({
-                                                            ...current,
-                                                            [item.bookId]: value,
-                                                        }));
-                                                    }}
-                                                    className="w-28 rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text outline-none transition focus:border-primary-400"
-                                                />
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-text">{item.reservedQuantity}</td>
-                                            <td className="px-4 py-3 text-sm text-text">{item.totalQuantity}</td>
+                    const filteredInventoryItems = inventoryData.items.filter((item) => {
+                        const query = normalizeText(inventorySearch);
+                        if (!query) return true;
+                        return (
+                            normalizeText(item.title).includes(query) ||
+                            normalizeText(item.author).includes(query)
+                        );
+                    });
+
+                    return (
+                        <div className="space-y-4">
+                            <div className="grid gap-4 md:grid-cols-3">
+                                <SummaryCard
+                                    label="Disponibles"
+                                    value={inventoryData.totalAvailableQuantity}
+                                    helper="Unidades listas para vender"
+                                />
+                                <SummaryCard
+                                    label="Reservados"
+                                    value={inventoryData.totalReservedQuantity}
+                                    helper="Unidades apartadas en pedidos"
+                                />
+                                <SummaryCard
+                                    label="Artículos"
+                                    value={inventoryData.items.length}
+                                    helper="Libros con inventario en esta tienda"
+                                />
+                            </div>
+
+                            {/* Campo de búsqueda del inventario */}
+                            <div className="flex gap-2">
+                                <div className="relative flex-1">
+                                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-text-muted">
+                                        🔍
+                                    </span>
+                                    <input
+                                        type="text"
+                                        value={inventorySearch}
+                                        onChange={(event) => setInventorySearch(event.target.value)}
+                                        placeholder="Buscar libro por título o autor..."
+                                        className="w-full rounded-xl border border-border bg-bg pl-9 pr-4 py-2.5 text-sm text-text outline-none transition focus:border-primary-400"
+                                    />
+                                    {inventorySearch ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => setInventorySearch('')}
+                                            className="absolute inset-y-0 right-0 flex items-center pr-3 text-text-muted hover:text-text"
+                                        >
+                                            ✕
+                                        </button>
+                                    ) : null}
+                                </div>
+                            </div>
+
+                            <div className="rounded-2xl border border-border bg-bg-secondary overflow-x-auto">
+                                <table className="w-full">
+                                    <thead className="border-b border-border bg-bg">
+                                        <tr>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-text">Libro</th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-text">Autor</th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-text">Disponible</th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-text">Reservado</th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold text-text">Total</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                    </thead>
+                                    <tbody className="divide-y divide-border">
+                                        {filteredInventoryItems.map((item) => (
+                                            <tr key={item.bookId} className="hover:bg-bg">
+                                                <td className="px-4 py-3 text-sm text-text">{item.title}</td>
+                                                <td className="px-4 py-3 text-sm text-text-muted">{item.author}</td>
+                                                <td className="px-4 py-3 text-sm text-text">
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        value={inventoryDraft[item.bookId] ?? String(item.availableQuantity)}
+                                                        onChange={(event) => {
+                                                            const value = event.target.value;
+                                                            setInventoryDraft((current) => ({
+                                                                ...current,
+                                                                [item.bookId]: value,
+                                                            }));
+                                                        }}
+                                                        className="w-28 rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text outline-none transition focus:border-primary-400"
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-text">{item.reservedQuantity}</td>
+                                                <td className="px-4 py-3 text-sm text-text">{item.totalQuantity}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
 
-                        {inventoryData.items.length === 0 ? (
-                            <p className="text-sm text-text-muted">No hay inventario registrado para esta tienda.</p>
-                        ) : null}
-                        <p className="text-sm text-text-muted">
-                            Edita la cantidad disponible de cada libro y guarda los cambios para actualizar la tienda.
-                        </p>
-                    </div>
-                ) : inventoryLoading ? (
+                            {filteredInventoryItems.length === 0 ? (
+                                <p className="text-sm text-text-muted text-center py-4">
+                                    No se encontraron libros que coincidan con "{inventorySearch}".
+                                </p>
+                            ) : null}
+
+                            {inventoryData.items.length === 0 ? (
+                                <p className="text-sm text-text-muted">No hay inventario registrado para esta tienda.</p>
+                            ) : null}
+                            <p className="text-sm text-text-muted">
+                                Edita la cantidad disponible de cada libro y guarda los cambios para actualizar la tienda.
+                            </p>
+                        </div>
+                    );
+                })()
+                : inventoryLoading ? (
                     <div className="flex justify-center py-12">
                         <Spinner />
                     </div>

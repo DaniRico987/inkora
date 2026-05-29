@@ -22,7 +22,6 @@ export class CreateStoreDto {
   @IsString()
   @IsNotEmpty()
   @Length(1, 150)
-  @Matches(/^(?=.*[\p{L}\p{N}])[\p{L}\p{N}\s]+$/u)
   name: string;
 
   @ApiProperty({

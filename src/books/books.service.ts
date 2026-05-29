@@ -28,7 +28,34 @@ export class BooksService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 10;
     const skip = (page - 1) * limit;
-    const where = this.buildSearchWhere(query);
+
+    let matchingBookIds: number[] | null = null;
+    if (query.title || query.author) {
+      const searchTerms = [query.title, query.author].filter(Boolean).join(" ");
+      const cleanTerm = searchTerms
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^\w\s]/gi, "")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      const searchPattern = `%${cleanTerm}%`;
+      const sqlQuery = `
+        SELECT "bookId" FROM "book"
+        WHERE 
+          regexp_replace(lower(translate("title", 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN')), '[^a-z0-9\\s]', '', 'g') LIKE $1
+          OR regexp_replace(lower(translate("author", 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN')), '[^a-z0-9\\s]', '', 'g') LIKE $1
+      `;
+      try {
+        const result = await this.prisma.$queryRawUnsafe<{ bookId: number }[]>(sqlQuery, searchPattern);
+        matchingBookIds = result.map((r) => r.bookId);
+      } catch (err) {
+        console.error('Error in raw search query:', err);
+      }
+    }
+
+    const where = this.buildSearchWhere(query, matchingBookIds);
     const orderBy = this.buildOrderBy(query);
 
     const [books, total] = await Promise.all([
@@ -72,7 +99,7 @@ export class BooksService {
     };
   }
 
-  private buildSearchWhere(query: GetBooksQueryDto): Prisma.BookWhereInput {
+  private buildSearchWhere(query: GetBooksQueryDto, matchingBookIds?: number[] | null): Prisma.BookWhereInput {
     if (
       query.minPrice !== undefined &&
       query.maxPrice !== undefined &&
@@ -92,18 +119,24 @@ export class BooksService {
       },
     };
 
-    if (query.title) {
-      where.title = {
-        contains: query.title.trim(),
-        mode: 'insensitive',
+    if (matchingBookIds !== undefined && matchingBookIds !== null) {
+      where.bookId = {
+        in: matchingBookIds,
       };
-    }
+    } else {
+      if (query.title) {
+        where.title = {
+          contains: query.title.trim(),
+          mode: 'insensitive',
+        };
+      }
 
-    if (query.author) {
-      where.author = {
-        contains: query.author.trim(),
-        mode: 'insensitive',
-      };
+      if (query.author) {
+        where.author = {
+          contains: query.author.trim(),
+          mode: 'insensitive',
+        };
+      }
     }
 
     if (query.categoryId) {

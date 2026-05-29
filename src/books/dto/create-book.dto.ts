@@ -52,7 +52,6 @@ export class CreateBookDto {
   @IsString()
   @IsNotEmpty()
   @Length(1, 255)
-  @Matches(/^(?=.*[\p{L}\p{N}])[\p{L}\p{N}\s]+$/u)
   title: string;
 
   @ApiProperty({
@@ -62,7 +61,6 @@ export class CreateBookDto {
   @IsString()
   @IsNotEmpty()
   @Length(1, 150)
-  @Matches(/^(?=.*[\p{L}\p{N}])[\p{L}\p{N}\s]+$/u)
   author: string;
 
   @ApiPropertyOptional({
@@ -84,7 +82,6 @@ export class CreateBookDto {
   @IsOptional()
   @IsString()
   @Length(1, 150)
-  @Matches(/^(?=.*[\p{L}\p{N}])[\p{L}\p{N}\s]+$/u)
   publisher?: string | null;
 
   @ApiPropertyOptional({
@@ -92,10 +89,9 @@ export class CreateBookDto {
     example: '9780307474728',
     nullable: true,
   })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  @Length(13, 13)
-  @Matches(/^\d{13}$/)
+  @Length(10, 20)
   isbn?: string | null;
 
   @ApiPropertyOptional({
@@ -150,8 +146,8 @@ export class CreateBookDto {
     example:
       'La historia de la familia Buendía a lo largo de varias generaciones.',
   })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @Length(1, 2000)
   description?: string | null;
 
@@ -161,7 +157,7 @@ export class CreateBookDto {
     nullable: true,
   })
   @IsOptional()
-  @IsUrl()
+  @IsString()
   coverUrl?: string | null;
 
   @ApiPropertyOptional({
@@ -170,7 +166,7 @@ export class CreateBookDto {
     nullable: true,
   })
   @IsOptional()
-  @IsUrl()
+  @IsString()
   previewUrl?: string | null;
 
   @ApiProperty({
