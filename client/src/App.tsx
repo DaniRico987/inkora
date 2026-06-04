@@ -39,6 +39,7 @@ import { StoresManagementPage } from './pages/StoresManagementPage';
 import { ReturnsManagementPage } from './pages/ReturnsManagementPage';
 import { AdminsManagementPage } from './pages/AdminsManagementPage';
 import { RootAdminCreationPage } from './pages/RootAdminCreationPage';
+import { AuditLogsPage } from './pages/AuditLogsPage';
 import { NewsPage } from './pages/NewsPage';
 import { StoresPage } from './pages/StoresPage';
 import WalletPage from './pages/Wallet/WalletPage';
@@ -384,6 +385,14 @@ function AppContent() {
             element={
               <AccessGuard allowedRoles={['root']}>
                 <AdminsManagementPage />
+              </AccessGuard>
+            }
+          />
+          <Route
+            path="/admin/audit-logs"
+            element={
+              <AccessGuard allowedRoles={['root']}>
+                <AuditLogsPage />
               </AccessGuard>
             }
           />

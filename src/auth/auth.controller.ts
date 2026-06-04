@@ -36,6 +36,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { AuthenticatedUser } from './interfaces/authenticated-user.interface';
 import { Roles } from './roles.decorator';
+import { audit } from '../audit/audit.decorator';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -102,6 +103,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Actualizar los datos del perfil autenticado' })
   @ApiResponse({ status: 200, description: 'Perfil actualizado correctamente' })
   @ApiUnauthorizedResponse({ description: 'Token invalido o expirado' })
+  @audit('perfil_editado')
   async updateProfile(
     @Req() req: Request & { user: AuthenticatedUser },
     @Body() dto: UpdateProfileDto,
@@ -140,6 +142,7 @@ export class AuthController {
     status: 403,
     description: 'Solo root puede crear administradores',
   })
+  @audit('admin_creado')
   async createAdmin(
     @Req() req: Request & { user: AuthenticatedUser },
     @Body() dto: CreateAdminDto,
@@ -170,6 +173,7 @@ export class AuthController {
     status: 404,
     description: 'Administrador no encontrado o ya inactivo',
   })
+  @audit('admin_desactivado')
   async deleteAdmin(
     @Param('userId', ParseIntPipe) userId: number,
     @Req() req: Request & { user: AuthenticatedUser },

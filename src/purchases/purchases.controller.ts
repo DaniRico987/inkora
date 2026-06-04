@@ -26,6 +26,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
+import { audit } from '../audit/audit.decorator';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
 import { PurchaseResponseDto } from './dto/purchase-response.dto';
 import { UpdatePurchaseAddressDto } from './dto/update-purchase-address.dto';
@@ -59,6 +60,7 @@ export class PurchasesController {
   @ApiForbiddenResponse({
     description: 'Solo clientes pueden confirmar compras',
   })
+  @audit('compra_creada')
   async createPurchase(
     @Req() req: { user: AuthenticatedUser },
     @Body() dto: CreatePurchaseDto,
@@ -118,6 +120,7 @@ export class PurchasesController {
   @ApiForbiddenResponse({
     description: 'No tienes permiso para modificar esta compra',
   })
+  @audit('compra_editada_direccion')
   async updatePurchaseAddress(
     @Req() req: { user: AuthenticatedUser },
     @Param('id', ParseIntPipe) purchaseId: number,
@@ -156,6 +159,7 @@ export class PurchasesController {
   @ApiForbiddenResponse({
     description: 'Solo administradores pueden actualizar estados',
   })
+  @audit('compra_editada_estado')
   async updatePurchaseStatus(
     @Param('id', ParseIntPipe) purchaseId: number,
     @Body() dto: UpdatePurchaseStatusDto,

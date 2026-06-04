@@ -26,6 +26,7 @@ import { Roles } from '../auth/roles.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { AuthService } from '../auth/auth.service';
 import { CreateAdminDto } from '../auth/dto/create-admin.dto';
+import { audit } from '../audit/audit.decorator';
 import { AdminService } from './admin.service';
 
 @ApiTags('Administradores')
@@ -65,6 +66,7 @@ export class AdminController {
     status: 403,
     description: 'Solo root puede crear administradores',
   })
+  @audit('admin_creado')
   async createAdmin(
     @Req() req: { user: AuthenticatedUser },
     @Body() dto: CreateAdminDto,
@@ -125,6 +127,7 @@ export class AdminController {
     status: 404,
     description: 'Administrador no encontrado o ya inactivo',
   })
+  @audit('admin_desactivado')
   async deleteAdmin(
     @Param('id', ParseIntPipe) id: number,
     @Req() req: { user: AuthenticatedUser },
@@ -157,6 +160,7 @@ export class AdminController {
     status: 404,
     description: 'Administrador no encontrado o ya está activo',
   })
+  @audit('admin_activado')
   async activateAdmin(
     @Param('id', ParseIntPipe) id: number,
     @Req() req: { user: AuthenticatedUser },

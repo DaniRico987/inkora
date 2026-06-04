@@ -23,6 +23,7 @@ import { ClientsModule } from './clients/clients.module';
 import { WalletModule } from './wallet/wallet.module';
 import { ReturnsModule } from './returns/returns.module';
 import { RefundsModule } from './refunds/refunds.module';
+import { AuditModule } from './audit/audit.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { RefundsModule } from './refunds/refunds.module';
     ClientsModule,
     WalletModule,
     ReturnsModule,
+    AuditModule,
     ConversationsModule,
     RefundsModule,
     TasksModule,

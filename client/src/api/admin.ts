@@ -186,3 +186,52 @@ export async function rejectReturn(returnBookId: number, adminNote?: string): Pr
     throw error;
   }
 }
+
+export type AuditLogUser = {
+  userId: number;
+  email: string;
+  username: string;
+  userType: 'client' | 'admin' | 'root';
+};
+
+export type AuditLogItem = {
+  logId: number;
+  userId: number;
+  action: string;
+  affectedEntity: string | null;
+  affectedEntityId: number | null;
+  createdAt: string;
+  detail: string | null;
+  user: AuditLogUser;
+};
+
+export type AuditLogsResponse = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  items: AuditLogItem[];
+};
+
+export interface GetAuditLogsParams {
+  page?: number;
+  limit?: number;
+  user?: string;
+  action?: string;
+  entity?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export async function getAuditLogs(params: GetAuditLogsParams = {}): Promise<AuditLogsResponse> {
+  try {
+    const response = await apiClient.get<AuditLogsResponse>('/audit-logs', {
+      params,
+    });
+
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching audit logs:', error);
+    throw error;
+  }
+}
