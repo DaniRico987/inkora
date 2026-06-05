@@ -69,7 +69,7 @@ export function InventoryList({
                     <TextField
                       type="number"
                       size="small"
-                      value={quantity}
+                      value={quantity === 0 ? '' : quantity}
                       onChange={(e) => {
                         const val = Math.max(0, parseInt(e.target.value, 10) || 0);
                         onInventoryChange(storeId, val);
