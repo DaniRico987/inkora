@@ -26,6 +26,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
+import { audit } from '../audit/audit.decorator';
 import { AdminReturnRequestDto } from './dto/admin-return-request.dto';
 import { CreateReturnRequestDto } from './dto/create-return-request.dto';
 import { ReturnResponseDto } from './dto/return-response.dto';
@@ -81,6 +82,7 @@ export class ReturnsController {
   @ApiForbiddenResponse({
     description: 'Solo clientes pueden solicitar devoluciones propias',
   })
+  @audit('devolucion_solicitada')
   async createReturnRequest(
     @Req() req: { user: AuthenticatedUser },
     @Body() dto: CreateReturnRequestDto,
@@ -116,6 +118,7 @@ export class ReturnsController {
   @ApiForbiddenResponse({
     description: 'Solo administradores pueden aprobar devoluciones',
   })
+  @audit('devolucion_aprobada')
   async approveReturnRequest(
     @Param('id', ParseIntPipe) returnBookId: number,
   ): Promise<ReturnResponseDto> {
@@ -143,6 +146,7 @@ export class ReturnsController {
   @ApiForbiddenResponse({
     description: 'Solo administradores pueden rechazar devoluciones',
   })
+  @audit('devolucion_rechazada')
   async rejectReturnRequest(
     @Param('id', ParseIntPipe) returnBookId: number,
     @Body() dto: import('./dto/reject-return-request.dto').RejectReturnRequestDto,

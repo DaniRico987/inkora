@@ -105,6 +105,10 @@ async function bootstrap() {
       'Conversations',
       'Mensajería privada entre clientes y administración',
     )
+    .addTag(
+      'Audit Logs',
+      'Registro y consulta de operaciones criticas del sistema (solo root)',
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

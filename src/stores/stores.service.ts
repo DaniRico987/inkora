@@ -9,6 +9,7 @@ import { CreateStoreDto } from './dto/create-store.dto';
 import { UpdateStoreDto } from './dto/update-store.dto';
 import { StorePublicDto } from './dto/store-public.dto';
 import { StoreResponseDto } from './dto/store-response.dto';
+import { StoreNearestDto } from './dto/store-nearest-response.dto';
 import { StoreInventoryResponseDto } from './dto/store-inventory-response.dto';
 import { StoreInventoryItemDto } from './dto/store-inventory-item.dto';
 import { StoreOrdersResponseDto } from './dto/store-orders-response.dto';
@@ -169,6 +170,86 @@ export class StoresService {
       latitude: toNullableNumber(store.latitude),
       longitude: toNullableNumber(store.longitude),
     }));
+  }
+
+  async findNearestStores(
+    latitude: number,
+    longitude: number,
+  ): Promise<StoreNearestDto[]> {
+    const stores = await this.prisma.store.findMany({
+      where: {
+        status: 'active',
+        latitude: { not: null },
+        longitude: { not: null },
+      },
+      select: {
+        storeId: true,
+        name: true,
+        address: true,
+        city: true,
+        latitude: true,
+        longitude: true,
+      },
+      orderBy: { storeId: 'asc' },
+    });
+
+    const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
+    const earthRadiusKm = 6371;
+
+    return stores
+      .map((store): StoreNearestDto => {
+        const storeLatitude = toNullableNumber(store.latitude);
+        const storeLongitude = toNullableNumber(store.longitude);
+
+        if (storeLatitude == null || storeLongitude == null) {
+          return {
+            storeId: store.storeId,
+            name: store.name,
+            address: store.address,
+            city: store.city,
+            latitude: storeLatitude,
+            longitude: storeLongitude,
+            distanceKm: Number.POSITIVE_INFINITY,
+          };
+        }
+
+        const deltaLat = toRadians(storeLatitude - latitude);
+        const deltaLon = toRadians(storeLongitude - longitude);
+        const originLat = toRadians(latitude);
+        const storeLat = toRadians(storeLatitude);
+
+        const a =
+          Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+          Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2) *
+            Math.cos(originLat) *
+            Math.cos(storeLat);
+
+        const distanceKm =
+          2 * earthRadiusKm * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return {
+          storeId: store.storeId,
+          name: store.name,
+          address: store.address,
+          city: store.city,
+          latitude: storeLatitude,
+          longitude: storeLongitude,
+          distanceKm,
+        };
+      })
+      .sort((left, right) => {
+        if (left.distanceKm !== right.distanceKm) {
+          return left.distanceKm - right.distanceKm;
+        }
+
+        return left.name.localeCompare(right.name, 'es');
+      })
+      .map((store) => ({
+        ...store,
+        distanceKm: Number.isFinite(store.distanceKm)
+          ? Number(store.distanceKm.toFixed(2))
+          : store.distanceKm,
+      }));
   }
 
   async create(dto: CreateStoreDto): Promise<StoreResponseDto> {

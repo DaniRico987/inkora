@@ -29,6 +29,10 @@ export type PublicStore = {
   longitude: number | null;
 };
 
+export type NearestStore = PublicStore & {
+  distanceKm: number;
+};
+
 export type StoreStatus = 'active' | 'inactive';
 
 export type StoreRecord = {
@@ -103,6 +107,17 @@ export type UpdateStoreInventoryItem = {
 
 export async function getPublicStores(): Promise<PublicStore[]> {
   const response = await publicStoresClient.get<PublicStore[]>('/stores/public');
+  return response.data;
+}
+
+export async function getNearestStores(
+  lat: number,
+  lng: number,
+): Promise<NearestStore[]> {
+  const response = await publicStoresClient.get<NearestStore[]>('/stores/nearest', {
+    params: { lat, lng },
+  });
+
   return response.data;
 }
 

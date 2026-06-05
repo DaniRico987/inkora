@@ -41,7 +41,7 @@ type StoreMarkerProps = {
 
 function StoreMarker({ store, isSelected, onMarkerClick }: StoreMarkerProps) {
   const markerRef = useRef<L.Marker | null>(null);
-  const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${store.position[0]},${store.position[1]}`;
+  const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${store.position[0]},${store.position[1]}`;
 
   useEffect(() => {
     if (!markerRef.current) {
@@ -75,9 +75,9 @@ function StoreMarker({ store, isSelected, onMarkerClick }: StoreMarkerProps) {
             href={googleMapsUrl}
             target="_blank"
             rel="noreferrer"
-            className="mt-2 inline-flex text-xs font-medium text-primary-600 underline underline-offset-2 hover:text-primary-700"
+            className="mt-2 inline-flex rounded-full bg-primary-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-primary-700"
           >
-            Abrir en Google Maps
+            Cómo llegar
           </a>
         </div>
       </Popup>

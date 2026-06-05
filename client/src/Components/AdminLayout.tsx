@@ -32,6 +32,12 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   const menuItems: MenuItem[] = role === 'root'
     ? [
       {
+        label: 'Auditoria',
+        path: '/admin/audit-logs',
+        icon: '🧾',
+        roles: ['root'],
+      },
+      {
         label: 'Administradores',
         path: '/admin/admins',
         icon: '👥',
