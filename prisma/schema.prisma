@@ -145,6 +145,7 @@ model User {
   auditLogs           AuditLog[]
   passwordResetTokens PasswordResetToken[]
   vouchers            Voucher[]
+  blacklistedTokens   TokenBlacklist[]
 
   @@map("user")
 }
@@ -661,4 +662,24 @@ model AuditLog {
   user User @relation(fields: [userId], references: [userId])
 
   @@map("audit_log")
+}
+
+// ==================== AUTH & SECURITY ====================
+
+model TokenBlacklist {
+  id          Int       @id @default(autoincrement())
+  tokenHash   String    @unique
+  userId      Int
+  reason      String    @default("user_logout")  // logout | password_change | security
+  revokedAt   DateTime  @default(now())
+  expiresAt   DateTime                            // When token expires and can be cleaned from DB
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([tokenHash])
+  @@map("token_blacklist")
 }

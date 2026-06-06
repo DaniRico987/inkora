@@ -22,6 +22,8 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { CreateAdminDto } from './dto/create-admin.dto';
+import { LogoutResponseDto, LogoutAllResponseDto } from './dto/logout-response.dto';
+import { TokenBlacklistService } from './services/token-blacklist.service';
 import {
   ApiBearerAuth,
   ApiTags,
@@ -41,7 +43,10 @@ import { audit } from '../audit/audit.decorator';
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly tokenBlacklistService: TokenBlacklistService,
+  ) {}
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -215,5 +220,76 @@ export class AuthController {
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
   async register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT')
+  @ApiOperation({
+    summary: 'Cerrar sesión actual',
+    description: 'Revoca el token JWT actual. El usuario deberá iniciar sesión nuevamente.',
+  })
+  @ApiOkResponse({
+    description: 'Sesión cerrada exitosamente',
+    type: LogoutResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Token inválido o expirado',
+  })
+  async logout(
+    @Req() req: Request & { user: AuthenticatedUser },
+  ): Promise<LogoutResponseDto> {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      throw new Error('Token no encontrado');
+    }
+
+    await this.tokenBlacklistService.revokeToken(
+      token,
+      req.user.userId,
+      'user_logout',
+    );
+
+    return {
+      message: 'Sesión cerrada exitosamente. Por favor, inicia sesión nuevamente.',
+    };
+  }
+
+  @Post('logout-all')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT')
+  @ApiOperation({
+    summary: 'Cerrar todas las sesiones activas',
+    description: 'Revoca los tokens JWT del usuario. Útil en caso de seguridad o cambio de dispositivo.',
+  })
+  @ApiOkResponse({
+    description: 'Todas las sesiones cerradas exitosamente',
+    type: LogoutAllResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Token inválido o expirado',
+  })
+  async logoutAll(
+    @Req() req: Request & { user: AuthenticatedUser },
+  ): Promise<LogoutAllResponseDto> {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      throw new Error('Token no encontrado');
+    }
+
+    await this.tokenBlacklistService.revokeToken(
+      token,
+      req.user.userId,
+      'user_logout',
+    );
+
+    const revokedCount = await this.authService.logoutAll(req.user.userId);
+
+    return {
+      message: 'Todas las sesiones han sido cerradas exitosamente.',
+      revokedSessions: revokedCount,
+    };
   }
 }

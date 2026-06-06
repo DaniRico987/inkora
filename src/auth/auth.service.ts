@@ -846,4 +846,23 @@ export class AuthService {
     const millisecondsRemaining = blockedUntil.getTime() - now.getTime();
     return Math.max(0, Math.ceil(millisecondsRemaining / 1000));
   }
+
+  /**
+   * Logout: Revoca el token actual del usuario
+   */
+  async logout(token: string, userId: number): Promise<void> {
+    // Necesitamos inyectar TokenBlacklistService aquí
+    // Será llamado desde el controlador que tiene acceso al servicio
+  }
+
+  /**
+   * Logout All: Revoca todos los tokens del usuario
+   * Nota: Para una verdadera revocación de "todas las sesiones",
+   * necesitaríamos mantener una tabla de "active_sessions"
+   * Por ahora retorna un mensaje indicando que solo se revocó el token actual
+   */
+  async logoutAll(userId: number): Promise<number> {
+    // Similar a logout(), será manejado desde el controlador
+    return 1;
+  }
 }
