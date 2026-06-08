@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { InputText, InputPassword } from '../Components/Inputs';
 import { Button } from '../Components/Button';
@@ -60,6 +60,23 @@ export function LoginPage() {
     'from' in location.state
       ? { from: (location.state as { from?: string }).from }
       : undefined;
+
+  useEffect(() => {
+    const reason = new URLSearchParams(location.search).get('reason');
+
+    if (reason === 'expired') {
+      setErrorState({
+        title: 'Tu sesion ha expirado. Inicia sesion nuevamente.',
+      });
+      return;
+    }
+
+    if (reason === 'inactivity') {
+      setErrorState({
+        title: 'Tu sesion se cerro por inactividad. Inicia sesion nuevamente.',
+      });
+    }
+  }, [location.search]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

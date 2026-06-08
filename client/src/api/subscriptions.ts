@@ -1,19 +1,6 @@
-import axios from "axios";
-import { AxiosHeaders } from 'axios';
-import { getAccessToken } from "../auth/session";
+import { createApiClient } from "./createApiClient";
 
-const api = axios.create({
-  baseURL: "/api/v1",
-});
-
-api.interceptors.request.use((config) => {
-  const token = getAccessToken();
-  if (token) {
-    config.headers = AxiosHeaders.from(config.headers);
-    config.headers.set('Authorization', `Bearer ${token}`);
-  }
-  return config;
-});
+const api = createApiClient();
 
 export type SubscribePayload = {
   categoryId: number;

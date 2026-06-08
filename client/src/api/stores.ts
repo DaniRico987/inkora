@@ -1,24 +1,13 @@
 import axios from 'axios';
 import type { CreateStoreRequest, UpdateStoreRequest } from '../interfaces/admin';
-import { getAccessToken } from '../auth/session';
+import { createApiClient } from './createApiClient';
 
 /** Cliente sin JWT: rutas públicas como GET /stores/public */
 const publicStoresClient = axios.create({
   baseURL: '/api/v1',
 });
 
-const apiClient = axios.create({
-  baseURL: '/api/v1',
-});
-
-// Add authorization header
-apiClient.interceptors.request.use((config) => {
-  const token = getAccessToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+const apiClient = createApiClient();
 
 export type PublicStore = {
   storeId: number;

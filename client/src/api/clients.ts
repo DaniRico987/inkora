@@ -1,20 +1,6 @@
-import axios from 'axios';
-import { getAccessToken } from '../auth/session';
+import { createApiClient } from './createApiClient';
 
-const api = axios.create({
-  baseURL: '/api/v1',
-});
-
-api.interceptors.request.use((config) => {
-  const token = getAccessToken();
-  if (token) {
-    if (!config.headers) {
-      config.headers = {} as never;
-    }
-    (config.headers as { Authorization?: string }).Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+const api = createApiClient();
 
 export type ClientCardType = 'credit' | 'debit';
 

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { getRoleFromToken, getAccessToken, clearAccessToken } from '../auth/session';
+import { Link, useLocation } from 'react-router-dom';
+import { getRoleFromToken, getAccessToken } from '../auth/session';
+import { logoutSession } from '../auth/logoutSession';
 import { getConversations } from '../api/conversations';
 import { ProfileModal } from './ProfileModal';
 
@@ -19,14 +20,24 @@ interface MenuItem {
 export function AdminLayout({ children }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const location = useLocation();
-  const navigate = useNavigate();
   const token = getAccessToken();
   const role = getRoleFromToken(token);
 
-  const handleLogout = () => {
-    clearAccessToken();
-    navigate('/login', { replace: true });
+  const handleLogout = async () => {
+    if (isLoggingOut) {
+      return;
+    }
+
+    setIsLoggingOut(true);
+    setProfileModalOpen(false);
+
+    try {
+      await logoutSession({ reason: 'manual' });
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   const menuItems: MenuItem[] = role === 'root'
@@ -161,7 +172,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               )}
               <button
                 onClick={handleLogout}
-                className={`${role === 'admin' ? 'flex-1' : 'w-full'} px-4 py-2 rounded-lg bg-red-600/10 text-red-600 hover:bg-red-600/20 transition-colors font-medium text-sm flex items-center justify-center gap-2`}
+                disabled={isLoggingOut}
+                className={`${role === 'admin' ? 'flex-1' : 'w-full'} px-4 py-2 rounded-lg bg-red-600/10 text-red-600 hover:bg-red-600/20 transition-colors font-medium text-sm flex items-center justify-center gap-2 disabled:opacity-60`}
               >
                 <span>🚪</span>
                 <span>Salir</span>

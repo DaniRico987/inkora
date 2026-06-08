@@ -45,6 +45,7 @@ import { StoresPage } from './pages/StoresPage';
 import WalletPage from './pages/Wallet/WalletPage';
 import { MessagesPage } from './pages/MessagesPage';
 import { ChatFloatingButton } from './Components/ChatFloatingButton';
+import { SessionManager } from './Components/SessionManager';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -421,7 +422,9 @@ function App() {
                 dedupeWindowMs: 1500,
               }}
             >
-              <AppContent />
+              <SessionManager queryClient={queryClient}>
+                <AppContent />
+              </SessionManager>
             </SnackbarProvider>
           </LocalizationProvider>
         </NotificationsProvider>
