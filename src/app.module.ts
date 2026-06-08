@@ -12,6 +12,7 @@ import { CategoriesModule } from './categories/categories.module';
 import { AdminModule } from './admin/admin.module';
 import { StoresModule } from './stores/stores.module';
 import { PurchasesModule } from './purchases/purchases.module';
+import { PaymentsModule } from './payments/payments.module';
 import { ReservationsModule } from './reservations/reservations.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -40,6 +41,7 @@ import { AuditModule } from './audit/audit.module';
     AdminModule,
     StoresModule,
     PurchasesModule,
+    PaymentsModule,
     ReservationsModule,
     VouchersModule,
     ClientsModule,

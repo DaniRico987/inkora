@@ -10,5 +10,6 @@ import { PurchasesService } from './purchases.service';
   imports: [PrismaModule, MailModule, StoresModule, WalletModule],
   controllers: [PurchasesController],
   providers: [PurchasesService],
+  exports: [PurchasesService],
 })
 export class PurchasesModule {}

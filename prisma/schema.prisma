@@ -85,6 +85,15 @@ enum TransactionType {
   topUp
 }
 
+enum PaymentAttemptStatus {
+  pending
+  processing
+  approved
+  failed
+  cancelled
+  expired
+}
+
 enum CartStatus {
   active
   processed
@@ -165,6 +174,7 @@ model Client {
   returnBooks      ReturnBook[]
   paymentCards     PaymentCard[]
   transactions     Transaction[]
+  paymentAttempts  PaymentAttempt[]
   subscriptions    Subscription[]
   conversations    Conversation[]
   birthdayVouchers BirthdayVoucher[]
@@ -368,6 +378,7 @@ model Cart {
 
   client    Client     @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
   cartItems CartItem[]
+  paymentAttempts PaymentAttempt[]
 
   @@map("cart")
 }
@@ -409,6 +420,7 @@ model Purchase {
   returnBook    ReturnBook?
   transactions  Transaction[]
   refunds       Refund[]
+  paymentAttempts PaymentAttempt[]
 
   @@map("purchase")
 }
@@ -529,6 +541,43 @@ model Transaction {
   @@index([purchaseId], map: "idx_transaction_purchase")
   @@index([refundId], map: "idx_transaction_refund")
   @@map("transaction")
+}
+
+model PaymentAttempt {
+  paymentAttemptId     Int                 @id @default(autoincrement())
+  clientId             Int
+  cartId               Int
+  purchaseId           Int?
+  paymentMethod        String?             @db.VarChar(50)
+  amount               Decimal             @db.Decimal(10, 2)
+  currency             String              @default("COP") @db.VarChar(3)
+  status               PaymentAttemptStatus @default(pending)
+  provider             String              @default("wompi") @db.VarChar(50)
+  gatewayReference     String?             @unique @db.VarChar(255)
+  gatewayStatus        String?             @db.VarChar(50)
+  gatewayResponse      Json?
+  shippingAddress      String?             @db.VarChar(255)
+  deliveryMode         DeliveryMode
+  pickupStoreId        Int?
+  allowWaitlistPickup  Boolean             @default(false)
+  voucherCode          String?             @db.VarChar(100)
+  itemsSnapshot        Json
+  checkoutUrl          String?             @db.Text
+  failureReason        String?             @db.Text
+  expiresAt            DateTime?
+  confirmedAt          DateTime?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  client   Client   @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  cart     Cart     @relation(fields: [cartId], references: [cartId], onDelete: Cascade)
+  purchase Purchase? @relation(fields: [purchaseId], references: [purchaseId], onDelete: SetNull)
+
+  @@index([clientId, createdAt], map: "idx_payment_attempt_client_created_at")
+  @@index([cartId], map: "idx_payment_attempt_cart")
+  @@index([purchaseId], map: "idx_payment_attempt_purchase")
+  @@index([status], map: "idx_payment_attempt_status")
+  @@map("payment_attempt")
 }
 
 // ==================== NEWS & SUBSCRIPTIONS ====================

@@ -153,188 +153,33 @@ export class PurchasesService {
       throw new BadRequestException('El carrito ya fue procesado');
     }
 
-    const cartItems = cart.cartItems as PurchaseCartItem[];
-    const subtotalAmount = cartItems.reduce((sum, item) => {
-      return sum + item.quantity * toNumber(item.unitPrice);
-    }, 0);
-    const taxAmount = subtotalAmount * 0.21;
-    const totalAmount = subtotalAmount + taxAmount;
+    const purchase = await this.createPurchaseFromCartItems(clientId, dto, {
+      cartId: cart.cartId,
+      cartItems: cart.cartItems as PurchaseCartItem[],
+      gatewayReference: dto.paymentMethod ?? null,
+    });
 
-    const requestedItems = this.groupCartItemsByBook(cartItems);
-    let pickupStoreName: string | undefined;
+    this.sendInvoiceEmail(purchase).catch((error) => {
+      this.logger.error(
+        `No se pudo enviar factura de compra ${purchase.purchaseId}: ${String(error)}`,
+      );
+    });
 
-    const purchase = await this.prisma.$transaction(
-      async (tx): Promise<PurchaseDetails> => {
-        const inventoryValidation = await this.validatePurchaseInventory(
-          tx,
-          clientId,
-          cartItems,
-          dto.deliveryMode,
-          dto.pickupStoreId,
-          dto.allowWaitlistPickup === true,
-        );
-        pickupStoreName = inventoryValidation.pickupStoreName;
+    return this.mapPurchaseResponse(purchase);
+  }
 
-        const reservedConsumption = await this.consumeReservedInventoryForPurchase(
-          tx,
-          clientId,
-          requestedItems,
-          dto.pickupStoreId,
-        );
-
-        const estimatedDeliveryTime = this.calculateEstimatedDeliveryTime(
-          dto.deliveryMode,
-          pickupStoreName,
-          dto.shippingAddress,
-          inventoryValidation.waitlistApplied,
-        );
-
-        // Apply voucher if provided
-        let finalTotal = totalAmount;
-        let appliedVoucherId: number | null = null;
-        if (dto.voucherCode) {
-          const clientInfo = await tx.client.findUnique({ where: { clientId }, select: { userId: true } });
-          const voucher = await tx.voucher.findUnique({ where: { code: dto.voucherCode } });
-          if (!voucher) {
-            throw new BadRequestException('Voucher invalido');
-          }
-          if (voucher.userId !== clientInfo?.userId) {
-            throw new BadRequestException('Voucher no pertenece a este cliente');
-          }
-          if (voucher.isUsed) {
-            throw new BadRequestException('Voucher ya fue usado');
-          }
-          const nowUtc = new Date();
-          if (voucher.expiresAt < nowUtc) {
-            throw new BadRequestException('Voucher expirado');
-          }
-
-          const discount = (Number(voucher.discountPercentage) / 100) * finalTotal;
-          finalTotal = finalTotal - discount;
-          appliedVoucherId = voucher.id;
-        }
-
-        const createdPurchase = await tx.purchase.create({
-          data: {
-            clientId,
-            totalAmount: finalTotal,
-            paymentMethod: dto.paymentMethod,
-            shippingAddress: dto.shippingAddress,
-            deliveryMode: dto.deliveryMode,
-            pickupStoreId:
-              dto.deliveryMode === DeliveryMode.storePickup
-                ? dto.pickupStoreId
-                : null,
-            estimatedDeliveryTime,
-            status: PurchaseStatus.inPreparation,
-            purchaseItems: {
-              create: cartItems.map((item) => ({
-                book: {
-                  connect: {
-                    bookId: item.bookId,
-                  },
-                },
-                quantity: item.quantity,
-                unitPrice: toNumber(item.unitPrice),
-              })),
-            },
-          },
-          include: {
-            purchaseItems: {
-              include: {
-                book: {
-                  select: {
-                    title: true,
-                    author: true,
-                  },
-                },
-              },
-            },
-            client: {
-              include: {
-                user: {
-                  select: {
-                    email: true,
-                    firstName: true,
-                  },
-                },
-              },
-            },
-            pickupStore: {
-              select: {
-                name: true,
-              },
-            },
-          },
-        });
-
-        const remainingPurchaseItems = new Map<number, number>();
-        for (const [bookId, quantity] of requestedItems.entries()) {
-          const reservedUsed = reservedConsumption.get(bookId) ?? 0;
-          const remaining = Math.max(0, quantity - reservedUsed);
-          if (remaining > 0) {
-            remainingPurchaseItems.set(bookId, remaining);
-          }
-        }
-
-        if (remainingPurchaseItems.size > 0) {
-          const requestedBookIds = [...remainingPurchaseItems.keys()];
-          const decrementInventories = await tx.inventory.findMany({
-            where: {
-              bookId: { in: requestedBookIds },
-              availableQuantity: { gt: 0 },
-              ...(dto.deliveryMode === DeliveryMode.storePickup
-                ? { storeId: dto.pickupStoreId }
-                : {}),
-            },
-            select: {
-              inventoryId: true,
-              bookId: true,
-              storeId: true,
-              availableQuantity: true,
-            },
-            orderBy: [{ bookId: 'asc' }, { storeId: 'asc' }],
-          });
-
-          for (const [bookId, remaining] of remainingPurchaseItems.entries()) {
-            const bookInventories = decrementInventories.filter(
-              (inventory) => inventory.bookId === bookId,
-            );
-            await this.decrementInventoryForPurchase(
-              tx,
-              bookInventories,
-              remaining,
-              inventoryValidation.waitlistApplied &&
-              dto.deliveryMode === DeliveryMode.storePickup,
-            );
-          }
-        }
-
-        await this.walletService.recordPurchaseTransaction(tx, {
-          clientId,
-          amount: finalTotal,
-          purchaseId: createdPurchase.purchaseId,
-          gatewayReference: dto.paymentMethod ?? null,
-        });
-
-        await tx.cart.update({
-          where: { cartId: cart.cartId },
-          data: { status: 'processed' },
-        });
-
-        // mark voucher as used if applied (with audit fields)
-        if (appliedVoucherId) {
-          await tx.voucher.update({
-            where: { id: appliedVoucherId },
-            data: { isUsed: true, usedAt: new Date(), appliedToPurchaseId: createdPurchase.purchaseId },
-          });
-        }
-
-        await tx.cartItem.deleteMany({ where: { cartId: cart.cartId } });
-
-        return createdPurchase;
-      },
-    );
+  async createPurchaseFromPaymentSnapshot(
+    clientId: number,
+    dto: CreatePurchaseDto,
+    cartId: number,
+    cartItems: PurchaseCartItem[],
+    gatewayReference?: string | null,
+  ): Promise<PurchaseResponseDto> {
+    const purchase = await this.createPurchaseFromCartItems(clientId, dto, {
+      cartId,
+      cartItems,
+      gatewayReference: gatewayReference ?? null,
+    });
 
     this.sendInvoiceEmail(purchase).catch((error) => {
       this.logger.error(
@@ -1272,6 +1117,245 @@ export class PurchasesService {
           subtotal: unitPrice * item.quantity,
         };
       }),
+    });
+  }
+
+  private async createPurchaseFromCartItems(
+    clientId: number,
+    dto: CreatePurchaseDto,
+    context: {
+      cartId: number;
+      cartItems: PurchaseCartItem[];
+      gatewayReference?: string | null;
+    },
+  ): Promise<PurchaseDetails> {
+    if (dto.currency && dto.currency !== 'COP') {
+      throw new BadRequestException('Solo se acepta la moneda COP');
+    }
+
+    if (
+      dto.deliveryMode === DeliveryMode.homeDelivery &&
+      !dto.shippingAddress
+    ) {
+      throw new BadRequestException(
+        'shippingAddress es obligatorio cuando deliveryMode es homeDelivery',
+      );
+    }
+
+    if (context.cartItems.length === 0) {
+      throw new BadRequestException(
+        'El carrito no tiene items para confirmar compra',
+      );
+    }
+
+    const cart = await this.prisma.cart.findUnique({
+      where: { cartId: context.cartId },
+      select: {
+        cartId: true,
+        clientId: true,
+        status: true,
+      },
+    });
+
+    if (!cart) {
+      throw new NotFoundException(
+        `Carrito con ID ${context.cartId} no encontrado`,
+      );
+    }
+
+    if (cart.clientId !== clientId) {
+      throw new ForbiddenException('No tienes permiso sobre este carrito');
+    }
+
+    if (cart.status !== 'active') {
+      throw new BadRequestException('El carrito ya fue procesado');
+    }
+
+    const subtotalAmount = context.cartItems.reduce((sum, item) => {
+      return sum + item.quantity * toNumber(item.unitPrice);
+    }, 0);
+    const taxAmount = subtotalAmount * 0.21;
+    const totalAmount = subtotalAmount + taxAmount;
+
+    const requestedItems = this.groupCartItemsByBook(context.cartItems);
+    let pickupStoreName: string | undefined;
+
+    return this.prisma.$transaction(async (tx): Promise<PurchaseDetails> => {
+      const inventoryValidation = await this.validatePurchaseInventory(
+        tx,
+        clientId,
+        context.cartItems,
+        dto.deliveryMode,
+        dto.pickupStoreId,
+        dto.allowWaitlistPickup === true,
+      );
+      pickupStoreName = inventoryValidation.pickupStoreName;
+
+      const reservedConsumption = await this.consumeReservedInventoryForPurchase(
+        tx,
+        clientId,
+        requestedItems,
+        dto.pickupStoreId,
+      );
+
+      const estimatedDeliveryTime = this.calculateEstimatedDeliveryTime(
+        dto.deliveryMode,
+        pickupStoreName,
+        dto.shippingAddress,
+        inventoryValidation.waitlistApplied,
+      );
+
+      let finalTotal = totalAmount;
+      let appliedVoucherId: number | null = null;
+      if (dto.voucherCode) {
+        const clientInfo = await tx.client.findUnique({
+          where: { clientId },
+          select: { userId: true },
+        });
+        const voucher = await tx.voucher.findUnique({
+          where: { code: dto.voucherCode },
+        });
+        if (!voucher) {
+          throw new BadRequestException('Voucher invalido');
+        }
+        if (voucher.userId !== clientInfo?.userId) {
+          throw new BadRequestException('Voucher no pertenece a este cliente');
+        }
+        if (voucher.isUsed) {
+          throw new BadRequestException('Voucher ya fue usado');
+        }
+        const nowUtc = new Date();
+        if (voucher.expiresAt < nowUtc) {
+          throw new BadRequestException('Voucher expirado');
+        }
+
+        const discount = (Number(voucher.discountPercentage) / 100) * finalTotal;
+        finalTotal = finalTotal - discount;
+        appliedVoucherId = voucher.id;
+      }
+
+      const createdPurchase = await tx.purchase.create({
+        data: {
+          clientId,
+          totalAmount: finalTotal,
+          paymentMethod: dto.paymentMethod,
+          shippingAddress: dto.shippingAddress,
+          deliveryMode: dto.deliveryMode,
+          pickupStoreId:
+            dto.deliveryMode === DeliveryMode.storePickup
+              ? dto.pickupStoreId
+              : null,
+          estimatedDeliveryTime,
+          status: PurchaseStatus.inPreparation,
+          purchaseItems: {
+            create: context.cartItems.map((item) => ({
+              book: {
+                connect: {
+                  bookId: item.bookId,
+                },
+              },
+              quantity: item.quantity,
+              unitPrice: toNumber(item.unitPrice),
+            })),
+          },
+        },
+        include: {
+          purchaseItems: {
+            include: {
+              book: {
+                select: {
+                  title: true,
+                  author: true,
+                },
+              },
+            },
+          },
+          client: {
+            include: {
+              user: {
+                select: {
+                  email: true,
+                  firstName: true,
+                },
+              },
+            },
+          },
+          pickupStore: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      });
+
+      const remainingPurchaseItems = new Map<number, number>();
+      for (const [bookId, quantity] of requestedItems.entries()) {
+        const reservedUsed = reservedConsumption.get(bookId) ?? 0;
+        const remaining = Math.max(0, quantity - reservedUsed);
+        if (remaining > 0) {
+          remainingPurchaseItems.set(bookId, remaining);
+        }
+      }
+
+      if (remainingPurchaseItems.size > 0) {
+        const requestedBookIds = [...remainingPurchaseItems.keys()];
+        const decrementInventories = await tx.inventory.findMany({
+          where: {
+            bookId: { in: requestedBookIds },
+            availableQuantity: { gt: 0 },
+            ...(dto.deliveryMode === DeliveryMode.storePickup
+              ? { storeId: dto.pickupStoreId }
+              : {}),
+          },
+          select: {
+            inventoryId: true,
+            bookId: true,
+            storeId: true,
+            availableQuantity: true,
+          },
+          orderBy: [{ bookId: 'asc' }, { storeId: 'asc' }],
+        });
+
+        for (const [bookId, remaining] of remainingPurchaseItems.entries()) {
+          const bookInventories = decrementInventories.filter(
+            (inventory) => inventory.bookId === bookId,
+          );
+          await this.decrementInventoryForPurchase(
+            tx,
+            bookInventories,
+            remaining,
+            inventoryValidation.waitlistApplied &&
+              dto.deliveryMode === DeliveryMode.storePickup,
+          );
+        }
+      }
+
+      await this.walletService.recordPurchaseTransaction(tx, {
+        clientId,
+        amount: finalTotal,
+        purchaseId: createdPurchase.purchaseId,
+        gatewayReference: context.gatewayReference ?? dto.paymentMethod ?? null,
+      });
+
+      await tx.cart.update({
+        where: { cartId: context.cartId },
+        data: { status: 'processed' },
+      });
+
+      if (appliedVoucherId) {
+        await tx.voucher.update({
+          where: { id: appliedVoucherId },
+          data: {
+            isUsed: true,
+            usedAt: new Date(),
+            appliedToPurchaseId: createdPurchase.purchaseId,
+          },
+        });
+      }
+
+      await tx.cartItem.deleteMany({ where: { cartId: context.cartId } });
+
+      return createdPurchase;
     });
   }
 }
