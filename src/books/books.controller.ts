@@ -13,6 +13,7 @@ import {
   Post,
   Put,
   Query,
+  Req,
   UploadedFile,
   UploadedFiles,
   UseInterceptors,
@@ -44,11 +45,16 @@ import { BookModelDto } from './dto/book-model.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import { RecommendationsService } from '../recommendations/recommendations.service';
 
 @ApiTags('Books')
 @Controller('books')
 export class BooksController {
-  constructor(private readonly booksService: BooksService) { }
+  constructor(
+    private readonly booksService: BooksService,
+    private readonly recommendationsService: RecommendationsService,
+  ) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -203,8 +209,23 @@ export class BooksController {
     description: 'Resultado paginado de busqueda de libros disponibles',
     type: PaginatedBooksResponseDto,
   })
-  async search(@Query() query: GetBooksQueryDto) {
-    return this.booksService.findAll(query);
+  @UseGuards(OptionalJwtAuthGuard)
+  async search(
+    @Req() req: { user?: { clientId?: number } },
+    @Query() query: GetBooksQueryDto,
+  ) {
+    const result = await this.booksService.findAll(query);
+
+    if (req.user?.clientId) {
+      void this.recommendationsService.recordSearchHistory(
+        req.user.clientId,
+        query,
+      ).catch((error) => {
+        console.error('Error recording recommendation search history:', error);
+      });
+    }
+
+    return result;
   }
 
   @Get(':id')

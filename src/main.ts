@@ -98,6 +98,10 @@ async function bootstrap() {
       'Operaciones del cliente autenticado, incluyendo historial consolidado de transacciones',
     )
     .addTag(
+      'Recommendations',
+      'Recomendaciones personalizadas de libros basadas en historial y preferencias declaradas',
+    )
+    .addTag(
       'Administradores',
       'Gestión de administradores (solo accesible para usuarios root)',
     )

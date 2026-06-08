@@ -160,6 +160,7 @@ model Client {
   userPreferences  UserPreference[]
   carts            Cart[]
   purchases        Purchase[]
+  searchHistories  SearchHistory[]
   reservations     Reservation[]
   returnBooks      ReturnBook[]
   paymentCards     PaymentCard[]
@@ -215,6 +216,21 @@ model UserPreference {
 
   @@unique([clientId, categoryId])
   @@map("user_preference")
+}
+
+model SearchHistory {
+  searchHistoryId Int      @id @default(autoincrement())
+  clientId        Int
+  query           String   @db.VarChar(255)
+  categoryId      Int?
+  createdAt       DateTime @default(now())
+
+  client   Client   @relation(fields: [clientId], references: [clientId])
+  category Category? @relation(fields: [categoryId], references: [categoryId])
+
+  @@index([clientId, createdAt], map: "idx_search_history_client_created_at")
+  @@index([categoryId, createdAt], map: "idx_search_history_category_created_at")
+  @@map("search_history")
 }
 
 model PasswordResetToken {
@@ -276,6 +292,7 @@ model Category {
   // Relations
   bookCategories  BookCategory[]
   userPreferences UserPreference[]
+  searchHistories SearchHistory[]
   subscriptions   Subscription[]
   newsCategories  NewsCategory[]
 
