@@ -895,6 +895,37 @@ function getSeedMode(): 'all' | 'categories' {
   throw new Error(`Unsupported seed mode: ${value}. Use --only=categories.`);
 }
 
+async function seedBook3DModel() {
+  console.log('Seeding sample 3D model...');
+  const cienAnosBook = await prisma.book.findFirst({
+    where: { isbn: '9780307474728' }, // Cien años de soledad
+    select: { bookId: true },
+  });
+
+  if (!cienAnosBook) {
+    console.log('Book "Cien años de soledad" not found for 3D model seeding. Skipping...');
+    return;
+  }
+
+  // Minimal valid GLB model in Base64
+  const glbBase64 = 'data:model/gltf-binary;base64,Z2xURgIAAAA8AgAA9AEAAEpTT057ImFzc2V0Ijp7InZlcnNpb24iOiIyLjAiLCJnZW5lcmF0b3IiOiJBbnRpZ3Jhdml0eSJ9LCJzY2VuZXMiOlt7Im5vZGVzIjpbMF19XSwibm9kZXMiOlt7Im1lc2giOjB9XSwibWVzaGVzIjpbeyJwcmltaXRpdmVzIjpbeyJhdHRyaWJ1dGVzIjp7IlBPU0lUSU9OIjowfSwiaW5kaWNlcyI6MSwibW9kZSI6NH1dfV0sImFjY2Vzc29ycyI6W3siYnVmZmVyVmlldyI6MCwiY29tcG9uZW50VHlwZSI6NTEyNiwiY291bnQiOjMsInR5cGUiOiJWRUMzIiwibWF4IjpbMSwxLDBdLCJtaW4iOlswLDAsMF19LHsiYnVmZmVyVmlldyI6MSwiY29tcG9uZW50VHlwZSI6NTEyMywiY291bnQiOjMsInR5cGUiOiJTQ0FMQVIiLCJtYXgiOlsyXSwibWluIjpbMF19XSwiYnVmZmVyVmlld3MiOlt7ImJ5dGVMZW5ndGgiOjM2LCJidWZmZXIiOjAsImJ1dGVPZmZzZXQiOjB9LHsiYnVmZmVyIjowLCJieXRlT2Zmc2V0IjozNiwiYnl0ZUxlbmd0aCI6Nn1dLCJidWZmZXJzIjpbeyJieXRlTGVuZ3RoIjo0NH1dfSwAAABCSU4AAAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAABAAIAAAA=';
+
+  await prisma.book3DModel.upsert({
+    where: { bookId: cienAnosBook.bookId },
+    update: {
+      modelGlb: glbBase64,
+      fileName: 'cien_anos_de_soledad.glb',
+    },
+    create: {
+      bookId: cienAnosBook.bookId,
+      modelGlb: glbBase64,
+      fileName: 'cien_anos_de_soledad.glb',
+    },
+  });
+
+  console.log('3D model seeded successfully for "Cien años de soledad".');
+}
+
 async function main() {
   try {
     const mode = getSeedMode();
@@ -908,6 +939,7 @@ async function main() {
     if (mode === 'all') {
       await seedBooks();
       await seedInventory();
+      await seedBook3DModel();
     }
   } catch (error) {
     console.error('An error occurred during seeding:');

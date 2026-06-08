@@ -40,6 +40,7 @@ import { GetBooksQueryDto } from './dto/get-books-query.dto';
 import { PaginatedBooksResponseDto } from './dto/paginated-books-response.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
 import { UploadBookCoverResponseDto } from './dto/upload-book-cover-response.dto';
+import { BookModelDto } from './dto/book-model.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -356,6 +357,29 @@ export class BooksController {
     @Param('imageId', ParseIntPipe) imageId: number,
   ) {
     return this.booksService.deleteGalleryImage(id, imageId);
+  }
+
+  @Get(':id/model')
+  @ApiOperation({
+    summary: 'Obtener el modelo 3D de un libro',
+    description: 'Retorna el modelo 3D asociado en formato glTF/GLB (en base64) para visualización interactiva y RA.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID del libro',
+    example: 12,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Modelo 3D del libro retornado con éxito',
+    type: BookModelDto,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Libro no encontrado o no tiene modelo 3D asociado',
+  })
+  async getModel(@Param('id', ParseIntPipe) id: number) {
+    return this.booksService.getBookModel(id);
   }
 }
 

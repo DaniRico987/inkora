@@ -13,6 +13,9 @@ describe('BooksService', () => {
       findUnique: jest.Mock;
       update: jest.Mock;
     };
+    book3DModel: {
+      findUnique: jest.Mock;
+    };
   };
   let notificationsService: {
     sendNewBookNotification: jest.Mock;
@@ -25,6 +28,9 @@ describe('BooksService', () => {
         count: jest.fn(),
         findUnique: jest.fn(),
         update: jest.fn(),
+      },
+      book3DModel: {
+        findUnique: jest.fn(),
       },
     };
 
@@ -442,5 +448,50 @@ describe('BooksService', () => {
     await expect(service.uploadCover(404, file)).rejects.toThrow(
       NotFoundException,
     );
+  });
+
+  describe('getBookModel', () => {
+    it('returns the 3D model when book exists and has a model associated', async () => {
+      prismaService.book.findUnique.mockResolvedValue({ bookId: 12 });
+      prismaService.book3DModel.findUnique.mockResolvedValue({
+        id: 1,
+        bookId: 12,
+        modelGlb: 'data:model/gltf-binary;base64,AAA...',
+        fileName: 'model.glb',
+      });
+
+      const result = await service.getBookModel(12);
+
+      expect(prismaService.book.findUnique).toHaveBeenCalledWith({
+        where: { bookId: 12 },
+        select: { bookId: true },
+      });
+      expect(prismaService.book3DModel.findUnique).toHaveBeenCalledWith({
+        where: { bookId: 12 },
+      });
+      expect(result).toEqual({
+        id: 1,
+        bookId: 12,
+        modelGlb: 'data:model/gltf-binary;base64,AAA...',
+        fileName: 'model.glb',
+      });
+    });
+
+    it('throws NotFoundException when the book does not exist', async () => {
+      prismaService.book.findUnique.mockResolvedValue(null);
+
+      await expect(service.getBookModel(999)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('throws NotFoundException when the book exists but does not have a 3D model', async () => {
+      prismaService.book.findUnique.mockResolvedValue({ bookId: 12 });
+      prismaService.book3DModel.findUnique.mockResolvedValue(null);
+
+      await expect(service.getBookModel(12)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
   });
 });

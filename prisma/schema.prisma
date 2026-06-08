@@ -257,6 +257,7 @@ model Book {
   reservationItems ReservationItem[]
   news             News[]
   notifications    Notification[]
+  book3DModel      Book3DModel?
 
   @@index([isAvailable, price], map: "idx_book_available_price")
   @@index([isAvailable, publicationYear], map: "idx_book_available_publication_year")
@@ -682,4 +683,17 @@ model TokenBlacklist {
   @@index([expiresAt])
   @@index([tokenHash])
   @@map("token_blacklist")
+}
+
+model Book3DModel {
+  id        Int      @id @default(autoincrement())
+  bookId    Int      @unique
+  modelGlb  String   @db.Text
+  fileName  String?  @db.VarChar(255)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  book      Book     @relation(fields: [bookId], references: [bookId], onDelete: Cascade)
+
+  @@map("book_3d_model")
 }
