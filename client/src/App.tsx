@@ -409,6 +409,8 @@ function AppContent() {
   );
 }
 
+import { GeolocationProvider } from './hooks/useGeolocation';
+
 function App() {
   useTheme();
   return (
@@ -424,9 +426,11 @@ function App() {
                 dedupeWindowMs: 1500,
               }}
             >
-              <SessionManager queryClient={queryClient}>
-                <AppContent />
-              </SessionManager>
+              <GeolocationProvider>
+                <SessionManager queryClient={queryClient}>
+                  <AppContent />
+                </SessionManager>
+              </GeolocationProvider>
             </SnackbarProvider>
           </LocalizationProvider>
         </NotificationsProvider>

@@ -73,8 +73,8 @@ export class PaymentsService {
       throw new NotFoundException(`Cliente con ID ${clientId} no encontrado`);
     }
 
-    const voucherDiscount = await this.resolveVoucherDiscount(client.userId, dto.voucherCode, cart.total);
-    const amount = Math.max(0, cart.total - voucherDiscount);
+    const voucherDiscount = await this.resolveVoucherDiscount(client.userId, dto.voucherCode, Number(cart.total));
+    const amount = Math.max(0, Number(cart.total) - voucherDiscount);
     const snapshot = this.buildSnapshot(cart.items);
 
     const paymentAttempt = await this.prisma.paymentAttempt.create({
@@ -234,11 +234,22 @@ export class PaymentsService {
     const snapshot = this.parseSnapshot(paymentAttempt.itemsSnapshot);
 
     try {
+      const mappedSnapshot = snapshot.map((item) => ({
+        bookId: item.bookId,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        book: {
+          bookId: item.bookId,
+          title: item.title,
+          author: item.author,
+        },
+      }));
+
       const purchase = await this.purchasesService.createPurchaseFromPaymentSnapshot(
         paymentAttempt.clientId,
         purchaseDto,
         paymentAttempt.cartId,
-        snapshot,
+        mappedSnapshot,
         paymentAttempt.gatewayReference ?? dto.gatewayReference,
       );
 
@@ -346,11 +357,11 @@ export class PaymentsService {
     return `${this.getFallbackCheckoutBaseUrl()}/checkout/payment/${encodeURIComponent(reference)}`;
   }
 
-  private buildSnapshot(items: Array<{ bookId: number; quantity: number; unitPrice: number; title: string; author: string }>): PurchaseSnapshotItem[] {
+  private buildSnapshot(items: Array<{ bookId: number; quantity: number; unitPrice: string | number; title: string; author: string }>): PurchaseSnapshotItem[] {
     return items.map((item) => ({
       bookId: item.bookId,
       quantity: item.quantity,
-      unitPrice: item.unitPrice,
+      unitPrice: Number(item.unitPrice),
       title: item.title,
       author: item.author,
     }));

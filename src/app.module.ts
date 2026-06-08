@@ -25,6 +25,7 @@ import { WalletModule } from './wallet/wallet.module';
 import { ReturnsModule } from './returns/returns.module';
 import { RefundsModule } from './refunds/refunds.module';
 import { AuditModule } from './audit/audit.module';
+import { GeoModule } from './geo/geo.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { AuditModule } from './audit/audit.module';
     TasksModule,
     SubscriptionsModule,
     NotificationsModule,
+    GeoModule,
   ],
   controllers: [AppController],
   providers: [AppService],

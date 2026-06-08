@@ -18,6 +18,7 @@ import {
 } from '../api/purchases';
 import { getAvailableStores, type AvailableStore } from '../api/stores';
 import { useCart } from '../hooks/useCart';
+import { useGeolocation } from '../hooks/useGeolocation';
 import type { CartItem } from '../interfaces/CartInterface';
 import type { Purchase } from '../interfaces/PurchaseInterface';
 import { suggestAddresses, validateAddress } from '../services/addressValidation';
@@ -726,11 +727,18 @@ function StorePickupPanel({
 export function CheckoutPage() {
   const snackbar = useSnackbar();
   const { cart, loading: cartLoading, error: cartError, loadCart } = useCart();
+  const { isInColombia, geoStatus, message: geoMessage } = useGeolocation();
   const [currentStep, setCurrentStep] = useState<CheckoutStep>(1);
   const [addressForm, setAddressForm] =
     useState<AddressFormState>(initialAddressState);
   const [deliveryMode, setDeliveryMode] =
     useState<DeliveryChoice>('homeDelivery');
+
+  useEffect(() => {
+    if (!isInColombia && deliveryMode === 'storePickup') {
+      setDeliveryMode('homeDelivery');
+    }
+  }, [isInColombia, deliveryMode]);
   const [pickupStoreId, setPickupStoreId] = useState<number | null>(null);
   const [pickupFallbackChoice, setPickupFallbackChoice] =
     useState<PickupFallbackChoice>(null);
@@ -776,7 +784,7 @@ export function CheckoutPage() {
   } | null>(null);
   const [useRegisteredAddress, setUseRegisteredAddress] = useState(false);
   const paymentChoiceInitializedRef = useRef(false);
-  const cartItems = cart?.items ?? [];
+  const cartItems = useMemo(() => cart?.items ?? [], [cart?.items]);
   const subtotal = cart?.subtotal ?? 0;
   const total = cart?.total ?? 0;
   const tax = cart?.tax ?? 0;
@@ -1771,7 +1779,8 @@ export function CheckoutPage() {
                           'Retira tu compra en una sucursal con stock disponible.',
                       },
                     ] as const
-                  ).map((option) => {
+                  ).filter((option) => option.value === 'homeDelivery' || isInColombia)
+                  .map((option) => {
                     const isActive = deliveryMode === option.value;
 
                     return (
@@ -1813,6 +1822,45 @@ export function CheckoutPage() {
                     );
                   })}
                 </div>
+
+                {geoStatus === 'loading' && (
+                  <div className="mt-4 rounded-2xl border border-babyblue-200 bg-babyblue-50/50 p-4 text-sm text-babyblue-800 flex items-center gap-2">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-babyblue-600 border-t-transparent" />
+                    <span>Verificando tu ubicación para habilitar recogida en tienda...</span>
+                  </div>
+                )}
+                {geoStatus === 'denied' && (
+                  <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                    <p className="font-semibold">Acceso a ubicación denegado</p>
+                    <p className="mt-1 leading-6">
+                      Has denegado el permiso de ubicación. La opción de <strong>Recoger en tienda</strong> no estará disponible sin acceso a tu ubicación actual.
+                    </p>
+                  </div>
+                )}
+                {geoStatus === 'error' && (
+                  <div className="mt-4 rounded-2xl border border-danger-200 bg-danger-50 p-4 text-sm text-danger-800">
+                    <p className="font-semibold">Error al obtener ubicación</p>
+                    <p className="mt-1 leading-6">
+                      {geoMessage || 'No fue posible determinar tu ubicación actual. Las opciones geográficas de entrega física han sido deshabilitadas.'}
+                    </p>
+                  </div>
+                )}
+                {geoStatus === 'success' && !isInColombia && (
+                  <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                    <p className="font-semibold">Ubicación fuera del área de cobertura</p>
+                    <p className="mt-1 leading-6">
+                      Tu ubicación detectada está fuera de Colombia. La opción de <strong>Recoger en tienda</strong> solo está disponible dentro del territorio colombiano.
+                    </p>
+                  </div>
+                )}
+                {geoStatus === 'success' && isInColombia && (
+                  <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+                    <p className="font-semibold">Ubicación verificada</p>
+                    <p className="mt-1 leading-6">
+                      Te encuentras en Colombia. La opción de <strong>Recoger en tienda</strong> está disponible para tu compra.
+                    </p>
+                  </div>
+                )}
 
                 {deliveryMode === 'homeDelivery' ? (
                   <>
