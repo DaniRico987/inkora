@@ -60,8 +60,12 @@ export async function logoutSession(options: LogoutSessionOptions = {}) {
     }
   }
 
-  clearSessionData();
-  redirectToLogin(reason);
+  try {
+    clearSessionData();
+    redirectToLogin(reason);
+  } finally {
+    isLoggingOut = false;
+  }
 }
 
 export function handleUnauthorizedResponse(requestUrl?: string) {

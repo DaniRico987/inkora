@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { createApiClient } from './createApiClient';
 import type { Purchase } from '../interfaces/PurchaseInterface';
+import { notifyRecommendationsChanged } from '../utils/recommendationsEvents';
 
 export type CreatePurchasePayload = {
   deliveryMode: 'homeDelivery' | 'storePickup';
@@ -46,7 +47,9 @@ const apiClient = createApiClient();
 
 function normalizeApiError(error: unknown, fallback: string): Error {
   if (axios.isAxiosError(error)) {
-    const payload = error.response?.data as { message?: string | string[]; code?: string } | undefined;
+    const payload = error.response?.data as
+      | { message?: string | string[]; code?: string }
+      | undefined;
     const message = payload?.message;
     const err = new Error(
       Array.isArray(message)
@@ -89,6 +92,7 @@ export async function createPurchase(
 ): Promise<Purchase> {
   try {
     const response = await apiClient.post<Purchase>('/purchases', payload);
+    notifyRecommendationsChanged();
     return response.data;
   } catch (error) {
     throw normalizeApiError(error, 'No se pudo confirmar la compra');
@@ -99,7 +103,9 @@ export async function validateVoucherCode(
   code: string,
 ): Promise<VoucherValidationResult> {
   try {
-    const response = await apiClient.get<VoucherValidationResult>(`/vouchers/validate/${encodeURIComponent(code)}`);
+    const response = await apiClient.get<VoucherValidationResult>(
+      `/vouchers/validate/${encodeURIComponent(code)}`,
+    );
     return response.data;
   } catch (error) {
     throw normalizeApiError(error, 'No se pudo validar el voucher');
@@ -111,12 +117,18 @@ export async function updatePurchaseAddress(
   shippingAddress: string,
 ): Promise<Purchase> {
   try {
-    const response = await apiClient.patch<Purchase>(`/purchases/${purchaseId}/address`, {
-      shippingAddress,
-    });
+    const response = await apiClient.patch<Purchase>(
+      `/purchases/${purchaseId}/address`,
+      {
+        shippingAddress,
+      },
+    );
     return response.data;
   } catch (error) {
-    throw normalizeApiError(error, 'No se pudo actualizar la direccion del pedido');
+    throw normalizeApiError(
+      error,
+      'No se pudo actualizar la direccion del pedido',
+    );
   }
 }
 
@@ -127,6 +139,9 @@ export async function createReturnRequest(
     const response = await apiClient.post<ReturnRequest>('/returns', payload);
     return response.data;
   } catch (error) {
-    throw normalizeApiError(error, 'No se pudo enviar la solicitud de devolucion');
+    throw normalizeApiError(
+      error,
+      'No se pudo enviar la solicitud de devolucion',
+    );
   }
 }

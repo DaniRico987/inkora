@@ -1,38 +1,57 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
-import type { PropsWithChildren } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import type { PropsWithChildren } from 'react';
 import type {
   ShowSnackbarInput,
   SnackbarConfig,
   SnackbarPosition,
   SnackbarStatus,
-} from "../interfaces/SnackbarInterface";
-import { SnackbarItem, type SnackbarItemModel } from "./Snackbar";
+} from '../interfaces/SnackbarInterface';
+import { SnackbarItem, type SnackbarItemModel } from './Snackbar';
 
 type SnackbarContextValue = {
   showSnackbar: (input: ShowSnackbarInput) => void;
-  info: (message: string, opts?: Omit<ShowSnackbarInput, "message" | "status">) => void;
-  success: (message: string, opts?: Omit<ShowSnackbarInput, "message" | "status">) => void;
-  warning: (message: string, opts?: Omit<ShowSnackbarInput, "message" | "status">) => void;
-  error: (message: string, opts?: Omit<ShowSnackbarInput, "message" | "status">) => void;
+  info: (
+    message: string,
+    opts?: Omit<ShowSnackbarInput, 'message' | 'status'>,
+  ) => void;
+  success: (
+    message: string,
+    opts?: Omit<ShowSnackbarInput, 'message' | 'status'>,
+  ) => void;
+  warning: (
+    message: string,
+    opts?: Omit<ShowSnackbarInput, 'message' | 'status'>,
+  ) => void;
+  error: (
+    message: string,
+    opts?: Omit<ShowSnackbarInput, 'message' | 'status'>,
+  ) => void;
 };
 
 const SnackbarContext = createContext<SnackbarContextValue | null>(null);
 
 function posClasses(position: SnackbarPosition) {
   switch (position) {
-    case "top-left":
-      return "top-4 left-4 items-start";
-    case "top-center":
-      return "top-4 left-1/2 -translate-x-1/2 items-center";
-    case "top-right":
-      return "top-4 right-4 items-end";
-    case "bottom-left":
-      return "bottom-4 left-4 items-start";
-    case "bottom-right":
-      return "bottom-4 right-4 items-end";
-    case "bottom-center":
+    case 'top-left':
+      return 'top-4 left-4 items-start';
+    case 'top-center':
+      return 'top-4 left-1/2 -translate-x-1/2 items-center';
+    case 'top-right':
+      return 'top-4 right-4 items-end';
+    case 'bottom-left':
+      return 'bottom-4 left-4 items-start';
+    case 'bottom-right':
+      return 'bottom-4 right-4 items-end';
+    case 'bottom-center':
     default:
-      return "bottom-4 left-1/2 -translate-x-1/2 items-center";
+      return 'bottom-4 left-1/2 -translate-x-1/2 items-center';
   }
 }
 
@@ -48,7 +67,7 @@ export function SnackbarProvider({
   children,
   config,
 }: PropsWithChildren<{ config?: SnackbarConfig }>) {
-  const position = config?.position ?? "top-center";
+  const position = config?.position ?? 'top-center';
   const maxVisible = config?.maxVisible ?? 3;
   const maxQueue = config?.maxQueue ?? 20;
   const dedupeWindowMs = config?.dedupeWindowMs ?? 1500;
@@ -94,7 +113,10 @@ export function SnackbarProvider({
 
         // Evita saturación: recorta pendientes si superan maxQueue
         const maxTotal = maxVisible + maxQueue;
-        const base = prev.length >= maxTotal ? prev.slice(prev.length - (maxTotal - 1)) : prev;
+        const base =
+          prev.length >= maxTotal
+            ? prev.slice(prev.length - (maxTotal - 1))
+            : prev;
         lastShownRef.current.set(key, now);
         return [...base, nextSnack];
       });
@@ -104,7 +126,7 @@ export function SnackbarProvider({
 
   const makeQuick = useCallback(
     (status: SnackbarStatus) =>
-      (message: string, opts?: Omit<ShowSnackbarInput, "message" | "status">) =>
+      (message: string, opts?: Omit<ShowSnackbarInput, 'message' | 'status'>) =>
         showSnackbar({ message, status, ...opts }),
     [showSnackbar],
   );
@@ -112,10 +134,10 @@ export function SnackbarProvider({
   const value = useMemo<SnackbarContextValue>(
     () => ({
       showSnackbar,
-      info: makeQuick("info"),
-      success: makeQuick("success"),
-      warning: makeQuick("warning"),
-      error: makeQuick("error"),
+      info: makeQuick('info'),
+      success: makeQuick('success'),
+      warning: makeQuick('warning'),
+      error: makeQuick('error'),
     }),
     [makeQuick, showSnackbar],
   );
@@ -127,11 +149,11 @@ export function SnackbarProvider({
       {children}
       <div
         className={[
-          "fixed z-[99999]",
-          "flex flex-col gap-2",
-          "pointer-events-none",
+          'fixed z-99999',
+          'flex flex-col gap-2',
+          'pointer-events-none',
           posClasses(position),
-        ].join(" ")}
+        ].join(' ')}
       >
         {visible.map((item) => (
           <SnackbarItem key={item.id} item={item} onClose={close} />
@@ -144,7 +166,7 @@ export function SnackbarProvider({
 // eslint-disable-next-line react-refresh/only-export-components
 export function useSnackbar() {
   const ctx = useContext(SnackbarContext);
-  if (!ctx) throw new Error("useSnackbar debe usarse dentro de <SnackbarProvider />");
+  if (!ctx)
+    throw new Error('useSnackbar debe usarse dentro de <SnackbarProvider />');
   return ctx;
 }
-

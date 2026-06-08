@@ -1,5 +1,6 @@
 import type { CreateBookRequest, UpdateBookRequest } from '../interfaces/admin';
 import { createApiClient } from './createApiClient';
+import { notifyRecommendationsChanged } from '../utils/recommendationsEvents';
 
 export interface GetBooksQueryParams {
   title?: string;
@@ -100,14 +101,19 @@ export async function searchBooks(
     const params =
       typeof query === 'string'
         ? {
-          title: query,
-          page,
-        }
+            title: query,
+            page,
+          }
         : query;
 
-    const response = await apiClient.get<PaginatedBooksResponse>('/books/search', {
-      params,
-    });
+    const response = await apiClient.get<PaginatedBooksResponse>(
+      '/books/search',
+      {
+        params,
+      },
+    );
+
+    notifyRecommendationsChanged();
     return response.data;
   } catch (error) {
     console.error('Error searching books:', error);
@@ -137,7 +143,10 @@ export async function createBook(data: CreateBookRequest) {
   }
 }
 
-export async function updateBook(bookId: string, data: Partial<UpdateBookRequest>) {
+export async function updateBook(
+  bookId: string,
+  data: Partial<UpdateBookRequest>,
+) {
   try {
     const response = await apiClient.put(`/books/${bookId}`, data);
     return response.data;
@@ -173,9 +182,14 @@ export async function uploadBookImage(bookId: string, file: File) {
   }
 }
 
-export async function updateBookInventory(bookId: string, items: { storeId: number; availableQuantity: number }[]) {
+export async function updateBookInventory(
+  bookId: string,
+  items: { storeId: number; availableQuantity: number }[],
+) {
   try {
-    const response = await apiClient.patch(`/books/${bookId}/inventory`, { items });
+    const response = await apiClient.patch(`/books/${bookId}/inventory`, {
+      items,
+    });
     return response.data;
   } catch (error) {
     console.error('Error updating book inventory:', error);
@@ -187,9 +201,13 @@ export async function uploadBookGallery(bookId: string, files: File[]) {
   try {
     const formData = new FormData();
     files.forEach((f) => formData.append('files', f));
-    const response = await apiClient.post(`/books/${bookId}/gallery`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const response = await apiClient.post(
+      `/books/${bookId}/gallery`,
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      },
+    );
     return response.data;
   } catch (error) {
     console.error('Error uploading book gallery images:', error);
@@ -199,7 +217,9 @@ export async function uploadBookGallery(bookId: string, files: File[]) {
 
 export async function deleteBookGalleryImage(bookId: string, imageId: number) {
   try {
-    const response = await apiClient.delete(`/books/${bookId}/gallery/${imageId}`);
+    const response = await apiClient.delete(
+      `/books/${bookId}/gallery/${imageId}`,
+    );
     return response.data;
   } catch (error) {
     console.error('Error deleting book gallery image:', error);
@@ -217,6 +237,8 @@ export interface Book3DModelItem {
 export async function getBookModel(
   bookId: number | string,
 ): Promise<Book3DModelItem> {
-  const response = await apiClient.get<Book3DModelItem>(`/books/${bookId}/model`);
+  const response = await apiClient.get<Book3DModelItem>(
+    `/books/${bookId}/model`,
+  );
   return response.data;
 }

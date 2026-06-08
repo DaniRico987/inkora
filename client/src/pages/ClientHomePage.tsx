@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { RecommendationsSection } from '../Components/RecommendationsSection';
 
 const shelfBooks = [
   {
@@ -125,6 +126,8 @@ export function ClientHomePage() {
             </div>
           </div>
         </header>
+
+        <RecommendationsSection />
 
         <section className="mt-16 lg:mt-20">
           <div className="mb-10">

@@ -45,6 +45,7 @@ import { StoresPage } from './pages/StoresPage';
 import WalletPage from './pages/Wallet/WalletPage';
 import { MessagesPage } from './pages/MessagesPage';
 import { ChatFloatingButton } from './Components/ChatFloatingButton';
+import { RecommendationsChatWidget } from './Components/RecommendationsChatWidget';
 import { SessionManager } from './Components/SessionManager';
 
 const queryClient = new QueryClient({
@@ -403,6 +404,7 @@ function AppContent() {
         </Routes>
       </main>
       {!shouldHideNavBar && <ChatFloatingButton />}
+      {appRole === 'client' && <RecommendationsChatWidget />}
     </div>
   );
 }
