@@ -218,3 +218,17 @@ export async function deleteBookGalleryImage(bookId: string, imageId: number) {
     throw error;
   }
 }
+
+export interface Book3DModelItem {
+  id: number;
+  bookId: number;
+  modelGlb: string;
+  fileName?: string | null;
+}
+
+export async function getBookModel(
+  bookId: number | string,
+): Promise<Book3DModelItem> {
+  const response = await apiClient.get<Book3DModelItem>(`/books/${bookId}/model`);
+  return response.data;
+}

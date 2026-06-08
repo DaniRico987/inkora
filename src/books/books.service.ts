@@ -663,4 +663,23 @@ export class BooksService {
       throw new NotFoundException('Libro no encontrado');
     }
   }
+
+  async getBookModel(id: number) {
+    await this.assertBookExists(id);
+
+    const model = await this.prisma.book3DModel.findUnique({
+      where: { bookId: id },
+    });
+
+    if (!model) {
+      throw new NotFoundException('El libro no tiene un modelo 3D asociado');
+    }
+
+    return {
+      id: model.id,
+      bookId: model.bookId,
+      modelGlb: model.modelGlb,
+      fileName: model.fileName,
+    };
+  }
 }

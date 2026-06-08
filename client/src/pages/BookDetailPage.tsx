@@ -7,6 +7,7 @@ import { addToCart } from '../api/cart';
 import { addMapping as addReservationCartMapping } from '../utils/reservationCart';
 import { getAccessToken, getRoleFromToken } from '../auth/session';
 import { useBookDetail } from '../hooks/useBooks';
+import { Book3DModal } from '../Components/Book3DModal';
 
 function formatPrice(value: number): string {
   return value.toLocaleString('es-CO');
@@ -42,6 +43,23 @@ export function BookDetailPage() {
   const [selectedQuantity, setSelectedQuantity] = useState(1);
   const [quantityError, setQuantityError] = useState<string | null>(null);
   const [imageFailed, setImageFailed] = useState(false);
+  const [is3DModalOpen, setIs3DModalOpen] = useState(false);
+  const [arSupported, setArSupported] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const nav = navigator as any;
+    if (nav.xr) {
+      nav.xr.isSessionSupported('immersive-ar')
+        .then((supported: boolean) => {
+          setArSupported(supported);
+        })
+        .catch(() => {
+          setArSupported(false);
+        });
+    } else {
+      setArSupported(false);
+    }
+  }, []);
 
   const token = getAccessToken();
   const role = getRoleFromToken(token);
@@ -224,19 +242,32 @@ export function BookDetailPage() {
         )}
 
         <section className="grid gap-6 rounded-3xl border border-border bg-bg-secondary p-5 shadow-sm sm:p-6 lg:grid-cols-[320px_1fr]">
-          <div className="overflow-hidden rounded-2xl bg-babyblue-300/50">
-            {book.coverUrl && !imageFailed ? (
-              <img
-                src={book.coverUrl}
-                alt={book.title}
-                className="h-full w-full object-cover"
-                onError={() => setImageFailed(true)}
-              />
-            ) : (
-              <div className="flex h-full min-h-90 items-center justify-center">
-                <img src="/inkoraICO.svg" alt="inkora" className="w-24" />
-              </div>
-            )}
+          <div className="flex flex-col gap-4">
+            <div className="overflow-hidden rounded-2xl bg-babyblue-300/50">
+              {book.coverUrl && !imageFailed ? (
+                <img
+                  src={book.coverUrl}
+                  alt={book.title}
+                  className="h-full w-full object-cover"
+                  onError={() => setImageFailed(true)}
+                />
+              ) : (
+                <div className="flex h-full min-h-90 items-center justify-center">
+                  <img src="/inkoraICO.svg" alt="inkora" className="w-24" />
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIs3DModalOpen(true)}
+              className="flex items-center justify-center gap-2 w-full rounded-2xl bg-gradient-to-r from-babyblue-600 via-indigo-600 to-indigo-700 hover:from-babyblue-700 hover:via-indigo-700 hover:to-indigo-800 text-white font-semibold py-3 px-4 shadow-lg hover:shadow-indigo-500/20 transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0 text-sm"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5" />
+              </svg>
+              <span>Ver en 3D / AR</span>
+            </button>
           </div>
 
           <div className="space-y-4">
@@ -403,6 +434,16 @@ export function BookDetailPage() {
         </section>
       </div>
 
+      <Book3DModal
+        isOpen={is3DModalOpen}
+        onClose={() => setIs3DModalOpen(false)}
+        coverUrl={book.coverUrl ?? null}
+        viewerKey={`book-3d-${book.id}`}
+        arSupported={arSupported}
+        title={book.title}
+        author={book.author}
+        priceLabel={`$${formatPrice(book.price)}`}
+      />
     </div>
   );
 }
