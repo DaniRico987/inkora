@@ -1,6 +1,5 @@
 import axios from 'axios';
-import { AxiosHeaders } from 'axios';
-import { getAccessToken } from '../auth/session';
+import { createApiClient } from './createApiClient';
 
 export type HistoryPurchaseStatus = 'inPreparation' | 'shipped' | 'delivered' | 'cancelled' | string;
 export type HistoryReservationStatus = 'active' | 'cancelled' | 'expired' | 'converted' | string;
@@ -44,18 +43,7 @@ export interface ClientHistoryResponse {
   reservations: HistoryReservation[];
 }
 
-const apiClient = axios.create({
-  baseURL: '/api/v1',
-});
-
-apiClient.interceptors.request.use((config) => {
-  const token = getAccessToken();
-  if (token) {
-    config.headers = AxiosHeaders.from(config.headers);
-    config.headers.set('Authorization', `Bearer ${token}`);
-  }
-  return config;
-});
+const apiClient = createApiClient();
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getAccessToken } from '../auth/session';
+import { createApiClient } from './createApiClient';
 
 export type CreateRefundPayload = {
   returnBookId: number;
@@ -15,17 +15,7 @@ export type Refund = {
   status: 'pending' | 'processed' | 'rejected';
 };
 
-const apiClient = axios.create({
-  baseURL: '/api/v1',
-});
-
-apiClient.interceptors.request.use((config) => {
-  const token = getAccessToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+const apiClient = createApiClient();
 
 function normalizeApiError(error: unknown, fallback: string): Error {
   if (axios.isAxiosError(error)) {

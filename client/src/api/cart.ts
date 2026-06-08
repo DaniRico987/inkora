@@ -1,5 +1,4 @@
-import axios from 'axios';
-import { getAccessToken } from '../auth/session';
+import { createApiClient } from './createApiClient';
 
 // ======================== INTERFACES ========================
 
@@ -37,18 +36,7 @@ export interface UpdateCartItemRequest {
 
 // ======================== API CLIENT ========================
 
-const apiClient = axios.create({
-  baseURL: '/api/v1',
-});
-
-// Add authorization header
-apiClient.interceptors.request.use((config) => {
-  const token = getAccessToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+const apiClient = createApiClient();
 
 // ======================== FUNCTIONS ========================
 

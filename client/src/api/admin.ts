@@ -1,21 +1,10 @@
 import axios from 'axios';
 import type { AdminStats } from '../interfaces/admin';
-import { getAccessToken } from '../auth/session';
 import { getBooks } from './books';
+import { createApiClient } from './createApiClient';
 import { getStores } from './stores';
 
-const apiClient = axios.create({
-  baseURL: '/api/v1',
-});
-
-// Add authorization header
-apiClient.interceptors.request.use((config) => {
-  const token = getAccessToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+const apiClient = createApiClient();
 
 export async function getAdmins(page: number = 1, limit: number = 10) {
   try {

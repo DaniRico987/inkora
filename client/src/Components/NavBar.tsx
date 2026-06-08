@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { clearAccessToken } from '../auth/session';
+import { logoutSession } from '../auth/logoutSession';
 import { CartIcon } from './CartIcon';
 import { UserProfileModal } from './UserProfileModal';
 import { useNotifications } from '../hooks/useNotifications';
@@ -39,6 +39,7 @@ function getNavItems(variant: NavBarVariant): NavBarItem[] {
 
 export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
     const [isOpen, setIsOpen] = useState(false);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
     const [userProfileModalOpen, setUserProfileModalOpen] = useState(false);
     const [notificationsDropdownOpen, setNotificationsDropdownOpen] = useState(false);
     const notificationsRef = useRef<HTMLDivElement>(null);
@@ -59,10 +60,20 @@ export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
         from: `${location.pathname}${location.search}${location.hash}`,
     };
 
-    const handleLogout = () => {
-        clearAccessToken();
+    const handleLogout = async () => {
+        if (isLoggingOut) {
+            return;
+        }
+
+        setIsLoggingOut(true);
         setIsOpen(false);
-        navigate('/login', { replace: true });
+        setUserProfileModalOpen(false);
+
+        try {
+            await logoutSession({ reason: 'manual' });
+        } finally {
+            setIsLoggingOut(false);
+        }
     };
 
     const handleMobileLinkClick = () => {
@@ -273,7 +284,7 @@ export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
                                             <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
                                         </svg>
                                     </button>
-                                    <button type="button" onClick={handleLogout} className={authLinkClass}>
+                                    <button type="button" onClick={handleLogout} disabled={isLoggingOut} className={authLinkClass}>
                                         Cerrar sesion
                                     </button>
                                 </>
@@ -282,7 +293,7 @@ export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
                             {variant === 'admin' && (
                                 <>
                                     {showNotifications && renderNotificationsMenu()}
-                                    <button type="button" onClick={handleLogout} className={authLinkClass}>
+                                    <button type="button" onClick={handleLogout} disabled={isLoggingOut} className={authLinkClass}>
                                         Cerrar sesion
                                     </button>
                                 </>
@@ -354,7 +365,8 @@ export const NavBar: React.FC<NavBarProps> = ({ variant }) => {
                                     <button
                                         type="button"
                                         onClick={handleLogout}
-                                        className="rounded-md px-2 py-2 text-left hover:bg-white/12"
+                                        disabled={isLoggingOut}
+                                        className="rounded-md px-2 py-2 text-left hover:bg-white/12 disabled:opacity-60"
                                     >
                                         Cerrar sesion
                                     </button>

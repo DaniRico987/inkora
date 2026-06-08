@@ -1,6 +1,5 @@
-import axios from 'axios';
 import type { CreateBookRequest, UpdateBookRequest } from '../interfaces/admin';
-import { getAccessToken } from '../auth/session';
+import { createApiClient } from './createApiClient';
 
 export interface GetBooksQueryParams {
   title?: string;
@@ -76,18 +75,7 @@ export interface PaginatedBooksResponse {
   totalPages: number;
 }
 
-const apiClient = axios.create({
-  baseURL: '/api/v1',
-});
-
-// Add authorization header
-apiClient.interceptors.request.use((config) => {
-  const token = getAccessToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+const apiClient = createApiClient();
 
 export async function getBooks(
   page: number = 1,
